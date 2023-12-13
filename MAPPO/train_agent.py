@@ -229,9 +229,6 @@ class MAPPO:
 								else:
 									rewards_to_send.append(0.0)
 
-					print("PER TIMESTEP REWARD")
-					print(rewards_to_send)
-
 					self.agents.buffer.push(
 						states_allies_critic, states_enemies_critic, q_value, rnn_hidden_state_q, \
 						states_actor, rnn_hidden_state_actor, action_logprob, actions, last_one_hot_actions, one_hot_actions, mask_actions, \
