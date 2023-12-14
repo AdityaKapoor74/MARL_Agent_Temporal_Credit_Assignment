@@ -206,7 +206,7 @@ class MAPPO:
 				if self.learn:
 					if self.experiment_type == "temporal_team":
 						rewards_to_send = [rewards]*self.num_agents
-						rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
+						# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
 					elif self.experiment_type == "temporal_agent":
 						rewards_to_send = info["indiv_rewards"]
 					elif self.experiment_type == "episodic_team":
@@ -335,10 +335,10 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_value": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
 				"model_path_policy": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/actor_networks/actor_epsiode100000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": False,
+				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 20000,
 				"max_time_steps": 100,
@@ -387,8 +387,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.05,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 5e-3, #8e-3
-				"entropy_pen_final": 5e-3,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
