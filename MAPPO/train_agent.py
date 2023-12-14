@@ -206,7 +206,7 @@ class MAPPO:
 				if self.learn:
 					if self.experiment_type == "temporal_team":
 						rewards_to_send = [rewards]*self.num_agents
-						# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
+						rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
 					elif self.experiment_type == "temporal_agent":
 						rewards_to_send = info["indiv_rewards"]
 					elif self.experiment_type == "episodic_team":
