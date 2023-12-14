@@ -315,7 +315,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "episodic_team" # episodic_team, episodic_agent, temporal_team, temporal_agent
+		experiment_type = "episodic_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent
 
 		dictionary = {
 				# TRAINING
