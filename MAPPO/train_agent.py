@@ -318,7 +318,8 @@ class MAPPO:
 				self.agents.update(episode)
 
 			if self.learn and not(episode%self.train_reward_model) and episode != 0:
-				self.agents.update_reward_model(episode)
+				for i in range(self.train_reward_model):
+					self.agents.update_reward_model(episode-(self.train_reward_model-(i+1)))
 
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
@@ -395,7 +396,7 @@ if __name__ == '__main__':
 				"batch_size": 128,
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"train_reward_model": 1,
+				"train_reward_model": 1000,
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,

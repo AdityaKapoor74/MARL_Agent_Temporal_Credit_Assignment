@@ -292,9 +292,9 @@ class PPOAgent:
 			self.reward_optimizer.step()
 
 			if self.comet_ml is not None:
-				self.comet_ml.log_metric('Reward_Loss',loss,episode)
-				self.comet_ml.log_metric('Reward_Var',reward_var,episode)
-				self.comet_ml.log_metric('Reward_Grad_Norm',grad_norm_value_reward,episode)
+				self.comet_ml.log_metric('Reward_Loss', loss, episode)
+				self.comet_ml.log_metric('Reward_Var', reward_var, episode)
+				self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
 
 	def plot(self, masks, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
@@ -334,7 +334,6 @@ class PPOAgent:
 				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
 				self.buffer.rewards = (reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).cpu().numpy()
 
-		
 		# torch.autograd.set_detect_anomaly(True)
 		# Optimize policy for n epochs
 		for _ in range(self.n_epochs):
