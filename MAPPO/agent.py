@@ -265,7 +265,7 @@ class PPOAgent:
 	def update_reward_model(self, episode):
 		if self.reward_buffer.episode_num > self.batch_size:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
-			team_masks = (masks.sum(dim=-1)[:, ] > 0).int()
+			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
 			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
 
