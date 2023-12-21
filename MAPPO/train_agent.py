@@ -39,6 +39,7 @@ class MAPPO:
 		self.max_time_steps = dictionary["max_time_steps"]
 		self.experiment_type = dictionary["experiment_type"]
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
+		self.train_reward_model = dictionary["train_reward_model"]
 
 		# RNN HIDDEN
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
@@ -228,11 +229,21 @@ class MAPPO:
 									episodic_agent_reward[i] = 0
 								else:
 									rewards_to_send.append(0.0)
+					elif self.experiment_type == "AREL":
+						episodic_team_reward = [r+rewards for r in episodic_team_reward]
+						if all(next_indiv_dones) or step == self.max_time_steps:
+							rewards_to_send = episodic_team_reward
+						else:
+							rewards_to_send = [0]*self.num_agents
 
 					self.agents.buffer.push(
 						states_allies_critic, states_enemies_critic, q_value, rnn_hidden_state_q, \
 						states_actor, rnn_hidden_state_actor, action_logprob, actions, last_one_hot_actions, one_hot_actions, mask_actions, \
 						rewards_to_send, indiv_dones
+						)
+
+					self.agents.reward_buffer.push(
+						states_actor, one_hot_actions, indiv_dones
 						)
 
 				episode_reward += np.sum(rewards)
@@ -273,11 +284,14 @@ class MAPPO:
 
 						self.agents.buffer.end_episode(final_timestep, q_value, indiv_dones)
 
+						self.agents.reward_buffer.end_episode(episode_reward, final_timestep)
+
 					break
 
 			if self.agents.scheduler_need:
 				self.agents.scheduler_policy.step()
 				self.agents.scheduler_q_critic.step()
+				self.agents.scheduler_reward.step()
 
 			if self.eval_policy:
 				self.rewards.append(episode_reward)
@@ -288,11 +302,16 @@ class MAPPO:
 				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
 
 			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
-				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'_Q_epsiode'+str(episode)+'.pt')
-				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
+				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'_Q_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.q_critic_optimizer.state_dict(), self.model_path_q_critic_optimizer+'_optim_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.policy_optimizer.state_dict(), self.model_path_policy_optimizer+'_optim_epsiode_'+str(episode)+'.pt')  
 
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
 				self.agents.update(episode)
+
+			if self.learn and not(episode%self.train_reward_model) and episode != 0:
+				self.agents.update_reward_model(episode)
 
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
@@ -300,10 +319,10 @@ class MAPPO:
 
 
 			if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir, self.test_num+"_reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir, self.test_num+"_mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir, self.test_num+"_timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir, self.test_num+"_mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
 				
 
 if __name__ == '__main__':
@@ -315,16 +334,16 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
-				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
-				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"critic_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
+				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 15,
 				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
@@ -333,12 +352,14 @@ if __name__ == '__main__':
 				"gif": False,
 				"gif_checkpoint":1,
 				"load_models": False,
-				"model_path_value": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
-				"model_path_policy": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/actor_networks/actor_epsiode100000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"model_path_value": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_epsiode_100000.pt",
+				"model_path_policy": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/actor_networks/actor_epsiode_100000.pt",
+				"model_path_policy_optimizer": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_optim_epsiode_100000.pt",
+				"model_path_q_critic_optimizer": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/policy_optim_epsiode_100000.pt",
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"learn":True,
 				"max_episodes": 20000,
 				"max_time_steps": 100,
@@ -353,6 +374,23 @@ if __name__ == '__main__':
 
 				# ENVIRONMENT
 				"env": env_name,
+
+				# REWARD MODEL
+				"use_reward_model": True,
+				"reward_n_heads": 3,
+				"reward_depth": 3,
+				"reward_agent_attn": True,
+				"reward_dropout": 0.0,
+				"reward_attn_net_wide": 0.0,
+				"reward_comp": True,
+				"num_episodes_capacity": 10000,
+				"batch_size": 2,
+				"reward_lr": 5e-4,
+				"reward_weight_decay": 0.0,
+				"train_reward_model": 1,
+				"variance_loss_coeff": 20,
+				"enable_reward_grad_clip": True,
+				"reward_grad_clip_value": 10.0,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,
@@ -403,3 +441,6 @@ if __name__ == '__main__':
 		dictionary["local_observation"] = obs[0].shape[0]+env.n_agents
 		ma_controller = MAPPO(env,dictionary)
 		ma_controller.run()
+
+
+# TRAIN EPISODIC_TEAM with full episode length

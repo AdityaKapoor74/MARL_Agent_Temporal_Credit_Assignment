@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 import numpy as np
+import random
 
 from model import ValueNorm, RunningMeanStd
 
@@ -274,3 +275,87 @@ class RolloutBuffer:
 			nstep_values[:, t_start, :] = nstep_return_t
 		
 		return nstep_values
+
+
+
+class RewardRolloutBuffer:
+	def __init__(
+		self, 
+		num_episodes_capacity, 
+		max_time_steps, 
+		num_agents, 
+		num_enemies,
+		obs_shape,
+		num_actions, 
+		batch_size,
+		):
+		self.num_episodes_capacity = num_episodes_capacity
+		self.max_time_steps = max_time_steps
+		self.num_agents = num_agents
+		self.num_enemies = num_enemies
+		self.obs_shape = obs_shape
+		self.num_actions = num_actions
+
+		self.episode_num = 0
+		self.time_step = 0
+		self.batch_size = batch_size
+
+		self.states = np.zeros((num_episodes_capacity, max_time_steps, num_agents, obs_shape))
+		self.one_hot_actions = np.zeros((num_episodes_capacity, max_time_steps, num_agents, num_actions))
+		self.episodic_rewards = np.zeros((num_episodes_capacity))
+		self.dones = np.ones((num_episodes_capacity, max_time_steps, num_agents))
+
+		self.episode_length = np.zeros(num_episodes_capacity)
+	
+
+	def clear(self):
+		episode_num = self.episode_num % self.num_episodes_capacity
+
+		self.states[episode_num] = np.zeros((self.max_time_steps, self.num_agents, self.obs_shape))
+		self.one_hot_actions[episode_num] = np.zeros((self.max_time_steps, self.num_agents, self.num_actions))
+		self.episodic_rewards[episode_num] = 0.0
+		self.dones[episode_num] = np.ones((self.max_time_steps, self.num_agents))
+
+		self.episode_length[episode_num] = 0
+
+	def end_episode(self, episodic_reward, t):
+		episode_num = self.episode_num % self.num_episodes_capacity
+
+		self.episodic_rewards[episode_num] = episodic_reward
+		
+		self.episode_length[self.episode_num] = t
+		self.episode_num += 1
+
+		self.clear()
+
+		self.time_step = 0
+
+	def push(
+		self, 
+		states,
+		one_hot_actions, 
+		dones
+		):
+
+		episode_num = self.episode_num % self.num_episodes_capacity
+
+		self.states[episode_num][self.time_step] = states
+		self.one_hot_actions[episode_num][self.time_step] = one_hot_actions
+		self.dones[episode_num][self.time_step] = dones
+
+		if self.time_step < self.max_time_steps-1:
+			self.time_step += 1
+
+
+	def sample(self):
+
+		# uniform sampling
+		episode_num = self.episode_num % self.num_episodes_capacity
+		rand_batch = random.sample(range(0, episode_num+1), self.batch_size)
+
+		states = torch.from_numpy(self.states).float()[rand_batch, :]
+		episodic_rewards = torch.from_numpy(self.episodic_rewards).float()[rand_batch]
+		one_hot_actions = torch.from_numpy(self.one_hot_actions).float()[rand_batch, :]
+		masks = 1-torch.from_numpy(self.dones).float()[rand_batch, :]
+		
+		return states, episodic_rewards, one_hot_actions, masks

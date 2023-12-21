@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import Policy, Q_network
-from utils import RolloutBuffer
+from utils import RolloutBuffer, RewardRolloutBuffer
 
 class PPOAgent:
 
@@ -40,6 +40,16 @@ class PPOAgent:
 
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
 		self.max_time_steps = dictionary["max_time_steps"]
+
+
+		# Reward Model Setup
+		self.use_reward_model = dictionary["use_reward_model"]
+		self.num_episodes_capacity = dictionary["num_episodes_capacity"]
+		self.batch_size = dictionary["batch_size"]
+		self.reward_lr = dictionary["reward_lr"]
+		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
+		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
+		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -117,23 +127,6 @@ class PPOAgent:
 			rnn_num_layers=self.rnn_num_layers_actor,
 			device=self.device
 			).to(self.device)
-
-		# Loading models
-		if dictionary["load_models"]:
-			# For CPU
-			if torch.cuda.is_available() is False:
-				self.critic_network_q.load_state_dict(torch.load(dictionary["model_path_value"], map_location=torch.device('cpu')))
-				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"], map_location=torch.device('cpu')))
-			# For GPU
-			else:
-				self.critic_network_q.load_state_dict(torch.load(dictionary["model_path_value"]))
-				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"]))
-
-		# Copy network params
-		self.target_critic_network_q.load_state_dict(self.critic_network_q.state_dict())
-		# Disable updates for old network
-		for param in self.target_critic_network_q.parameters():
-			param.requires_grad_(False)
 		
 
 		self.network_update_interval_q = dictionary["network_update_interval_q"]
@@ -168,6 +161,39 @@ class PPOAgent:
 			Q_PopArt=self.critic_network_q.q_value_layer[-1],
 			)
 
+		if self.use_reward_model:
+
+			self.reward_buffer = RewardRolloutBuffer(
+				num_episodes_capacity=self.num_episodes_capacity, 
+				max_time_steps=self.max_time_steps, 
+				num_agents=self.num_agents, 
+				num_enemies=self.num_enemies,
+				obs_shape=self.actor_observation_shape,
+				num_actions=self.num_actions, 
+				batch_size=self.batch_size,
+				)
+
+			if self.experiment_type == "AREL":
+				from AREL import AREL
+				self.reward_model = AREL.Time_Agent_Transformer(
+					emb=self.actor_observation_shape, 
+					heads=dictionary["reward_n_heads"], 
+					depth=dictionary["reward_depth"], 
+					seq_length=self.max_time_steps, 
+					n_agents=self.num_agents, 
+					agent=dictionary["reward_agent_attn"], 
+					dropout=dictionary["reward_dropout"], 
+					wide=dictionary["reward_attn_net_wide"], 
+					comp=dictionary["reward_comp"], 
+					device=self.device,
+					)
+			else:
+				pass
+
+			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=self.reward_lr, weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
+			
+			if self.scheduler_need:
+				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[1000, 20000], gamma=0.1)
 
 		self.q_critic_optimizer = optim.AdamW(self.critic_network_q.parameters(), lr=self.q_value_lr, weight_decay=self.q_weight_decay, eps=1e-05)
 		self.policy_optimizer = optim.AdamW(self.policy_network.parameters(),lr=self.policy_lr, weight_decay=self.policy_weight_decay, eps=1e-05)
@@ -179,6 +205,28 @@ class PPOAgent:
 		self.comet_ml = None
 		if dictionary["save_comet_ml_plot"]:
 			self.comet_ml = comet_ml
+
+
+		# Loading models
+		if dictionary["load_models"]:
+			# For CPU
+			if torch.cuda.is_available() is False:
+				self.critic_network_q.load_state_dict(torch.load(dictionary["model_path_value"], map_location=torch.device('cpu')))
+				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"], map_location=torch.device('cpu')))
+				self.q_critic_optimizer.load_state_dict(torch.load(dictionary["model_path_q_critic_optimizer"], map_location=torch.device('cpu')))
+				self.policy_optimizer.load_state_dict(torch.load(dictionary["model_path_policy_optimizer"], map_location=torch.device('cpu')))
+			# For GPU
+			else:
+				self.critic_network_q.load_state_dict(torch.load(dictionary["model_path_value"]))
+				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"]))
+				self.q_critic_optimizer.load_state_dict(torch.load(dictionary["model_path_q_critic_optimizer"]))
+				self.policy_optimizer.load_state_dict(torch.load(dictionary["model_path_policy_optimizer"]))
+
+		# Copy network params
+		self.target_critic_network_q.load_state_dict(self.critic_network_q.state_dict())
+		# Disable updates for old network
+		for param in self.target_critic_network_q.parameters():
+			param.requires_grad_(False)
 
 	
 	def get_q_values(self, state_allies, state_enemies, one_hot_actions, rnn_hidden_state_q, indiv_dones):
@@ -214,6 +262,36 @@ class PPOAgent:
 			return actions, action_logprob, hidden_state.cpu().numpy()
 
 
+	def update_reward_model(self, episode):
+		if self.reward_buffer.episode_num > self.batch_size:
+			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+			team_masks = (masks.sum(dim=-1)[:, ] > 0).int()
+
+			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3))
+
+			shape = reward_time_wise.shape
+			reward_copy = copy.deepcopy(reward_time_wise.detach())
+			reward_copy[team_masks.view(*shape) == 0.0] = float('nan')
+			reward_mean = torch.nanmean(reward_copy)
+			reward_var = ((reward_time_wise - reward_mean)*team_masks.to(self.device))**2
+
+			loss = F.mse_loss(reward_episode_wise, episodic_rewards.to(self.device)) + self.variance_loss_coeff*(reward_var.sum()/team_masks.sum())
+
+			self.reward_optimizer.zero_grad()
+			loss.backward()
+			if self.enable_reward_grad_clip:
+				grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
+			else:
+				total_norm = 0
+				for p in self.reward_model.parameters():
+					param_norm = p.grad.detach().data.norm(2)
+					total_norm += param_norm.item() ** 2
+				grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
+			self.reward_optimizer.step()
+
+			if self.comet_ml is not None:
+				self.comet_ml.log_metric('Reward_Loss',loss,episode)
+				self.comet_ml.log_metric('Reward_Var',reward_var,episode)
 
 	def plot(self, masks, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
@@ -246,6 +324,12 @@ class PPOAgent:
 		grad_norm_policy_batch = 0
 
 		self.buffer.calculate_targets(episode)
+
+		if self.experiment_type == "AREL":
+			with torch.no_grad():
+				_, reward_time_wise = self.reward_model(torch.from_numpy(self.buffer.states_actor).float().to(self.device).permute(0,2,1,3))
+				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
+				self.buffer.rewards = (reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).numpy()
 
 		
 		# torch.autograd.set_detect_anomaly(True)
