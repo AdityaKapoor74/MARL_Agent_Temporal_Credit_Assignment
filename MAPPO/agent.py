@@ -186,7 +186,7 @@ class PPOAgent:
 					wide=dictionary["reward_attn_net_wide"], 
 					comp=dictionary["reward_comp"], 
 					device=self.device,
-					)
+					).to(self.device)
 			else:
 				pass
 
@@ -275,7 +275,7 @@ class PPOAgent:
 			reward_mean = torch.nanmean(reward_copy)
 			reward_var = ((reward_time_wise - reward_mean)*team_masks.to(self.device))**2
 
-			loss = F.mse_loss(reward_episode_wise, episodic_rewards.to(self.device)) + self.variance_loss_coeff*(reward_var.sum()/team_masks.sum())
+			loss = F.mse_loss((reward_time_wise*team_masks).sum(dim=-1), episodic_rewards.to(self.device)) + self.variance_loss_coeff*(reward_var.sum()/team_masks.sum())
 
 			self.reward_optimizer.zero_grad()
 			loss.backward()
@@ -292,6 +292,7 @@ class PPOAgent:
 			if self.comet_ml is not None:
 				self.comet_ml.log_metric('Reward_Loss',loss,episode)
 				self.comet_ml.log_metric('Reward_Var',reward_var,episode)
+				self.comet_ml.log_metric('Reward_Grad_Norm',grad_norm_value_reward,episode)
 
 	def plot(self, masks, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
