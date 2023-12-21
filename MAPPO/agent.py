@@ -275,7 +275,7 @@ class PPOAgent:
 			reward_mean = torch.nanmean(reward_copy)
 			reward_var = ((reward_time_wise - reward_mean)*team_masks.to(self.device))**2
 
-			loss = F.mse_loss((reward_time_wise*team_masks).sum(dim=-1), episodic_rewards.to(self.device)) + self.variance_loss_coeff*(reward_var.sum()/team_masks.sum())
+			loss = F.mse_loss((reward_time_wise*team_masks.to(self.device)).sum(dim=-1), episodic_rewards.to(self.device)) + self.variance_loss_coeff*(reward_var.sum()/team_masks.sum())
 
 			self.reward_optimizer.zero_grad()
 			loss.backward()
