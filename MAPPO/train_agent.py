@@ -389,7 +389,7 @@ if __name__ == '__main__':
 				"reward_depth": 3,
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
-				"reward_attn_net_wide": 0.0,
+				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 10000,
 				"batch_size": 128,
