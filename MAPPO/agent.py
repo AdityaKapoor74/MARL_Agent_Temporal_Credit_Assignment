@@ -263,7 +263,7 @@ class PPOAgent:
 
 
 	def update_reward_model(self, episode):
-		if self.reward_buffer.episode_num > self.batch_size:
+		if self.reward_buffer.episode_num >= self.batch_size:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 

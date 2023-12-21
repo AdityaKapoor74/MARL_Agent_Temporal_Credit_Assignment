@@ -351,7 +351,7 @@ class RewardRolloutBuffer:
 
 		# uniform sampling
 		episode_num = self.episode_num % self.num_episodes_capacity
-		rand_batch = random.sample(range(0, episode_num+1), self.batch_size)
+		rand_batch = random.sample(range(0, episode_num), self.batch_size)
 
 		states = torch.from_numpy(self.states).float()[rand_batch, :]
 		episodic_rewards = torch.from_numpy(self.episodic_rewards).float()[rand_batch]
