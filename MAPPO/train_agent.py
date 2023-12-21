@@ -83,10 +83,17 @@ class MAPPO:
 				print("Actor Directory created successfully") 
 			except OSError as error: 
 				print("Actor Directory can not be created")
+			optim_dir = dictionary["optim_dir"]
+			try: 
+				os.makedirs(optim_dir, exist_ok = True) 
+				print("Optim Directory created successfully") 
+			except OSError as error: 
+				print("Optim Directory can not be created")
 
 			
-			self.critic_model_path = critic_dir+"critic"
-			self.actor_model_path = actor_dir+"actor"
+			self.critic_model_path = dictionary["critic_dir"]
+			self.actor_model_path = dictionary["actor_dir"]
+			self.optim_model_path = dictionary["optim_dir"]
 			
 
 		if self.gif:
@@ -302,10 +309,10 @@ class MAPPO:
 				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
 
 			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
-				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'_Q_epsiode_'+str(episode)+'.pt')
-				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode_'+str(episode)+'.pt')
-				torch.save(self.agents.q_critic_optimizer.state_dict(), self.model_path_q_critic_optimizer+'_optim_epsiode_'+str(episode)+'.pt')
-				torch.save(self.agents.policy_optimizer.state_dict(), self.model_path_policy_optimizer+'_optim_epsiode_'+str(episode)+'.pt')  
+				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'critic_Q_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'actor_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.q_critic_optimizer.state_dict(), self.optim_model_path+'critic_optim_epsiode_'+str(episode)+'.pt')
+				torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'policy_optim_epsiode_'+str(episode)+'.pt')  
 
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
 				self.agents.update(episode)
@@ -344,6 +351,7 @@ if __name__ == '__main__':
 				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
 				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"optimizer_model_path": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
 				"n_epochs": 15,
 				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
