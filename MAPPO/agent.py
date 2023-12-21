@@ -267,7 +267,7 @@ class PPOAgent:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 			team_masks = (masks.sum(dim=-1)[:, ] > 0).int()
 
-			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3))
+			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
 
 			shape = reward_time_wise.shape
 			reward_copy = copy.deepcopy(reward_time_wise.detach())
