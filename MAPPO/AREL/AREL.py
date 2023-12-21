@@ -26,7 +26,7 @@ class Time_Agent_Transformer(nn.Module):
 		print(self.comp_emb, '-'*50)
 
 		if not comp:
-			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length)
+			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length).to(self.device)
 		
 			tblocks = []
 			for i in range(depth):
@@ -45,7 +45,7 @@ class Time_Agent_Transformer(nn.Module):
 		else:
 			self.compress_input = nn.Linear(emb, self.comp_emb)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
 
 
 			tblocks = []
