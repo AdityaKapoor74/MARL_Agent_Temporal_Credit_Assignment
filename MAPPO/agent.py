@@ -263,9 +263,9 @@ class PPOAgent:
 
 
 	def update_reward_model(self, episode):
-		states, rewards, one_hot_actions, dones = torch.from_numpy(self.buffer.states_actor).float(), torch.from_numpy(self.buffer.rewards).float(), torch.from_numpy(self.buffer.one_hot_actions).float(), torch.from_numpy(self.buffer.dones).float()
-		masks = 1 - dones[:, :-1]
-		episodic_rewards = rewards.sum(dim=1)
+		states, episodic_rewards, one_hot_actions, masks = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
+		# masks = 1 - dones
+		# episodic_rewards = rewards.sum(dim=1)
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
 		reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
@@ -356,7 +356,8 @@ class PPOAgent:
 
 	def update(self, episode):
 
-		self.update_reward_model(episode)
+		for i in range(10):
+			self.update_reward_model(episode-(10-i))
 		
 		q_value_loss_batch = 0
 		policy_loss_batch = 0

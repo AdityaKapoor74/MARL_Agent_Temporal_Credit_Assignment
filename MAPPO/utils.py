@@ -323,10 +323,12 @@ class RewardRolloutBuffer:
 
 		self.episodic_rewards[episode_num] = episodic_reward
 		
-		self.episode_length[self.episode_num] = t
+		self.episode_length[episode_num] = t
 		self.episode_num += 1
 
 		self.clear()
+
+		print(episode_num, self.episode_num)
 
 		self.time_step = 0
 
