@@ -394,7 +394,7 @@ if __name__ == '__main__':
 				"reward_comp": True,
 				"num_episodes_capacity": 30,
 				"batch_size": 30,
-				"reward_lr": 1e-2,
+				"reward_lr": 1e-3,
 				"reward_weight_decay": 1e-4,
 				"train_reward_model": 1000,
 				"variance_loss_coeff": 1.0,
