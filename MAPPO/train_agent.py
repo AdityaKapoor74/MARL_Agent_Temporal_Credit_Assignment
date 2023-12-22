@@ -397,7 +397,7 @@ if __name__ == '__main__':
 				"reward_lr": 1e-2,
 				"reward_weight_decay": 1e-4,
 				"train_reward_model": 1000,
-				"variance_loss_coeff": 20.0,
+				"variance_loss_coeff": 1.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 
