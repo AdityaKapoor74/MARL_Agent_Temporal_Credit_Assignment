@@ -263,38 +263,74 @@ class PPOAgent:
 
 
 	def update_reward_model(self, episode):
-		if self.reward_buffer.episode_num >= self.batch_size:
-			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
-			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
+		states, rewards, one_hot_actions, dones = torch.from_numpy(self.buffer.states_actor), torch.from_numpy(self.buffer.rewards), torch.from_numpy(self.buffer.one_hot_actions), torch.from_numpy(self.buffer.dones)
+		episodic_rewards = rewards.sum(dim=1)
+		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
-			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
+		reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
 
-			shape = reward_time_wise.shape
-			reward_copy = copy.deepcopy(reward_time_wise.detach())
-			reward_copy[team_masks.view(*shape) == 0.0] = float('nan')
-			reward_mean = torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
-			reward_var = (reward_time_wise - reward_mean)**2
-			reward_var[team_masks.view(*shape) == 0.0] = 0.0
-			reward_var = reward_var.sum() / team_masks.sum()
+		shape = reward_time_wise.shape
+		reward_copy = copy.deepcopy(reward_time_wise.detach())
+		reward_copy[team_masks.view(*shape) == 0.0] = float('nan')
+		reward_mean = torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
+		reward_var = (reward_time_wise - reward_mean)**2
+		reward_var[team_masks.view(*shape) == 0.0] = 0.0
+		reward_var = reward_var.sum() / team_masks.sum()
 
-			loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
+		loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
 
-			self.reward_optimizer.zero_grad()
-			loss.backward()
-			if self.enable_reward_grad_clip:
-				grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
-			else:
-				total_norm = 0
-				for p in self.reward_model.parameters():
-					param_norm = p.grad.detach().data.norm(2)
-					total_norm += param_norm.item() ** 2
-				grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
-			self.reward_optimizer.step()
+		self.reward_optimizer.zero_grad()
+		loss.backward()
+		if self.enable_reward_grad_clip:
+			grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
+		else:
+			total_norm = 0
+			for p in self.reward_model.parameters():
+				param_norm = p.grad.detach().data.norm(2)
+				total_norm += param_norm.item() ** 2
+			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
+		self.reward_optimizer.step()
 
 			if self.comet_ml is not None:
 				self.comet_ml.log_metric('Reward_Loss', loss, episode)
 				self.comet_ml.log_metric('Reward_Var', reward_var, episode)
 				self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
+
+
+
+	# def update_reward_model(self, episode):
+	# 	if self.reward_buffer.episode_num >= self.batch_size:
+	# 		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+	# 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
+
+	# 		reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
+
+	# 		shape = reward_time_wise.shape
+	# 		reward_copy = copy.deepcopy(reward_time_wise.detach())
+	# 		reward_copy[team_masks.view(*shape) == 0.0] = float('nan')
+	# 		reward_mean = torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
+	# 		reward_var = (reward_time_wise - reward_mean)**2
+	# 		reward_var[team_masks.view(*shape) == 0.0] = 0.0
+	# 		reward_var = reward_var.sum() / team_masks.sum()
+
+	# 		loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
+
+	# 		self.reward_optimizer.zero_grad()
+	# 		loss.backward()
+	# 		if self.enable_reward_grad_clip:
+	# 			grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
+	# 		else:
+	# 			total_norm = 0
+	# 			for p in self.reward_model.parameters():
+	# 				param_norm = p.grad.detach().data.norm(2)
+	# 				total_norm += param_norm.item() ** 2
+	# 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
+	# 		self.reward_optimizer.step()
+
+	# 		if self.comet_ml is not None:
+	# 			self.comet_ml.log_metric('Reward_Loss', loss, episode)
+	# 			self.comet_ml.log_metric('Reward_Var', reward_var, episode)
+	# 			self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
 
 	def plot(self, masks, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
@@ -318,6 +354,8 @@ class PPOAgent:
 
 
 	def update(self, episode):
+
+		self.update_reward_model(episode)
 		
 		q_value_loss_batch = 0
 		policy_loss_batch = 0

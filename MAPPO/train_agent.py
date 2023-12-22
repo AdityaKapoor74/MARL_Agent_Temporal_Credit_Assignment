@@ -317,9 +317,9 @@ class MAPPO:
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
 				self.agents.update(episode)
 
-			if self.learn and not(episode%self.train_reward_model) and episode != 0:
-				for i in range(self.train_reward_model):
-					self.agents.update_reward_model(episode-(self.train_reward_model-(i+1)))
+			# if self.learn and not(episode%self.train_reward_model) and episode != 0:
+			# 	for i in range(self.train_reward_model):
+			# 		self.agents.update_reward_model(episode-(self.train_reward_model-(i+1)))
 
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
