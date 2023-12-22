@@ -326,7 +326,7 @@ class RewardRolloutBuffer:
 		self.episode_length[episode_num] = t
 		self.episode_num += 1
 
-		self.clear()
+		# self.clear()
 
 		self.time_step = 0
 
