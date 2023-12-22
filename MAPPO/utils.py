@@ -328,8 +328,6 @@ class RewardRolloutBuffer:
 
 		self.clear()
 
-		print(episode_num, self.episode_num)
-
 		self.time_step = 0
 
 	def push(
