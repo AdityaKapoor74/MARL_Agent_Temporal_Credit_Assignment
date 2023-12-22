@@ -273,7 +273,7 @@ class PPOAgent:
 		shape = reward_time_wise.shape
 		reward_copy = copy.deepcopy(reward_time_wise.detach())
 		reward_copy[team_masks.view(*shape) == 0.0] = 0.0 #float('nan')
-		reward_mean = (reward_copy.sum(dim=-1)/team_masks.sum(dim=-1)).unsqueeze(-1) #torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
+		reward_mean = (reward_copy.sum(dim=-1)/team_masks.to(self.device).sum(dim=-1)).unsqueeze(-1) #torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
 		reward_var = (reward_time_wise - reward_mean)**2
 		reward_var[team_masks.view(*shape) == 0.0] = 0.0
 		reward_var = reward_var.sum() / team_masks.sum()
