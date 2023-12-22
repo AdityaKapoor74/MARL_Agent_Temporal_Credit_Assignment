@@ -264,6 +264,7 @@ class PPOAgent:
 
 	def update_reward_model(self, episode):
 		states, rewards, one_hot_actions, dones = torch.from_numpy(self.buffer.states_actor), torch.from_numpy(self.buffer.rewards), torch.from_numpy(self.buffer.one_hot_actions), torch.from_numpy(self.buffer.dones)
+		masks = 1 - dones
 		episodic_rewards = rewards.sum(dim=1)
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
