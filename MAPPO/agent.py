@@ -291,10 +291,10 @@ class PPOAgent:
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
 		self.reward_optimizer.step()
 
-			if self.comet_ml is not None:
-				self.comet_ml.log_metric('Reward_Loss', loss, episode)
-				self.comet_ml.log_metric('Reward_Var', reward_var, episode)
-				self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
+		if self.comet_ml is not None:
+			self.comet_ml.log_metric('Reward_Loss', loss, episode)
+			self.comet_ml.log_metric('Reward_Var', reward_var, episode)
+			self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
 
 
 
