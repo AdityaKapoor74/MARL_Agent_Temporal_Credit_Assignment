@@ -323,11 +323,11 @@ class MAPPO:
 						self.agents.update(episode)
 
 			if self.experiment_type == "AREL" and episode >= self.reward_warmup:
-				if episode % 1000 == 0:
+				if episode % 200 == 0:
 					epoch_train_episode_reward_loss = []
 					epoch_grad_norms = []
 					epoch_variance_loss = []
-					for _ in range(1000):
+					for _ in range(400):
 						loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model()
 						epoch_train_episode_reward_loss.append(loss.item())
 						epoch_grad_norms.append(grad_norm_value_reward.item())
@@ -414,12 +414,12 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
-				"num_episodes_capacity": 1000,
-				"batch_size": 256,
-				"reward_lr": 1e-3,
-				"reward_weight_decay": 1e-4,
+				"num_episodes_capacity": 40000,
+				"batch_size": 32,
+				"reward_lr": 1e-4,
+				"reward_weight_decay": 1e-5,
 				"train_reward_model": 1000,
-				"variance_loss_coeff": 1.0,
+				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
