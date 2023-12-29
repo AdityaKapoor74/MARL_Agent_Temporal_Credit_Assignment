@@ -244,16 +244,17 @@ class RolloutBuffer:
 	def build_td_lambda_targets(self, rewards, values, next_value, masks, next_mask):
 		# Assumes  <target_qs > in B*T*A and <reward >, <terminated >  in B*T*A, <mask > in (at least) B*T-1*1
 		# Initialise  last  lambda -return  for  not  terminated  episodes
-		ret = target_qs.new_zeros(*target_qs.shape)
-		ret = target_qs * (1-terminated[:, :-1]) # some episodes end early so we can't assume that by copying the last target_qs in ret would be good enough
+		# ret = target_qs.new_zeros(*target_qs.shape)
+		# ret = target_qs * (1-terminated[:, :-1]) # some episodes end early so we can't assume that by copying the last target_qs in ret would be good enough
 		# ret[:, -1] = target_qs[:, -1] * (1 - (torch.sum(terminated, dim=1)>0).int())
 		# Backwards  recursive  update  of the "forward  view"
-		for t in range(ret.shape[1] - 2, -1, -1):
-			ret[:, t] = self.td_lambda * self.gamma * ret[:, t + 1] + mask[:, t].unsqueeze(-1) \
-						* (rewards[:, t] + (1 - self.td_lambda) * self.gamma * target_qs[:, t + 1] * (1 - terminated[:, t]))
+		# for t in range(ret.shape[1] - 2, -1, -1):
+		# 	ret[:, t] = self.td_lambda * self.gamma * ret[:, t + 1] + mask[:, t].unsqueeze(-1) \
+		# 				* (rewards[:, t] + (1 - self.td_lambda) * self.gamma * target_qs[:, t + 1] * (1 - terminated[:, t]))
 		# Returns lambda-return from t=0 to t=T-1, i.e. in B*T-1*A
 		# return ret[:, 0:-1]
-		return ret
+		# return ret
+		...
 
 
 	def nstep_returns(self, rewards, values, next_value, masks, next_mask):

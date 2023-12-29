@@ -40,6 +40,7 @@ class MAPPO:
 		self.experiment_type = dictionary["experiment_type"]
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
 		self.train_reward_model = dictionary["train_reward_model"]
+		self.reward_warmup = dictionary["reward_warmup"]
 
 		# RNN HIDDEN
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
@@ -315,7 +316,28 @@ class MAPPO:
 				torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'policy_optim_epsiode_'+str(episode)+'.pt')  
 
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
-				self.agents.update(episode)
+				if self.experiment_type != "AREL":
+					self.agents.update(episode)
+				else:
+					if episode >= self.reward_warmup:
+						self.agents.update(episode)
+
+			if self.experiment_type == "AREL" and episode >= self.reward_warmup:
+				if episode % 1000 == 0:
+					epoch_train_episode_reward_loss = []
+					epoch_grad_norms = []
+					epoch_variance_loss = []
+					for _ in range(1000):
+						loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model()
+						epoch_train_episode_reward_loss.append(loss.item())
+						epoch_grad_norms.append(grad_norm_value_reward.item())
+						epoch_variance_loss.append(reward_var.item())
+
+					if self.save_comet_ml_plot:
+						self.comet_ml.log_metric("Reward_Loss", np.mean(epoch_train_episode_reward_loss), step=episode)
+						self.comet_ml.log_metric("Reward_Var", np.mean(epoch_variance_loss), step=episode)
+						self.comet_ml.log_metric("Reward_Grad_Norm", np.mean(epoch_grad_norms), step=episode)
+
 
 			# if self.learn and not(episode%self.train_reward_model) and episode != 0:
 			# 	for i in range(self.train_reward_model):
@@ -348,11 +370,11 @@ if __name__ == '__main__':
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
-				"critic_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
-				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"optim_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
+				"critic_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
+				"actor_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+				"gif_dir": 'tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"policy_eval_dir":'tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"optim_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
 				"n_epochs": 15,
 				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
@@ -361,16 +383,16 @@ if __name__ == '__main__':
 				"gif": False,
 				"gif_checkpoint":1,
 				"load_models": False,
-				"model_path_value": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_epsiode_100000.pt",
-				"model_path_policy": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/actor_networks/actor_epsiode_100000.pt",
-				"model_path_policy_optimizer": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_optim_epsiode_100000.pt",
-				"model_path_q_critic_optimizer": "../../tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/policy_optim_epsiode_100000.pt",
+				"model_path_value": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_epsiode_100000.pt",
+				"model_path_policy": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/actor_networks/actor_epsiode_100000.pt",
+				"model_path_policy_optimizer": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_optim_epsiode_100000.pt",
+				"model_path_q_critic_optimizer": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/policy_optim_epsiode_100000.pt",
 				"eval_policy": True,
 				"save_model": True,
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 20000,
+				"max_episodes": 50000,
 				"max_time_steps": 100,
 				"experiment_type": experiment_type,
 				"parallel_training": False,
@@ -392,14 +414,15 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
-				"num_episodes_capacity": 30,
-				"batch_size": 30,
+				"num_episodes_capacity": 1000,
+				"batch_size": 256,
 				"reward_lr": 1e-3,
 				"reward_weight_decay": 1e-4,
 				"train_reward_model": 1000,
 				"variance_loss_coeff": 1.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
+				"reward_warmup": 1000,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,

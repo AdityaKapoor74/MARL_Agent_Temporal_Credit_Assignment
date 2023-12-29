@@ -263,8 +263,26 @@ class PPOAgent:
 
 
 	def update_reward_model(self, episode):
-		states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
-		masks = 1 - dones
+		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
+		# masks = 1 - dones
+
+		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+
+		"""
+		print(states.shape)
+		>>> torch.Size([30, 100, 5, 60])  -> 55 + 5 = 60
+		
+		print(episodic_rewards.shape)
+		>>>	torch.Size([30])
+		
+		print(dones.shape)
+		>>>	torch.Size([30, 100, 5])
+
+		print(self.reward_buffer.episode_length)
+		>>> [17. 21. 21. 21. 21. 57. 24. 16. 22. 21. 25. 61. 14. 36. 22. 34. 18. 15.
+			21. 15. 20. 21. 41. 63. 30. 17. 39. 18. 53. 22.]
+
+		"""
 		# episodic_rewards = rewards.sum(dim=1)
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
@@ -292,10 +310,12 @@ class PPOAgent:
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
 		self.reward_optimizer.step()
 
-		if self.comet_ml is not None:
-			self.comet_ml.log_metric('Reward_Loss', loss, episode)
-			self.comet_ml.log_metric('Reward_Var', reward_var, episode)
-			self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
+		return loss, reward_var, grad_norm_value_reward
+
+		# if self.comet_ml is not None:
+		# 	self.comet_ml.log_metric('Reward_Loss', loss, episode)
+		# 	self.comet_ml.log_metric('Reward_Var', reward_var, episode)
+		# 	self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
 
 
 
@@ -355,9 +375,9 @@ class PPOAgent:
 
 
 	def update(self, episode):
-
-		for i in range(10):
-			self.update_reward_model(episode-(10-i))
+		# update reward model is being called from train_agent
+		# for i in range(10):
+		# 	self.update_reward_model(episode-(10-i))
 		
 		q_value_loss_batch = 0
 		policy_loss_batch = 0
