@@ -397,8 +397,8 @@ if __name__ == '__main__':
 				"gif_dir": 'tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"optim_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
-				"n_epochs": 15,
-				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
+				"n_epochs": 5,
+				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
 				"extension": extension,
 				"gamma": 0.99,
@@ -480,9 +480,9 @@ if __name__ == '__main__':
 				"policy_clip": 0.05,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-1, #8e-3
+				"entropy_pen": 1.0, #8e-3
 				"entropy_pen_final": 1e-2,
-				"entropy_pen_steps": 10000,
+				"entropy_pen_steps": 50000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
 			}
