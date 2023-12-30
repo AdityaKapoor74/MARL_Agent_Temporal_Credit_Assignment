@@ -262,10 +262,20 @@ class PPOAgent:
 			return actions, action_logprob, hidden_state.cpu().numpy()
 
 
+	def evaluate_reward_model(self):
+		with torch.no_grad():
+			states, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
+			states = torch.from_numpy(states).float().unsqueeze(0)
+			masks = 1 - torch.from_numpy(dones[:-1, :]).float()
+			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
+			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
+
+			return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
+
 	def update_reward_model(self, episode=None):
 		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
 		# masks = 1 - dones
-		
+
 		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 
 		"""

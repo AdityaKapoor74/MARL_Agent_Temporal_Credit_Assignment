@@ -285,9 +285,12 @@ class MAPPO:
 
 					final_timestep = step
 
+					predicted_episode_reward = self.agents.evaluate_reward_model()
+
 					if self.save_comet_ml_plot:
 						self.comet_ml.log_metric('Episode_Length', step, episode)
 						self.comet_ml.log_metric('Reward', episode_reward, episode)
+						self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 						self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
 						self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
 						self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
@@ -456,7 +459,7 @@ if __name__ == '__main__':
 				"q_weight_decay": 0.0,
 				"enable_grad_clip_critic_q": True,
 				"grad_clip_critic_q": 0.5,
-				"value_clip": 0.05,
+				"value_clip": 0.2,
 				"num_heads": 1,
 				"critic_weight_entropy_pen": 0.0,
 				"critic_weight_entropy_pen_final": 0.0,
@@ -477,7 +480,7 @@ if __name__ == '__main__':
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
-				"policy_clip": 0.05,
+				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1.0, #8e-3
