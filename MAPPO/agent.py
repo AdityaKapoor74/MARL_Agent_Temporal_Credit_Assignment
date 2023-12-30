@@ -265,7 +265,7 @@ class PPOAgent:
 	def update_reward_model(self, episode=None):
 		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
 		# masks = 1 - dones
-
+		
 		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 
 		"""

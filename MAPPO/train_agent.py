@@ -39,10 +39,11 @@ class MAPPO:
 		self.max_time_steps = dictionary["max_time_steps"]
 		self.experiment_type = dictionary["experiment_type"]
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
-		self.train_reward_model = dictionary["train_reward_model"]
+		self.use_reward_model = dictionary["use_reward_model"]
 		self.reward_warmup = dictionary["reward_warmup"]
 		self.update_reward_model_freq = dictionary["update_reward_model_freq"]
 		self.reward_model_update_epochs = dictionary["reward_model_update_epochs"]
+		self.batch_size = dictionary["batch_size"]
 
 		# RNN HIDDEN
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
@@ -80,23 +81,34 @@ class MAPPO:
 				print("Critic Directory created successfully") 
 			except OSError as error: 
 				print("Critic Directory can not be created") 
+
 			actor_dir = dictionary["actor_dir"]
 			try: 
 				os.makedirs(actor_dir, exist_ok = True) 
 				print("Actor Directory created successfully") 
 			except OSError as error: 
 				print("Actor Directory can not be created")
+
 			optim_dir = dictionary["optim_dir"]
 			try: 
 				os.makedirs(optim_dir, exist_ok = True) 
 				print("Optim Directory created successfully") 
 			except OSError as error: 
-				print("Optim Directory can not be created")
-
+				print("Optim Directory can not be created")	
 			
 			self.critic_model_path = dictionary["critic_dir"]
 			self.actor_model_path = dictionary["actor_dir"]
 			self.optim_model_path = dictionary["optim_dir"]
+
+			if self.use_reward_model:
+				reward_dir = dictionary["reward_dir"]
+				try: 
+					os.makedirs(reward_dir, exist_ok = True) 
+					print("Reward Directory created successfully") 
+				except OSError as error: 
+					print("Reward Directory can not be created")
+
+				self.reward_model_path = dictionary["reward_dir"] 
 			
 
 		if self.gif:
@@ -312,22 +324,18 @@ class MAPPO:
 				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
 
 			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
+				# save actor, critic, reward and optims
 				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'critic_Q_epsiode_'+str(episode)+'.pt')
 				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'actor_epsiode_'+str(episode)+'.pt')
 				torch.save(self.agents.q_critic_optimizer.state_dict(), self.optim_model_path+'critic_optim_epsiode_'+str(episode)+'.pt')
 				torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'policy_optim_epsiode_'+str(episode)+'.pt')  
 
-			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
-				if self.experiment_type != "AREL":
-					self.agents.update(episode)
-				else:
-					if episode >= self.reward_warmup:
-						self.agents.update(episode)
-					else:
-						self.agents.buffer.clear()
-
-			if self.experiment_type == "AREL" and episode >= self.reward_warmup:
-				if episode % self.update_reward_model_freq == 0:
+				if self.use_reward_model:
+					torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'reward_model_epsiode_'+str(episode)+'.pt')
+					torch.save(self.agents.reward_optimizer.state_dict(), self.reward_model_path+'reward_optim_epsiode_'+str(episode)+'.pt')
+			
+			if self.experiment_type == "AREL":
+				if episode % self.update_reward_model_freq == 0 and self.agents.reward_buffer.episode_num >= self.batch_size:
 					# epoch_train_episode_reward_loss = []
 					# epoch_grad_norms = []
 					# epoch_variance_loss = []
@@ -343,9 +351,14 @@ class MAPPO:
 							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=episode+i)
 
 
-			# if self.learn and not(episode%self.train_reward_model) and episode != 0:
-			# 	for i in range(self.train_reward_model):
-			# 		self.agents.update_reward_model(episode-(self.train_reward_model-(i+1)))
+			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
+				if self.experiment_type != "AREL":
+					self.agents.update(episode)
+				else:
+					if episode >= self.reward_warmup:
+						self.agents.update(episode)
+					else:
+						self.agents.buffer.clear()
 
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
@@ -376,6 +389,7 @@ if __name__ == '__main__':
 				"device": "gpu",
 				"critic_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+				"reward_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_networks/',
 				"gif_dir": 'tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"optim_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
@@ -422,7 +436,6 @@ if __name__ == '__main__':
 				"batch_size": 32,
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
-				"train_reward_model": 1000,
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
