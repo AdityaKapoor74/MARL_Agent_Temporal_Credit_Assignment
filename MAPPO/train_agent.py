@@ -171,6 +171,8 @@ class MAPPO:
 			self.timesteps = []
 			self.timesteps_mean_per_1000_eps = []
 
+		self.reward_plot_counter = 0
+
 		for episode in range(1,self.max_episodes+1):
 
 			states_actor, info = self.env.reset(return_info=True)
@@ -346,9 +348,11 @@ class MAPPO:
 						# epoch_variance_loss.append(reward_var.item())
 
 						if self.save_comet_ml_plot:
-							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=episode+i)
-							self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=episode+i)
-							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=episode+i)
+							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=self.reward_plot_counter)
+							self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=self.reward_plot_counter)
+							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=self.reward_plot_counter)
+
+							self.reward_plot_counter += 1
 
 
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
