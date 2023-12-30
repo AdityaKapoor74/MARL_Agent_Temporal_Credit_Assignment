@@ -41,6 +41,8 @@ class MAPPO:
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
 		self.train_reward_model = dictionary["train_reward_model"]
 		self.reward_warmup = dictionary["reward_warmup"]
+		self.update_reward_model_freq = dictionary["update_reward_model_freq"]
+		self.reward_model_update_epochs = dictionary["reward_model_update_epochs"]
 
 		# RNN HIDDEN
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
@@ -321,22 +323,24 @@ class MAPPO:
 				else:
 					if episode >= self.reward_warmup:
 						self.agents.update(episode)
+					else:
+						self.agents.buffer.clear()
 
 			if self.experiment_type == "AREL" and episode >= self.reward_warmup:
-				if episode % 200 == 0:
-					epoch_train_episode_reward_loss = []
-					epoch_grad_norms = []
-					epoch_variance_loss = []
-					for _ in range(400):
+				if episode % self.update_reward_model_freq == 0:
+					# epoch_train_episode_reward_loss = []
+					# epoch_grad_norms = []
+					# epoch_variance_loss = []
+					for i in range(self.reward_model_update_epochs):
 						loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model()
-						epoch_train_episode_reward_loss.append(loss.item())
-						epoch_grad_norms.append(grad_norm_value_reward.item())
-						epoch_variance_loss.append(reward_var.item())
+						# epoch_train_episode_reward_loss.append(loss.item())
+						# epoch_grad_norms.append(grad_norm_value_reward.item())
+						# epoch_variance_loss.append(reward_var.item())
 
-					if self.save_comet_ml_plot:
-						self.comet_ml.log_metric("Reward_Loss", np.mean(epoch_train_episode_reward_loss), step=episode)
-						self.comet_ml.log_metric("Reward_Var", np.mean(epoch_variance_loss), step=episode)
-						self.comet_ml.log_metric("Reward_Grad_Norm", np.mean(epoch_grad_norms), step=episode)
+						if self.save_comet_ml_plot:
+							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=episode+i)
+							self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=episode+i)
+							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=episode+i)
 
 
 			# if self.learn and not(episode%self.train_reward_model) and episode != 0:
@@ -360,7 +364,7 @@ if __name__ == '__main__':
 	RENDER = False
 	USE_CPP_RVO2 = False
 
-	for i in range(1,4):
+	for i in range(1,6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
@@ -423,6 +427,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
+				"update_reward_model_freq": 200,
+				"reward_model_update_epochs": 400,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,

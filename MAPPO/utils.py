@@ -148,7 +148,7 @@ class RolloutBuffer:
 		q_value, 
 		dones
 		):
-		self.Q_values[self.episode_num][self.time_step] = q_value
+		self.Q_values[self.episode_num][self.time_step+1] = q_value
 		self.dones[self.episode_num][self.time_step+1] = dones
 
 		self.episode_length[self.episode_num] = t
