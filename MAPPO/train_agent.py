@@ -443,7 +443,7 @@ if __name__ == '__main__':
 				"batch_size": 32,
 				"reward_lr": 1e-2,
 				"reward_weight_decay": 1e-4,
-				"variance_loss_coeff": 20.0,
+				"variance_loss_coeff": 1.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
