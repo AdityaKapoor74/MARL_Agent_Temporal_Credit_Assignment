@@ -396,13 +396,13 @@ class PPOAgent:
 		grad_norm_value_q_batch = 0
 		grad_norm_policy_batch = 0
 
-		self.buffer.calculate_targets(episode)
-
 		if self.experiment_type == "AREL":
 			with torch.no_grad():
 				_, reward_time_wise = self.reward_model(torch.from_numpy(self.buffer.states_actor).float().to(self.device).permute(0,2,1,3))
 				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
 				self.buffer.rewards = (reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).cpu().numpy()
+
+		self.buffer.calculate_targets(episode)
 
 		# torch.autograd.set_detect_anomaly(True)
 		# Optimize policy for n epochs
