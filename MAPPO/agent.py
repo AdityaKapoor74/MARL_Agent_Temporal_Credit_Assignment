@@ -176,7 +176,7 @@ class PPOAgent:
 			if self.experiment_type == "AREL":
 				from AREL import AREL
 				self.reward_model = AREL.Time_Agent_Transformer(
-					emb=self.actor_observation_shape, 
+					emb=self.actor_observation_shape+self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=self.max_time_steps, 
@@ -264,11 +264,13 @@ class PPOAgent:
 
 	def evaluate_reward_model(self):
 		with torch.no_grad():
-			states, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
+			states, one_hot_actions, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
 			states = torch.from_numpy(states).float().unsqueeze(0)
+			one_hot_actions = torch.from_numpy(one_hot_actions).float().unsqueeze(0)
+			state_actions = torch.cat([states, one_hot_actions], dim=-1)
 			masks = 1 - torch.from_numpy(dones[:-1, :]).float()
 			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
-			reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
+			reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
 
 			return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
 
@@ -296,7 +298,9 @@ class PPOAgent:
 		# episodic_rewards = rewards.sum(dim=1)
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
-		reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
+
+		state_actions = torch.cat([states, one_hot_actions], dim=-1)
+		reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
 
 		shape = reward_time_wise.shape
 		reward_copy = copy.deepcopy(reward_time_wise.detach())
