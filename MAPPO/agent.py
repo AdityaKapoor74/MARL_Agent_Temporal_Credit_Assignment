@@ -402,7 +402,9 @@ class PPOAgent:
 
 		if self.experiment_type == "AREL":
 			with torch.no_grad():
-				_, reward_time_wise = self.reward_model(torch.from_numpy(self.buffer.states_actor).float().to(self.device).permute(0,2,1,3))
+				states = torch.from_numpy(self.buffer.states_actor).float()
+				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
+				_, reward_time_wise = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device))
 				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
 				self.buffer.rewards = (reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).cpu().numpy()
 
