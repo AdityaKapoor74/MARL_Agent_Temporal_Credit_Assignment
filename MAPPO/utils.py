@@ -325,7 +325,11 @@ class RewardRolloutBuffer:
 		self.episodic_rewards[episode_num] = episodic_reward
 		
 		self.episode_length[episode_num] = t
-		self.episode_num += 1
+
+		if self.episode_num + 1 > self.num_episodes_capacity:
+			self.episode_num = 0
+		else:
+			self.episode_num += 1
 
 		# self.clear()
 
