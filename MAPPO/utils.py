@@ -222,6 +222,13 @@ class RolloutBuffer:
 		
 		self.target_q_values = target_q_values.cpu()
 
+		print("Rewards")
+		print(rewards[0])
+		print("Q values")
+		print(q_values[0])
+		print("Target Q Values")
+		print(target_q_values[0])
+
 
 	def gae_targets(self, rewards, values, next_value, masks, next_mask):
 		

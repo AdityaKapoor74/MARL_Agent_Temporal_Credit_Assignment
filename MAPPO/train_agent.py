@@ -453,7 +453,7 @@ if __name__ == '__main__':
 				"reward_warmup": 500,
 				"update_reward_model_freq": 10,
 				"reward_model_update_epochs": 20,
-				"fine_tune_epochs": 5,
+				"fine_tune_epochs": 0,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,
