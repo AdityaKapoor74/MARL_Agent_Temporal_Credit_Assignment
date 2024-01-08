@@ -450,10 +450,10 @@ if __name__ == '__main__':
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
-				"reward_warmup": 500,
-				"update_reward_model_freq": 10,
-				"reward_model_update_epochs": 20,
-				"fine_tune_epochs": 4,
+				"reward_warmup": 1000,
+				"update_reward_model_freq": 200,
+				"reward_model_update_epochs": 400,
+				"fine_tune_epochs": 10,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,
