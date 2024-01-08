@@ -164,6 +164,7 @@ class PPOAgent:
 		if self.use_reward_model:
 
 			self.reward_buffer = RewardRolloutBuffer(
+				num_new_policy_episodes=self.update_ppo_agent,
 				num_episodes_capacity=self.num_episodes_capacity, 
 				max_time_steps=self.max_time_steps, 
 				num_agents=self.num_agents, 
@@ -274,11 +275,13 @@ class PPOAgent:
 
 			return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
 
-	def update_reward_model(self, episode=None):
+	def update_reward_model(self, fine_tune=False, episode=None):
 		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
 		# masks = 1 - dones
-
-		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+		if fine_tune:
+			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample_new_data()
+		else:
+			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 
 		"""
 		print(states.shape)

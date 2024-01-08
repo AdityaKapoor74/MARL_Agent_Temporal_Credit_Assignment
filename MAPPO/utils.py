@@ -282,6 +282,7 @@ class RolloutBuffer:
 class RewardRolloutBuffer:
 	def __init__(
 		self, 
+		num_new_policy_episodes,
 		num_episodes_capacity, 
 		max_time_steps, 
 		num_agents, 
@@ -290,6 +291,8 @@ class RewardRolloutBuffer:
 		num_actions, 
 		batch_size,
 		):
+
+		self.num_new_policy_episodes = num_new_policy_episodes
 		self.num_episodes_capacity = num_episodes_capacity
 		self.max_time_steps = max_time_steps
 		self.num_agents = num_agents
@@ -326,10 +329,7 @@ class RewardRolloutBuffer:
 		
 		self.episode_length[episode_num] = t
 
-		if self.episode_num + 1 > self.num_episodes_capacity:
-			self.episode_num = 0
-		else:
-			self.episode_num += 1
+		self.episode_num += 1
 
 		# self.clear()
 
@@ -355,7 +355,11 @@ class RewardRolloutBuffer:
 	def sample(self):
 
 		# uniform sampling
-		episode_num = self.episode_num % self.num_episodes_capacity
+		if self.episode_num > self.num_episodes_capacity:
+			episode_num = self.num_episodes_capacity
+		else:
+			episode_num = self.episode_num
+		
 		rand_batch = random.sample(range(0, episode_num), self.batch_size)
 
 		states = torch.from_numpy(self.states).float()[rand_batch, :]
@@ -364,3 +368,13 @@ class RewardRolloutBuffer:
 		masks = 1-torch.from_numpy(self.dones).float()[rand_batch, :]
 		
 		return states, episodic_rewards, one_hot_actions, masks
+
+	def sample_new_data(self):
+		# find current index in the buffer
+		episode_num = self.episode_num % self.num_episodes_capacity
+		new_states = torch.from_numpy(self.states).float()[episode_num-self.num_new_policy_episodes: episode_num, :]
+		new_episodic_rewards = torch.from_numpy(self.episodic_rewards).float()[episode_num-self.num_new_policy_episodes: episode_num]
+		new_one_hot_actions = torch.from_numpy(self.one_hot_actions).float()[episode_num-self.num_new_policy_episodes: episode_num, :]
+		new_masks = 1-torch.from_numpy(self.dones).float()[episode_num-self.num_new_policy_episodes: episode_num, :]
+
+		return new_states, new_episodic_rewards, new_one_hot_actions, new_masks

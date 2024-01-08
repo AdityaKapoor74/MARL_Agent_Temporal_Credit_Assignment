@@ -43,6 +43,7 @@ class MAPPO:
 		self.reward_warmup = dictionary["reward_warmup"]
 		self.update_reward_model_freq = dictionary["update_reward_model_freq"]
 		self.reward_model_update_epochs = dictionary["reward_model_update_epochs"]
+		self.fine_tune_epochs = dictionary["fine_tune_epochs"]
 		self.batch_size = dictionary["batch_size"]
 
 		# RNN HIDDEN
@@ -345,7 +346,10 @@ class MAPPO:
 					# epoch_grad_norms = []
 					# epoch_variance_loss = []
 					for i in range(self.reward_model_update_epochs):
-						loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model()
+						if i < self.reward_model_update_epochs - self.fine_tune_epochs:
+							loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=False)
+						else:
+							loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=True)
 						# epoch_train_episode_reward_loss.append(loss.item())
 						# epoch_grad_norms.append(grad_norm_value_reward.item())
 						# epoch_variance_loss.append(reward_var.item())
@@ -440,15 +444,16 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
-				"batch_size": 128,
+				"batch_size": 64,
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
-				"variance_loss_coeff": 1.0,
+				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
-				"reward_warmup": 1000,
-				"update_reward_model_freq": 200,
-				"reward_model_update_epochs": 400,
+				"reward_warmup": 500,
+				"update_reward_model_freq": 10,
+				"reward_model_update_epochs": 20,
+				"fine_tune_epochs": 0,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,
