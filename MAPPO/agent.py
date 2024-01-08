@@ -330,10 +330,11 @@ class PPOAgent:
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
 		
 		elif self.experiment_type == "ATRR":
-			reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
+			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
 
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
 			
+
 
 		self.reward_optimizer.zero_grad()
 		loss.backward()
@@ -347,7 +348,10 @@ class PPOAgent:
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
 		self.reward_optimizer.step()
 
-		return loss, reward_var, grad_norm_value_reward
+		if self.experiment_type == "AREL":
+			return loss, reward_var, grad_norm_value_reward
+		elif self.experiment_type == "ATRR":
+			return loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward
 
 		# if self.comet_ml is not None:
 		# 	self.comet_ml.log_metric('Reward_Loss', loss, episode)

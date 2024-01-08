@@ -254,7 +254,7 @@ class MAPPO:
 									episodic_agent_reward[i] = 0
 								else:
 									rewards_to_send.append(0.0)
-					elif self.experiment_type == "AREL":
+					elif self.experiment_type == "AREL" or self.experiment_type == "ATRR":
 						episodic_team_reward = [r+rewards for r in episodic_team_reward]
 						if all(next_indiv_dones) or step == self.max_time_steps:
 							rewards_to_send = episodic_team_reward
@@ -340,23 +340,33 @@ class MAPPO:
 					torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'reward_model_epsiode_'+str(episode)+'.pt')
 					torch.save(self.agents.reward_optimizer.state_dict(), self.reward_model_path+'reward_optim_epsiode_'+str(episode)+'.pt')
 			
-			if self.experiment_type == "AREL":
+			if self.use_reward_model:
 				if episode % self.update_reward_model_freq == 0 and self.agents.reward_buffer.episode_num >= self.batch_size:
 					# epoch_train_episode_reward_loss = []
 					# epoch_grad_norms = []
 					# epoch_variance_loss = []
 					for i in range(self.reward_model_update_epochs):
 						if i < self.reward_model_update_epochs - self.fine_tune_epochs:
-							loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=False)
+							if self.experiment_type == "AREL":
+								loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=False)
+							elif self.experiment_type == "ATRR":
+								loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=False)
 						else:
-							loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=True)
+							if self.experiment_type == "AREL":
+								loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=True)
+							elif self.experiment_type == "ATRR":
+								loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=True)
+						
 						# epoch_train_episode_reward_loss.append(loss.item())
 						# epoch_grad_norms.append(grad_norm_value_reward.item())
 						# epoch_variance_loss.append(reward_var.item())
 
 						if self.save_comet_ml_plot:
 							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=self.reward_plot_counter)
-							self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=self.reward_plot_counter)
+							if self.experiment_type == "AREL":
+								self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=self.reward_plot_counter)
+							# elif self.experiment_type == "ATRR":
+
 							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=self.reward_plot_counter)
 
 							self.reward_plot_counter += 1
@@ -426,10 +436,6 @@ if __name__ == '__main__':
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
-				"norm_rewards": False,
-				"clamp_rewards": False,
-				"clamp_rewards_value_min": 0.0,
-				"clamp_rewards_value_max": 2.0,
 
 
 				# ENVIRONMENT
@@ -454,6 +460,10 @@ if __name__ == '__main__':
 				"update_reward_model_freq": 30,
 				"reward_model_update_epochs": 100,
 				"fine_tune_epochs": 10,
+				"norm_rewards": False,
+				"clamp_rewards": False,
+				"clamp_rewards_value_min": 0.0,
+				"clamp_rewards_value_max": 2.0,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,

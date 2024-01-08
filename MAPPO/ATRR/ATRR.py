@@ -91,11 +91,11 @@ class Time_Agent_Transformer(nn.Module):
 		if not self.comp:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
 			x = x.view(b*n_a, t, e)
-			x = torch.cat([self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
 		else:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
 			x = self.compress_input(x).view(b*n_a, t, self.comp_emb)
-			x = torch.cat([self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
 
 		# x = self.do(x)
 
@@ -104,19 +104,22 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_weights, agent_weights = [], []
 
 		i = 0
-		while i<len(self.tblocks):
+		while i < len(self.tblocks):
 			# even numbers have temporal attention
-			temporal_weights.append(self.tblocks[i].weights)
+			temporal_weights.append(self.tblocks[i].attention.attn_weights)
 			i += 1
 			if self.agent_attn:
 				# odd numbers have agent attention
-				agent_weights.append(self.tblocks[i+1].weights)
+				agent_weights.append(self.tblocks[i+1].attention.attn_weights)
 				i += 1
 
+			if i < len(self.tblocks):
+				break
+
 				
-		x = self.rblocks(x).view(b, n_a, t, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
+		x = self.rblocks(x).view(b, n_a, t+1, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
 				
-		x_episode_wise = self.toreward(x[:, 0, :]).view(b, t).contiguous()
+		x_episode_wise = self.toreward(x[:, 0, :]).view(b, 1).contiguous()
 		
 		# x_episode_wise = x_time_wise.sum(1)
 
