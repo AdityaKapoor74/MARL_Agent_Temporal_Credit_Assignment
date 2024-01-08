@@ -445,7 +445,7 @@ if __name__ == '__main__':
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
 				"batch_size": 64,
-				"reward_lr": 1e-4,
+				"reward_lr": 1e-3,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
