@@ -26,7 +26,9 @@ class Time_Agent_Transformer(nn.Module):
 		print(self.comp_emb, '-'*50)
 
 		if not comp:
-			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length).to(self.device)
+			self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
+
+			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length+1).to(self.device)
 		
 			tblocks = []
 			for i in range(depth):
@@ -45,7 +47,9 @@ class Time_Agent_Transformer(nn.Module):
 		else:
 			self.compress_input = nn.Linear(emb, self.comp_emb)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
+			self.summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
+
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
 
 
 			tblocks = []
@@ -80,8 +84,9 @@ class Time_Agent_Transformer(nn.Module):
 		
 		b, n_a, t, e = x.size()
 		if not self.comp:
-			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, e)
-			x = x.view(b*n_a, t, e) + positions
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
+			x = x.view(b*n_a, t, e)
+			x = torch.cat([x, self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1)], dim=1)
 		else:
 			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
 			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) + positions
