@@ -28,6 +28,7 @@ class Time_Agent_Transformer(nn.Module):
 		seq_length = seq_length + 1 # adding 1 for CLS like token embedding
 
 		self.depth = depth
+		self.agent_attn = agent
 
 		if not comp:
 			self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
@@ -102,9 +103,15 @@ class Time_Agent_Transformer(nn.Module):
 
 		temporal_weights, agent_weights = [], []
 
-		for i in range(self.depth):
+		i = 0
+		while i<len(self.tblocks):
+			# even numbers have temporal attention
 			temporal_weights.append(self.tblocks[i].weights)
-			agent_weights.append(self.tblocks[i+1].weights)
+			i += 1
+			if self.agent_attn:
+				# odd numbers have agent attention
+				agent_weights.append(self.tblocks[i+1].weights)
+				i += 1
 
 				
 		x = self.rblocks(x).view(b, n_a, t, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
@@ -115,7 +122,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# return x_episode_wise, x_time_wise
 
-		return x_episode_wise
+		return x_episode_wise, temporal_weights, agent_weights
 
 
 

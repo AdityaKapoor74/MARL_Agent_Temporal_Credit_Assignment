@@ -392,7 +392,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
@@ -404,8 +404,8 @@ if __name__ == '__main__':
 				"gif_dir": 'tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"optim_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
-				"n_epochs": 5,
-				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes
+				"n_epochs": 15,
+				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
 				"extension": extension,
 				"gamma": 0.99,
@@ -451,7 +451,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
-				"update_reward_model_freq": 200,
+				"update_reward_model_freq": 30,
 				"reward_model_update_epochs": 100,
 				"fine_tune_epochs": 10,
 
@@ -464,7 +464,7 @@ if __name__ == '__main__':
 				"q_weight_decay": 0.0,
 				"enable_grad_clip_critic_q": True,
 				"grad_clip_critic_q": 0.5,
-				"value_clip": 0.2,
+				"value_clip": 0.05,
 				"num_heads": 1,
 				"critic_weight_entropy_pen": 0.0,
 				"critic_weight_entropy_pen_final": 0.0,
@@ -485,7 +485,7 @@ if __name__ == '__main__':
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
-				"policy_clip": 0.2,
+				"policy_clip": 0.05,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1e-2, #8e-3

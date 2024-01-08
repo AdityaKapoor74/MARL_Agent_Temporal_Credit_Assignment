@@ -188,8 +188,20 @@ class PPOAgent:
 					comp=dictionary["reward_comp"], 
 					device=self.device,
 					).to(self.device)
-			else:
-				pass
+			elif self.experiment_type == "ATRR":
+				from ATRR import ATRR
+				self.reward_model = ATRR.Time_Agent_Transformer(
+					emb=self.actor_observation_shape+self.num_actions, 
+					heads=dictionary["reward_n_heads"], 
+					depth=dictionary["reward_depth"], 
+					seq_length=self.max_time_steps, 
+					n_agents=self.num_agents, 
+					agent=dictionary["reward_agent_attn"], 
+					dropout=dictionary["reward_dropout"], 
+					wide=dictionary["reward_attn_net_wide"], 
+					comp=dictionary["reward_comp"], 
+					device=self.device,
+					).to(self.device)
 
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=self.reward_lr, weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			
@@ -303,18 +315,25 @@ class PPOAgent:
 
 
 		state_actions = torch.cat([states, one_hot_actions], dim=-1)
-		reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
+		if self.experiment_type == "AREL":
+			reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
 
-		shape = reward_time_wise.shape
-		reward_copy = copy.deepcopy(reward_time_wise.detach())
-		reward_copy[team_masks.view(*shape) == 0.0] = 0.0 #float('nan')
-		reward_mean = (reward_copy.sum(dim=-1)/team_masks.to(self.device).sum(dim=-1)).unsqueeze(-1) #torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
-		reward_var = (reward_time_wise - reward_mean)**2
-		reward_var[team_masks.view(*shape) == 0.0] = 0.0
-		reward_var = reward_var.sum() / team_masks.sum()
+			shape = reward_time_wise.shape
+			reward_copy = copy.deepcopy(reward_time_wise.detach())
+			reward_copy[team_masks.view(*shape) == 0.0] = 0.0 #float('nan')
+			reward_mean = (reward_copy.sum(dim=-1)/team_masks.to(self.device).sum(dim=-1)).unsqueeze(-1) #torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
+			reward_var = (reward_time_wise - reward_mean)**2
+			reward_var[team_masks.view(*shape) == 0.0] = 0.0
+			reward_var = reward_var.sum() / team_masks.sum()
 
-		# loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
-		loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
+			# loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
+			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
+		
+		elif self.experiment_type == "ATRR":
+			reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
+
+			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
+			
 
 		self.reward_optimizer.zero_grad()
 		loss.backward()
