@@ -314,7 +314,7 @@ class PPOAgent:
 		reward_var = reward_var.sum() / team_masks.sum()
 
 		# loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
-		loss = F.huber_loss(reward_time_wise*team_masks.view(*shape).to(self.device).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
+		loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
 
 		self.reward_optimizer.zero_grad()
 		loss.backward()

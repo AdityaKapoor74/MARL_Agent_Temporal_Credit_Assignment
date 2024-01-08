@@ -31,6 +31,8 @@ class SelfAttentionWide(nn.Module):
 
         self.unifyheads = nn.Linear(heads * emb, emb)
 
+        self.weights = None
+
     def forward(self, x):
 
         b, t, e = x.size()
@@ -63,6 +65,7 @@ class SelfAttentionWide(nn.Module):
 
         # dot = F.softmax(dot, dim=2)
         dot = self.softmax(dot)
+        self.weights = dot.detach()
         # - dot now has row-wise self-attention probabilities
 
         # apply the self attention to the values
@@ -99,6 +102,8 @@ class SelfAttentionNarrow(nn.Module):
         self.tovalues  = nn.Linear(s, s, bias=False)
 
         self.unifyheads = nn.Linear(heads * s, emb)
+
+        self.weights = None
 
     def forward(self, x):
 
@@ -138,6 +143,7 @@ class SelfAttentionNarrow(nn.Module):
             mask_(dot, maskval=float('-inf'), mask_diagonal=False)
 
         dot = F.softmax(dot, dim=2)
+        self.weights = dot.detach()
         # - dot now has row-wise self-attention probabilities
 
         # apply the self attention to the values

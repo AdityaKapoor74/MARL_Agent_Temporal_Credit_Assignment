@@ -25,10 +25,14 @@ class Time_Agent_Transformer(nn.Module):
 			self.comp_emb = emb
 		print(self.comp_emb, '-'*50)
 
+		seq_length = seq_length + 1 # adding 1 for CLS like token embedding
+
+		self.depth = depth
+
 		if not comp:
 			self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length).to(self.device)
 		
 			tblocks = []
 			for i in range(depth):
@@ -49,7 +53,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
 
 
 			tblocks = []
@@ -86,22 +90,33 @@ class Time_Agent_Transformer(nn.Module):
 		if not self.comp:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
 			x = x.view(b*n_a, t, e)
-			x = torch.cat([x, self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1)], dim=1)
+			x = torch.cat([self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
 		else:
-			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
-			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) + positions
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
+			x = self.compress_input(x).view(b*n_a, t, self.comp_emb)
+			x = torch.cat([self.summary_embedding.unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
 
 		# x = self.do(x)
 
 		x = self.tblocks(x)
+
+		temporal_weights, agent_weights = [], []
+
+		for i in range(self.depth):
+			temporal_weights.append(self.tblocks[i].weights)
+			agent_weights.append(self.tblocks[i+1].weights)
+
 				
 		x = self.rblocks(x).view(b, n_a, t, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
 				
-		x_time_wise = self.toreward(x).view(b, t).contiguous()
+		x_episode_wise = self.toreward(x[:, 0, :]).view(b, t).contiguous()
 		
-		x_episode_wise = x_time_wise.sum(1)
+		# x_episode_wise = x_time_wise.sum(1)
 
-		return x_episode_wise, x_time_wise
+		# return x_episode_wise, x_time_wise
+
+		return x_episode_wise
+
 
 
 class Time_Transformer(nn.Module):
