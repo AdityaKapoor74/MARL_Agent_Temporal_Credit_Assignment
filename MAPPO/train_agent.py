@@ -414,8 +414,8 @@ if __name__ == '__main__':
 				"gif_dir": 'tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"optim_dir": 'tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizer_models/',
-				"n_epochs": 5,
-				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes
+				"n_epochs": 15,
+				"update_ppo_agent": 30, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
 				"extension": extension,
 				"gamma": 0.99,
@@ -456,7 +456,7 @@ if __name__ == '__main__':
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
-				"reward_warmup": 1000,
+				"reward_warmup": 10000,
 				"update_reward_model_freq": 200,
 				"reward_model_update_epochs": 50,
 				"fine_tune_epochs": 4,
