@@ -32,7 +32,6 @@ class PPOAgent:
 		self.experiment_type = dictionary["experiment_type"]
 		self.n_epochs = dictionary["n_epochs"]
 		self.scheduler_need = dictionary["scheduler_need"]
-		self.norm_rewards = dictionary["norm_rewards"]
 		if dictionary["device"] == "gpu":
 			self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 		else:
@@ -51,6 +50,7 @@ class PPOAgent:
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
 		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
 		self.reward_n_heads = dictionary["reward_n_heads"]
+		self.norm_rewards = dictionary["norm_rewards"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -153,7 +153,6 @@ class PPOAgent:
 			clamp_rewards=self.clamp_rewards,
 			clamp_rewards_value_min=self.clamp_rewards_value_min,
 			clamp_rewards_value_max=self.clamp_rewards_value_max,
-			norm_rewards=self.norm_rewards,
 			target_calc_style=self.target_calc_style,
 			td_lambda=self.td_lambda,
 			gae_lambda=self.gae_lambda,
@@ -208,6 +207,9 @@ class PPOAgent:
 			
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[1000, 20000], gamma=0.1)
+
+			if self.norm_rewards:
+				self.reward_normalizer = 
 
 		self.q_critic_optimizer = optim.AdamW(self.critic_network_q.parameters(), lr=self.q_value_lr, weight_decay=self.q_weight_decay, eps=1e-05)
 		self.policy_optimizer = optim.AdamW(self.policy_network.parameters(),lr=self.policy_lr, weight_decay=self.policy_weight_decay, eps=1e-05)

@@ -26,7 +26,6 @@ class RolloutBuffer:
 		clamp_rewards,
 		clamp_rewards_value_min,
 		clamp_rewards_value_max,
-		norm_rewards,
 		target_calc_style,
 		td_lambda,
 		gae_lambda,
@@ -52,7 +51,6 @@ class RolloutBuffer:
 		self.clamp_rewards = clamp_rewards
 		self.clamp_rewards_value_min = clamp_rewards_value_min
 		self.clamp_rewards_value_max = clamp_rewards_value_max
-		self.norm_rewards = norm_rewards
 
 		self.target_calc_style = target_calc_style
 		self.td_lambda = td_lambda
@@ -62,9 +60,6 @@ class RolloutBuffer:
 			
 		if self.norm_returns_q:
 			self.q_value_norm = Q_PopArt
-
-		if self.norm_rewards:
-			self.reward_norm = RunningMeanStd(shape=(1), device=self.device)
 
 		self.episode_num = 0
 		self.time_step = 0
@@ -191,10 +186,6 @@ class RolloutBuffer:
 
 		if self.clamp_rewards:
 			rewards = torch.clamp(rewards, min=self.clamp_rewards_value_min, max=self.clamp_rewards_value_max)
-
-		if self.norm_rewards:
-			self.reward_norm.update(rewards.view(-1).to(self.device), masks.view(-1).to(self.device))
-			rewards = ((rewards.to(self.device) - self.reward_norm.mean) / (torch.sqrt(self.reward_norm.var) + 1e-5)).cpu().view(-1, self.num_agents)
 		
 		# TARGET CALC
 		q_values = torch.from_numpy(self.Q_values[:, :-1, :]) * masks
