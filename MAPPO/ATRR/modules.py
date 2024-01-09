@@ -64,8 +64,8 @@ class SelfAttentionWide(nn.Module):
             mask_(dot, maskval=float('-inf'), mask_diagonal=False)
 
         # dot = F.softmax(dot, dim=2)
-        dot = self.softmax(dot)
-        self.attn_weights = dot.detach()
+        dot = self.softmax(dot) # bxh, t, t
+        self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
         # - dot now has row-wise self-attention probabilities
 
         # apply the self attention to the values
@@ -143,7 +143,7 @@ class SelfAttentionNarrow(nn.Module):
             mask_(dot, maskval=float('-inf'), mask_diagonal=False)
 
         dot = F.softmax(dot, dim=2)
-        self.attn_weights = dot.detach()
+        self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
         # - dot now has row-wise self-attention probabilities
 
         # apply the self attention to the values

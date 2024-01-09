@@ -125,7 +125,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# return x_episode_wise, x_time_wise
 
-		return x_episode_wise, temporal_weights, agent_weights
+		return x_episode_wise, torch.stack(temporal_weights, dim=0), torch.stack(agent_weights, dim=0)
 
 
 

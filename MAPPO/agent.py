@@ -50,6 +50,7 @@ class PPOAgent:
 		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
 		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
+		self.reward_n_heads = dictionary["reward_n_heads"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -169,7 +170,7 @@ class PPOAgent:
 				max_time_steps=self.max_time_steps, 
 				num_agents=self.num_agents, 
 				num_enemies=self.num_enemies,
-				obs_shape=self.actor_observation_shape,
+				obs_shape=self.critic_ally_observation+(self.critic_enemy_observation)*self.num_enemies,
 				num_actions=self.num_actions, 
 				batch_size=self.batch_size,
 				)
@@ -177,7 +178,7 @@ class PPOAgent:
 			if self.experiment_type == "AREL":
 				from AREL import AREL
 				self.reward_model = AREL.Time_Agent_Transformer(
-					emb=self.actor_observation_shape+self.num_actions, 
+					emb=self.critic_ally_observation+(self.critic_enemy_observation)*self.num_enemies+self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=self.max_time_steps, 
@@ -277,15 +278,21 @@ class PPOAgent:
 
 	def evaluate_reward_model(self):
 		with torch.no_grad():
-			states, one_hot_actions, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
-			states = torch.from_numpy(states).float().unsqueeze(0)
+			state_allies, state_enemies, one_hot_actions, dones = self.buffer.states_critic_allies[self.buffer.episode_num], self.buffer.states_critic_enemies[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
+			state_allies = torch.from_numpy(state_allies).float()
+			state_enemies = torch.from_numpy(state_enemies).float().unsqueeze(1).repeat(1, self.num_agents, 1, 1).reshape(state_enemies.shape[0], self.num_agents, -1)
+			states = torch.cat([state_allies, state_enemies], dim=-1).unsqueeze(0)
 			one_hot_actions = torch.from_numpy(one_hot_actions).float().unsqueeze(0)
 			state_actions = torch.cat([states, one_hot_actions], dim=-1)
 			masks = 1 - torch.from_numpy(dones[:-1, :]).float()
 			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
-			reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
 
-			return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
+			if self.experiment_type == "AREL":
+				reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
+				return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
+			elif self.experiment_type == "ATRR":
+				reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
+				return reward_episode_wise
 
 	def update_reward_model(self, fine_tune=False, episode=None):
 		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
@@ -332,6 +339,12 @@ class PPOAgent:
 		elif self.experiment_type == "ATRR":
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
 
+			# shape = temporal_weights.shape
+			# temporal_weights = temporal_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
+			# shape = agent_weights.shape
+			# agent_weights = agent_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
+			print(temporal_weights.shape, agent_weights.shape)
+
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
 			
 
@@ -353,47 +366,7 @@ class PPOAgent:
 		elif self.experiment_type == "ATRR":
 			return loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward
 
-		# if self.comet_ml is not None:
-		# 	self.comet_ml.log_metric('Reward_Loss', loss, episode)
-		# 	self.comet_ml.log_metric('Reward_Var', reward_var, episode)
-		# 	self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
-
-
-
-	# def update_reward_model(self, episode):
-	# 	if self.reward_buffer.episode_num >= self.batch_size:
-	# 		states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
-	# 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
-
-	# 		reward_episode_wise, reward_time_wise = self.reward_model(states.permute(0,2,1,3).to(self.device))
-
-	# 		shape = reward_time_wise.shape
-	# 		reward_copy = copy.deepcopy(reward_time_wise.detach())
-	# 		reward_copy[team_masks.view(*shape) == 0.0] = float('nan')
-	# 		reward_mean = torch.nanmean(reward_copy, dim=-1).unsqueeze(-1)
-	# 		reward_var = (reward_time_wise - reward_mean)**2
-	# 		reward_var[team_masks.view(*shape) == 0.0] = 0.0
-	# 		reward_var = reward_var.sum() / team_masks.sum()
-
-	# 		loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
-
-	# 		self.reward_optimizer.zero_grad()
-	# 		loss.backward()
-	# 		if self.enable_reward_grad_clip:
-	# 			grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
-	# 		else:
-	# 			total_norm = 0
-	# 			for p in self.reward_model.parameters():
-	# 				param_norm = p.grad.detach().data.norm(2)
-	# 				total_norm += param_norm.item() ** 2
-	# 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
-	# 		self.reward_optimizer.step()
-
-	# 		if self.comet_ml is not None:
-	# 			self.comet_ml.log_metric('Reward_Loss', loss, episode)
-	# 			self.comet_ml.log_metric('Reward_Var', reward_var, episode)
-	# 			self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_value_reward, episode)
-
+		
 	def plot(self, masks, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_Q_Value',self.plotting_dict["grad_norm_value_q"],episode)
@@ -429,7 +402,9 @@ class PPOAgent:
 
 		if self.experiment_type == "AREL":
 			with torch.no_grad():
-				states = torch.from_numpy(self.buffer.states_actor).float()
+				state_allies, state_enemies = torch.from_numpy(self.buffer.states_critic_allies).float(), torch.from_numpy(self.buffer.states_critic_enemies).float()
+				state_enemies = state_enemies.unsqueeze(2).repeat(1, 1, self.num_agents, 1, 1).reshape(state_enemies.shape[0], state_enemies.shape[1], self.num_agents, -1)
+				states = torch.cat([state_allies, state_enemies], dim=-1)
 				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
 				_, reward_time_wise = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device))
 				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()

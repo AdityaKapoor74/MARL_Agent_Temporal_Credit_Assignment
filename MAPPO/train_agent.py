@@ -268,7 +268,7 @@ class MAPPO:
 						)
 
 					self.agents.reward_buffer.push(
-						states_actor, one_hot_actions, indiv_dones
+						np.concatenate((states_allies_critic, np.repeat(np.expand_dims(states_enemies_critic, axis=0), repeats=self.num_agents, axis=0).reshape(self.num_agents, -1)), axis=-1), one_hot_actions, indiv_dones
 						)
 
 				episode_reward += np.sum(rewards)
@@ -450,16 +450,16 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
-				"batch_size": 64,
-				"reward_lr": 1e-3,
-				"reward_weight_decay": 1e-4,
+				"batch_size": 128,
+				"reward_lr": 1e-4,
+				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
 				"update_reward_model_freq": 30,
-				"reward_model_update_epochs": 100,
-				"fine_tune_epochs": 10,
+				"reward_model_update_epochs": 30,
+				"fine_tune_epochs": 4,
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
