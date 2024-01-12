@@ -315,9 +315,9 @@ class PPOAgent:
 
 		if self.norm_rewards:
 			shape = episodic_rewards.shape
-			self.reward_normalizer.update(episodic_rewards.view(-1), team_masks.view(-1))
+			self.reward_normalizer.update(episodic_rewards.view(-1))
 			
-			episodic_rewards = self.reward_normalizer.normalize(episodic_rewards.view(-1)).view(shape) * team_masks.view(shape)
+			episodic_rewards = self.reward_normalizer.normalize(episodic_rewards.view(-1)).view(shape)
 
 		"""
 		print(states.shape)
@@ -372,8 +372,8 @@ class PPOAgent:
 		else:
 			total_norm = 0
 			for name, p in self.reward_model.named_parameters():
-				print(name)
-				print(p)
+				if p.requires_grad is False:
+					continue
 				param_norm = p.grad.detach().data.norm(2)
 				total_norm += param_norm.item() ** 2
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
