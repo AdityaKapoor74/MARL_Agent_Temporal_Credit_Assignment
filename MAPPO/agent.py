@@ -294,6 +294,8 @@ class PPOAgent:
 
 			if self.experiment_type == "AREL":
 				reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
+				print("Per timestep reward")
+				print(reward_time_wise)
 				reward_episode_wise = (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
 				if self.norm_rewards:
 					shape = reward_episode_wise.shape
