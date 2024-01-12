@@ -366,10 +366,10 @@ class MAPPO:
 						if self.save_comet_ml_plot:
 							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=self.reward_plot_counter)
 							if self.experiment_type == "AREL":
-								self.comet_ml.log_metric("Reward_Var", grad_norm_value_reward.item(), step=self.reward_plot_counter)
+								self.comet_ml.log_metric("Reward_Var", reward_var.item(), step=self.reward_plot_counter)
 							# elif self.experiment_type == "ATRR":
 
-							self.comet_ml.log_metric("Reward_Grad_Norm", reward_var.item(), step=self.reward_plot_counter)
+							self.comet_ml.log_metric("Reward_Grad_Norm", grad_norm_value_reward.item(), step=self.reward_plot_counter)
 
 							self.reward_plot_counter += 1
 
@@ -453,9 +453,9 @@ if __name__ == '__main__':
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
 				"batch_size": 32,
-				"reward_lr": 1e-3,
-				"reward_weight_decay": 1e-4,
-				"variance_loss_coeff": 20.0,
+				"reward_lr": 1e-4,
+				"reward_weight_decay": 1e-5,
+				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
