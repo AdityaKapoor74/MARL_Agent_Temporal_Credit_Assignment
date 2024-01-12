@@ -5,6 +5,19 @@ import torch.nn.functional as F
 from .modules import TransformerBlock, TransformerBlock_Agent
 
 from .util import d
+import math
+import numpy as np
+
+def init(module, weight_init, bias_init, gain=1):
+	weight_init(module.weight.data, gain=gain)
+	if module.bias is not None:
+		bias_init(module.bias.data)
+	return module
+
+def init_(m, gain=0.01, activate=False):
+	if activate:
+		gain = nn.init.calculate_gain('relu')
+	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
 class PopArt(torch.nn.Module):
@@ -112,7 +125,7 @@ class Time_Agent_Transformer(nn.Module):
 	"""
 
 	def __init__(self, emb, heads, depth, seq_length, n_agents, agent=True, 
-										dropout=0.0, wide=True, comp=True, device=None):
+										dropout=0.0, wide=True, comp=True, norm_rewards=False, device=None):
 		super().__init__()
 
 		self.comp = comp
@@ -138,7 +151,10 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 
-			self.toreward = nn.Linear(emb, 1)
+			if norm_rewards:
+				self.toreward = init_(PopArt(emb, 1, device=self.device))
+			else:
+				self.toreward = nn.Linear(emb, 1)
 
 			self.do = nn.Dropout(dropout)
 		else:
@@ -165,9 +181,11 @@ class Time_Agent_Transformer(nn.Module):
 			rblocks.append(nn.Linear(50, 50))
 			
 			self.rblocks = nn.Sequential(*rblocks)
-										   
-			self.toreward = nn.Linear(50, 1)
-			# self.toreward = PopArt(50, 1, device=self.device)
+			
+			if norm_rewards:	
+				self.toreward = init_(PopArt(50, 1, device=self.device))
+			else:
+				self.toreward = nn.Linear(50, 1)
 
 			self.do = nn.Dropout(dropout)
 			

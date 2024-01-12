@@ -186,8 +186,13 @@ class PPOAgent:
 					dropout=dictionary["reward_dropout"], 
 					wide=dictionary["reward_attn_net_wide"], 
 					comp=dictionary["reward_comp"], 
+					norm_rewards=dictionary["norm_rewards"],
 					device=self.device,
 					).to(self.device)
+
+				if self.norm_rewards:
+					self.reward_normalizer = self.reward_model.toreward
+
 			elif self.experiment_type == "ATRR":
 				from ATRR import ATRR
 				self.reward_model = ATRR.Time_Agent_Transformer(
@@ -208,8 +213,6 @@ class PPOAgent:
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[1000, 20000], gamma=0.1)
 
-			# if self.norm_rewards:
-			# 	self.reward_normalizer = 
 
 		self.q_critic_optimizer = optim.AdamW(self.critic_network_q.parameters(), lr=self.q_value_lr, weight_decay=self.q_weight_decay, eps=1e-05)
 		self.policy_optimizer = optim.AdamW(self.policy_network.parameters(),lr=self.policy_lr, weight_decay=self.policy_weight_decay, eps=1e-05)
@@ -291,7 +294,11 @@ class PPOAgent:
 
 			if self.experiment_type == "AREL":
 				reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
-				return (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
+				reward_episode_wise = (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
+				if self.norm_rewards:
+					shape = reward_episode_wise.shape
+					reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)*team_masks.to(self.device)
+				return reward_episode_wise
 			elif self.experiment_type == "ATRR":
 				reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
 				return reward_episode_wise
@@ -303,6 +310,14 @@ class PPOAgent:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample_new_data()
 		else:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+
+		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
+
+		if self.norm_rewards:
+			shape = episodic_rewards.shape
+			self.reward_normalizer.update(episodic_rewards.view(-1), team_masks.view(-1))
+			
+			episodic_rewards = self.reward_normalizer.normalize(episodic_rewards.view(-1)).view(shape) * team_masks.view(shape)
 
 		"""
 		print(states.shape)
@@ -320,7 +335,6 @@ class PPOAgent:
 
 		"""
 		# episodic_rewards = rewards.sum(dim=1)
-		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
 
 		state_actions = torch.cat([states, one_hot_actions], dim=-1)
@@ -345,7 +359,7 @@ class PPOAgent:
 			# temporal_weights = temporal_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
 			# shape = agent_weights.shape
 			# agent_weights = agent_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
-			print(temporal_weights.shape, agent_weights.shape)
+			# print(temporal_weights.shape, agent_weights.shape)
 
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
 			
@@ -357,7 +371,9 @@ class PPOAgent:
 			grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
 		else:
 			total_norm = 0
-			for p in self.reward_model.parameters():
+			for name, p in self.reward_model.named_parameters():
+				print(name)
+				print(p)
 				param_norm = p.grad.detach().data.norm(2)
 				total_norm += param_norm.item() ** 2
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
@@ -410,7 +426,12 @@ class PPOAgent:
 				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
 				_, reward_time_wise = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device))
 				reward_time_wise = reward_time_wise * ((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
-				self.buffer.rewards = (reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*(1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device))).cpu().numpy()
+				
+				if self.norm_rewards:
+					shape = reward_time_wise.shape
+					reward_time_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)*((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
+
+				self.buffer.rewards = reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents).cpu().numpy() #(reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*(1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device))).cpu().numpy()
 
 		self.buffer.calculate_targets(episode)
 

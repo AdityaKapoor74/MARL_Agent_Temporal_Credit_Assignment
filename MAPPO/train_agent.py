@@ -220,7 +220,6 @@ class MAPPO:
 
 				q_value, next_rnn_hidden_state_q = self.agents.get_q_values(states_allies_critic, states_enemies_critic, one_hot_actions, rnn_hidden_state_q, indiv_dones)
 
-
 				next_states_actor, rewards, next_dones, info = self.env.step(actions)
 				next_states_actor = np.array(next_states_actor)
 				next_states_actor = np.concatenate((self.agent_ids, next_states_actor), axis=-1)
@@ -232,7 +231,7 @@ class MAPPO:
 				if self.learn:
 					if self.experiment_type == "temporal_team":
 						rewards_to_send = [rewards]*self.num_agents
-						rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
+						# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
 					elif self.experiment_type == "temporal_agent":
 						rewards_to_send = info["indiv_rewards"]
 					elif self.experiment_type == "episodic_team":
@@ -261,15 +260,17 @@ class MAPPO:
 						else:
 							rewards_to_send = [0]*self.num_agents
 
-					self.agents.buffer.push(
-						states_allies_critic, states_enemies_critic, q_value, rnn_hidden_state_q, \
-						states_actor, rnn_hidden_state_actor, action_logprob, actions, last_one_hot_actions, one_hot_actions, mask_actions, \
-						rewards_to_send, indiv_dones
-						)
+					if self.learn:
+						self.agents.buffer.push(
+							states_allies_critic, states_enemies_critic, q_value, rnn_hidden_state_q, \
+							states_actor, rnn_hidden_state_actor, action_logprob, actions, last_one_hot_actions, one_hot_actions, mask_actions, \
+							rewards_to_send, indiv_dones
+							)
 
-					self.agents.reward_buffer.push(
-						np.concatenate((states_allies_critic, np.repeat(np.expand_dims(states_enemies_critic, axis=0), repeats=self.num_agents, axis=0).reshape(self.num_agents, -1)), axis=-1), one_hot_actions, indiv_dones
-						)
+						if self.use_reward_model:
+							self.agents.reward_buffer.push(
+								np.concatenate((states_allies_critic, np.repeat(np.expand_dims(states_enemies_critic, axis=0), repeats=self.num_agents, axis=0).reshape(self.num_agents, -1)), axis=-1), one_hot_actions, indiv_dones
+								)
 
 				episode_reward += np.sum(rewards)
 				episode_indiv_rewards = [r+info["indiv_rewards"][i] for i, r in enumerate(episode_indiv_rewards)]
@@ -312,7 +313,8 @@ class MAPPO:
 
 						self.agents.buffer.end_episode(final_timestep, q_value, indiv_dones)
 
-						self.agents.reward_buffer.end_episode(episode_reward, final_timestep)
+						if self.use_reward_model:
+							self.agents.reward_buffer.end_episode(episode_reward, final_timestep)
 
 					break
 
@@ -450,16 +452,16 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
-				"batch_size": 128,
-				"reward_lr": 1e-2,
-				"reward_weight_decay": 1e-5,
+				"batch_size": 32,
+				"reward_lr": 1e-3,
+				"reward_weight_decay": 1e-4,
 				"variance_loss_coeff": 20.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
-				"reward_warmup": 10000,
+				"reward_warmup": 20000,
 				"update_reward_model_freq": 200,
 				"reward_model_update_epochs": 400,
-				"fine_tune_epochs": 4,
+				"fine_tune_epochs": 10,
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
@@ -472,7 +474,7 @@ if __name__ == '__main__':
 				"temperature_q": 1.0,
 				"attention_dropout_prob_q": 0.0,
 				"q_weight_decay": 0.0,
-				"enable_grad_clip_critic_q": True,
+				"enable_grad_clip_critic_q": False,
 				"grad_clip_critic_q": 0.5,
 				"value_clip": 0.05,
 				"num_heads": 1,
