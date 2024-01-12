@@ -351,7 +351,9 @@ class PPOAgent:
 
 			# loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='none').sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
-
+			print("LOSS")
+			print(loss)
+			print((F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='none').sum()/team_masks.sum()).shape, (self.variance_loss_coeff*reward_var).shape)
 		elif self.experiment_type == "ATRR":
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
 
