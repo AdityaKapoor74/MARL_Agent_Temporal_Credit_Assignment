@@ -300,7 +300,7 @@ class PPOAgent:
 					reward_episode_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)
 
 				print("Per timestep reward")
-				print(reward_time_wise)
+				print(reward_time_wise*team_masks.to(self.device))
 
 				reward_episode_wise = (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
 				
