@@ -462,7 +462,7 @@ if __name__ == '__main__':
 				"update_reward_model_freq": 200,
 				"reward_model_update_epochs": 100,
 				"fine_tune_epochs": 10,
-				"norm_rewards": True,
+				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
