@@ -25,15 +25,16 @@ class Time_Agent_Transformer(nn.Module):
 			self.comp_emb = emb
 		print(self.comp_emb, '-'*50)
 
-		seq_length = seq_length + 1 # adding 1 for CLS like token embedding
+		# seq_length = seq_length + 1 # adding 1 for CLS like token embedding
 
 		self.depth = depth
 		self.agent_attn = agent
 
 		if not comp:
-			self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
+			# 0: CLS for agent & 1: CLS for temporal
+			self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=2).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length+1).to(self.device)
 		
 			tblocks = []
 			for i in range(depth):
@@ -41,10 +42,13 @@ class Time_Agent_Transformer(nn.Module):
 					TransformerBlock(emb=emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 				if agent:
 					tblocks.append(
-						TransformerBlock_Agent(emb=emb, heads=heads, seq_length=seq_length, n_agents= n_agents,
+						# adding an extra agent which is analogous to CLS token
+						TransformerBlock_Agent(emb=emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
 						mask=False, dropout=dropout, wide=wide))
 
 			self.tblocks = nn.Sequential(*tblocks)
+
+			self.final_temporal_block = TransformerBlock(emb=emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 
 			self.toreward = nn.Linear(emb, 1)
 
@@ -52,9 +56,10 @@ class Time_Agent_Transformer(nn.Module):
 		else:
 			self.compress_input = nn.Linear(emb, self.comp_emb)
 
-			self.summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
+			# 0: CLS for agent & 1: CLS for temporal
+			self.summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=2).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
 
 
 			tblocks = []
@@ -63,10 +68,13 @@ class Time_Agent_Transformer(nn.Module):
 					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 				if agent:
 					tblocks.append(
-						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents,
+						# adding an extra agent which is analogous to CLS token
+						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
 						mask=False, dropout=dropout, wide=wide))
 
 			self.tblocks = nn.Sequential(*tblocks)
+
+			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
 			rblocks = []
 
@@ -89,13 +97,14 @@ class Time_Agent_Transformer(nn.Module):
 		
 		b, n_a, t, e = x.size()
 		if not self.comp:
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
-			x = x.view(b*n_a, t, e)
-			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, e)
+			print(self.summary_embedding(torch.LongTensor([0])).shape)
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device)])
+			x = x.view(b*(n_a+1), t, e) + positions
 		else:
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
-			x = self.compress_input(x).view(b*n_a, t, self.comp_emb)
-			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).repeat(b*n_a, 1, 1).to(self.device), x], dim=1) + positions
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, self.comp_emb)
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1)
+			x = self.compress_input(x).view(b*(n_a+1), t, self.comp_emb) + positions
 
 		# x = self.do(x)
 
@@ -104,28 +113,29 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_weights, agent_weights = [], []
 
 		i = 0
+
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
-			temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			# temporal_weights.append(self.tblocks[i].attention.attn_weights)
 			i += 1
 			if self.agent_attn:
 				# odd numbers have agent attention
-				agent_weights.append(self.tblocks[i+1].attention.attn_weights)
+				agent_weights.append(self.tblocks[i].attention.attn_weights)
 				i += 1
 
-			if i < len(self.tblocks):
-				break
 
-				
-		x = self.rblocks(x).view(b, n_a, t+1, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
-				
-		x_episode_wise = self.toreward(x[:, 0, :]).view(b, 1).contiguous()
+		x = torch.cat([self.summary_embedding(torch.LongTensor([1])).unsqueeze(0).repeat(b, 1, 1), x.view(b, n_a+1, t, -1)[:, 0, :, :]], dim=1)
 		
-		# x_episode_wise = x_time_wise.sum(1)
+		x = self.final_temporal_block(x)
 
-		# return x_episode_wise, x_time_wise
+		x = self.rblocks(x[:, 0, :])
+				
+		x_episode_wise = self.toreward(x).view(b, 1).contiguous()
 
-		return x_episode_wise, torch.stack(temporal_weights, dim=0), torch.stack(agent_weights, dim=0)
+		temporal_weights = self.final_temporal_block.attention.attn_weights[:, 0, 1:]
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2)
+
+		return x_episode_wise, temporal_weights, agent_weights
 
 
 

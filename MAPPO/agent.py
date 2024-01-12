@@ -304,6 +304,7 @@ class PPOAgent:
 				return reward_episode_wise
 			elif self.experiment_type == "ATRR":
 				reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0,2,1,3).to(self.device))
+				
 				return reward_episode_wise
 
 	def update_reward_model(self, fine_tune=False, episode=None):
@@ -334,13 +335,16 @@ class PPOAgent:
 			reward_var = reward_var.sum() / team_masks.sum()
 
 			
-			loss = F.l1_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
+			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device)) + self.variance_loss_coeff*reward_var
 
 
 		elif self.experiment_type == "ATRR":
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
-
-			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
+			
+			entropy_temporal_weights = -torch.sum(torch.sum((temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)) * team_masks.to(self.device)), dim=-1))/team_masks.sum()
+			entropy_agent_weights = -torch.sum(torch.sum((agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)) * masks.reshape(-1, self.num_agents).to(self.device)), dim=-1))/masks.sum()
+			
+			loss = F.huber_loss(reward_episode_wise, episodic_rewards.to(self.device))
 			
 
 
@@ -361,7 +365,7 @@ class PPOAgent:
 		if self.experiment_type == "AREL":
 			return loss, reward_var, grad_norm_value_reward
 		elif self.experiment_type == "ATRR":
-			return loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward
+			return loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward
 
 		
 	def plot(self, masks, episode):

@@ -361,8 +361,10 @@ class MAPPO:
 							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=self.reward_plot_counter)
 							if self.experiment_type == "AREL":
 								self.comet_ml.log_metric("Reward_Var", reward_var.item(), step=self.reward_plot_counter)
-							# elif self.experiment_type == "ATRR":
-
+							elif self.experiment_type == "ATRR":
+								self.comet_ml.log_metric("Temporal Weights Entropy", temporal_weights_entropy.item(), step=self.reward_plot_counter)
+								self.comet_ml.log_metric("Agent Weights Entropy", agent_weights_entropy.item(), step=self.reward_plot_counter)
+							
 							self.comet_ml.log_metric("Reward_Grad_Norm", grad_norm_value_reward.item(), step=self.reward_plot_counter)
 
 							self.reward_plot_counter += 1
@@ -446,16 +448,16 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000,
-				"batch_size": 32,
+				"batch_size": 32, # 32
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": True,
+				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
-				"reward_warmup": 1000,
-				"update_reward_model_freq": 200,
-				"reward_model_update_epochs": 100,
-				"fine_tune_epochs": 10,
+				"reward_warmup": 1000, # 1000
+				"update_reward_model_freq": 200, # 200
+				"reward_model_update_epochs": 100, # 100
+				"fine_tune_epochs": 10, # 10
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
