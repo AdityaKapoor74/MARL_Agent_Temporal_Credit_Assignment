@@ -283,10 +283,6 @@ class PPOAgent:
 
 	def evaluate_reward_model(self):
 		with torch.no_grad():
-			# state_allies, state_enemies, one_hot_actions, dones = self.buffer.states_critic_allies[self.buffer.episode_num], self.buffer.states_critic_enemies[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
-			# state_allies = torch.from_numpy(state_allies).float()
-			# state_enemies = torch.from_numpy(state_enemies).float().unsqueeze(1).repeat(1, self.num_agents, 1, 1).reshape(state_enemies.shape[0], self.num_agents, -1)
-			# states = torch.cat([state_allies, state_enemies], dim=-1).unsqueeze(0)
 			states, one_hot_actions, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
 			states = torch.from_numpy(states).float().unsqueeze(0)
 			one_hot_actions = torch.from_numpy(one_hot_actions).float().unsqueeze(0)
@@ -301,9 +297,6 @@ class PPOAgent:
 					shape = reward_time_wise.shape
 					reward_episode_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)
 
-				print("Per timestep reward")
-				print(reward_time_wise*team_masks.to(self.device))
-
 				reward_episode_wise = (reward_time_wise.squeeze(0)*team_masks.to(self.device)).sum()
 				
 				return reward_episode_wise
@@ -312,8 +305,6 @@ class PPOAgent:
 				return reward_episode_wise
 
 	def update_reward_model(self, fine_tune=False, episode=None):
-		# states, episodic_rewards, one_hot_actions, dones = torch.from_numpy(self.reward_buffer.states).float(), torch.from_numpy(self.reward_buffer.episodic_rewards).float(), torch.from_numpy(self.reward_buffer.one_hot_actions).float(), torch.from_numpy(self.reward_buffer.dones).float()
-		# masks = 1 - dones
 		if fine_tune:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample_new_data()
 		else:
@@ -327,24 +318,7 @@ class PPOAgent:
 			
 			episodic_rewards = self.reward_normalizer.normalize(episodic_rewards.view(-1)).view(shape)
 
-		"""
-		print(states.shape)
-		>>> torch.Size([30, 100, 5, 60])  -> 55 + 5 = 60
 		
-		print(episodic_rewards.shape)
-		>>>	torch.Size([30])
-		
-		print(dones.shape)
-		>>>	torch.Size([30, 100, 5])
-
-		print(self.reward_buffer.episode_length)
-		>>> [17. 21. 21. 21. 21. 57. 24. 16. 22. 21. 25. 61. 14. 36. 22. 34. 18. 15.
-			21. 15. 20. 21. 41. 63. 30. 17. 39. 18. 53. 22.]
-
-		"""
-		# episodic_rewards = rewards.sum(dim=1)
-
-
 		state_actions = torch.cat([states, one_hot_actions], dim=-1)
 		if self.experiment_type == "AREL":
 			reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
@@ -357,21 +331,12 @@ class PPOAgent:
 			reward_var[team_masks.view(*shape) == 0.0] = 0.0
 			reward_var = reward_var.sum() / team_masks.sum()
 
-			# loss = (((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1) - episodic_rewards.to(self.device))**2).sum()/team_masks.sum() + self.variance_loss_coeff*reward_var
+			
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum() + self.variance_loss_coeff*reward_var
-			# print("Huber Loss", F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum())
-			# print("Variance Loss", reward_var*self.variance_loss_coeff)
-			# print("Total Loss", loss.item())
 
 
 		elif self.experiment_type == "ATRR":
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device))
-
-			# shape = temporal_weights.shape
-			# temporal_weights = temporal_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
-			# shape = agent_weights.shape
-			# agent_weights = agent_weights.reshape(shape[0], self.batch_size, self.num_agents, self.reward_n_heads, self.max_time_steps+1, self.max_time_steps+1)
-			# print(temporal_weights.shape, agent_weights.shape)
 
 			loss = F.huber_loss((reward_time_wise*team_masks.view(*shape).to(self.device)).sum(dim=-1), episodic_rewards.to(self.device), reduction='sum')/team_masks.sum()
 			
@@ -419,10 +384,6 @@ class PPOAgent:
 
 
 	def update(self, episode):
-		# update reward model is being called from train_agent
-		# for i in range(10):
-		# 	self.update_reward_model(episode-(10-i))
-		
 		q_value_loss_batch = 0
 		policy_loss_batch = 0
 		entropy_batch = 0
@@ -432,9 +393,6 @@ class PPOAgent:
 
 		if self.experiment_type == "AREL":
 			with torch.no_grad():
-				# state_allies, state_enemies = torch.from_numpy(self.buffer.states_critic_allies).float(), torch.from_numpy(self.buffer.states_critic_enemies).float()
-				# state_enemies = state_enemies.unsqueeze(2).repeat(1, 1, self.num_agents, 1, 1).reshape(state_enemies.shape[0], state_enemies.shape[1], self.num_agents, -1)
-				# states = torch.cat([state_allies, state_enemies], dim=-1)
 				states = torch.from_numpy(self.buffer.states_actor).float()
 				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
 				_, reward_time_wise = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device))

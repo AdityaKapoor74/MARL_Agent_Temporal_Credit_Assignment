@@ -269,7 +269,6 @@ class MAPPO:
 
 						if self.use_reward_model:
 							self.agents.reward_buffer.push(
-								# np.concatenate((states_allies_critic, np.repeat(np.expand_dims(states_enemies_critic, axis=0), repeats=self.num_agents, axis=0).reshape(self.num_agents, -1)), axis=-1), one_hot_actions, indiv_dones
 								states_actor, one_hot_actions, indiv_dones
 								)
 
@@ -345,9 +344,7 @@ class MAPPO:
 			
 			if self.use_reward_model:
 				if episode % self.update_reward_model_freq == 0 and self.agents.reward_buffer.episode_num >= self.batch_size:
-					# epoch_train_episode_reward_loss = []
-					# epoch_grad_norms = []
-					# epoch_variance_loss = []
+					
 					for i in range(self.reward_model_update_epochs):
 						if i < self.reward_model_update_epochs - self.fine_tune_epochs:
 							if self.experiment_type == "AREL":
@@ -360,10 +357,6 @@ class MAPPO:
 							elif self.experiment_type == "ATRR":
 								loss, temporal_weights_entropy, agent_weights_entropy, grad_norm_value_reward = self.agents.update_reward_model(fine_tune=True)
 						
-						# epoch_train_episode_reward_loss.append(loss.item())
-						# epoch_grad_norms.append(grad_norm_value_reward.item())
-						# epoch_variance_loss.append(reward_var.item())
-
 						if self.save_comet_ml_plot:
 							self.comet_ml.log_metric("Reward_Loss", loss.item(), step=self.reward_plot_counter)
 							if self.experiment_type == "AREL":
@@ -456,14 +449,14 @@ if __name__ == '__main__':
 				"batch_size": 32,
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
-				"variance_loss_coeff": 0.0,
+				"variance_loss_coeff": 1e-1,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000,
 				"update_reward_model_freq": 200,
 				"reward_model_update_epochs": 100,
 				"fine_tune_epochs": 10,
-				"norm_rewards": False,
+				"norm_rewards": True,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
