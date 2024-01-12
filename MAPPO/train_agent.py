@@ -449,7 +449,7 @@ if __name__ == '__main__':
 				"batch_size": 32,
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
-				"variance_loss_coeff": 0.1,
+				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"reward_warmup": 1000,
