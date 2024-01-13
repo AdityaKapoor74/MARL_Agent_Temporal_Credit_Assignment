@@ -98,11 +98,11 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, e = x.size()
 		if not self.comp:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, e)
-			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device)])
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0]).to(self.device)).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1)
 			x = x.view(b*(n_a+1), t, e) + positions
 		else:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, self.comp_emb)
-			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1)
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0]).to(self.device)).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1)
 			x = self.compress_input(x).view(b*(n_a+1), t, self.comp_emb) + positions
 
 		# x = self.do(x)
@@ -122,7 +122,7 @@ class Time_Agent_Transformer(nn.Module):
 				agent_weights.append(self.tblocks[i].attention.attn_weights)
 				i += 1
 
-		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]))+self.summary_embedding(torch.LongTensor([1]))).unsqueeze(0).repeat(b, 1, 1)], dim=1)
+		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1])).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
 		x = self.final_temporal_block(x, masks)
 
