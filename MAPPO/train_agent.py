@@ -371,7 +371,7 @@ class MAPPO:
 
 
 			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
-				if self.experiment_type != "AREL":
+				if self.use_reward_model is False:
 					self.agents.update(episode)
 				else:
 					if episode >= self.reward_warmup:
