@@ -305,6 +305,11 @@ class PPOAgent:
 			elif self.experiment_type == "ATRR":
 				reward_episode_wise, _, _ = self.reward_model(state_actions.permute(0,2,1,3).to(self.device), torch.cat([team_masks, torch.tensor([1])], dim=-1).unsqueeze(0).to(self.device))
 				
+				print("Per timestep reward")
+				episodic_rewards = torch.from_numpy(self.buffer.rewards[self.buffer.episode_num]).float().sum(dim=0)
+	
+				reward_time_wise = episodic_rewards.unsqueeze(-2).to(self.device) * temporal_weights.unsqueeze(-1)
+
 				return reward_episode_wise
 
 	def update_reward_model(self, fine_tune=False, episode=None):
