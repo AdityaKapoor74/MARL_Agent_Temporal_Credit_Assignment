@@ -122,7 +122,7 @@ class Time_Agent_Transformer(nn.Module):
 				agent_weights.append(self.tblocks[i].attention.attn_weights)
 				i += 1
 
-		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1])).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
+		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
 		x = self.final_temporal_block(x, masks)
 
