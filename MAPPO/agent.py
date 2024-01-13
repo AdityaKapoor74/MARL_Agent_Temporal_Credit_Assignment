@@ -309,6 +309,7 @@ class PPOAgent:
 				episodic_rewards = torch.from_numpy(self.buffer.rewards[self.buffer.episode_num]).float().sum(dim=0)
 	
 				reward_time_wise = episodic_rewards.unsqueeze(-2).to(self.device) * temporal_weights.unsqueeze(-1)
+				print(reward_time_wise)
 
 				return reward_episode_wise
 
