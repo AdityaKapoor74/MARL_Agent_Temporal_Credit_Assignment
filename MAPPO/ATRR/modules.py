@@ -33,7 +33,7 @@ class SelfAttentionWide(nn.Module):
 
         self.attn_weights = None
 
-    def forward(self, x, masks=None):
+    def forward(self, x, masks=None, agent=False, temporal_only=False):
 
         b, t, e = x.size()
         h = self.heads
@@ -60,7 +60,15 @@ class SelfAttentionWide(nn.Module):
 
         if masks is not None:
             shape = dot.shape
-            dot = (torch.where(masks.reshape(b, 1, 1, t).repeat(1, h, 1, 1).bool(), dot.reshape(b, h, t, t), float("-inf"))).reshape(*shape)
+            n_agents = masks.shape[-1]
+            if agent:
+                t_ = masks.shape[1]
+                dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), float("-inf"))).reshape(*shape)
+            elif temporal_only:
+                t_ = masks.shape[-1]
+                dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), float("-inf"))).reshape(*shape)
+            else:
+                dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), float("-inf"))).reshape(*shape)
             
         assert dot.size() == (b*h, t, t)
 
@@ -141,6 +149,11 @@ class SelfAttentionNarrow(nn.Module):
         # - get dot product of queries and keys, and scale
         dot = torch.bmm(queries, keys.transpose(1, 2))
 
+        if masks is not None:
+            shape = dot.shape
+            n_agents = masks.shape[-1]
+            dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), float("-inf"))).reshape(*shape)
+
         assert dot.size() == (b*h, t, t)
 
         if self.mask: # mask out the upper half of the dot matrix, excluding the diagonal
@@ -178,9 +191,9 @@ class TransformerBlock(nn.Module):
 
         self.do = nn.Dropout(dropout)
 
-    def forward(self, x, masks=None):
+    def forward(self, x, masks=None, temporal_only=False):
 
-        attended = self.attention(x, masks)
+        attended = self.attention(x, masks, temporal_only=temporal_only)
 
         x = self.norm1(attended + x)
 
@@ -223,7 +236,7 @@ class TransformerBlock_Agent(nn.Module):
 
         x = x.view(-1, self.n_a, t, e).transpose(1, 2).contiguous().view(-1, self.n_a, e)
 
-        attended = self.attention(x, masks)
+        attended = self.attention(x, masks, agent=True)
 
         x = self.norm1(attended + x)
 
