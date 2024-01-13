@@ -419,7 +419,7 @@ class PPOAgent:
 				_, temporal_weights, agent_weights = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device), team_masks.to(self.device))
 				episodic_rewards = torch.from_numpy(self.buffer.rewards).float().sum(dim=1)
 	
-				reward_time_wise = episodic_rewards.unsqueeze(-2) * temporal_weights.unsqueeze(-1).to(self.device)
+				reward_time_wise = episodic_rewards.unsqueeze(-2).to(self.device) * temporal_weights.unsqueeze(-1)
 				# if self.norm_rewards:
 				# 	shape = reward_time_wise.shape
 				# 	reward_time_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)*((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
