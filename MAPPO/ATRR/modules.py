@@ -33,7 +33,7 @@ class SelfAttentionWide(nn.Module):
 
         self.attn_weights = None
 
-    def forward(self, x):
+    def forward(self, x, masks=None):
 
         b, t, e = x.size()
         h = self.heads
@@ -57,7 +57,11 @@ class SelfAttentionWide(nn.Module):
 
         # - get dot product of queries and keys, and scale
         dot = torch.bmm(queries, keys.transpose(1, 2))
-        
+
+        if masks is not None:
+            shape = dot.shape
+            dot = (torch.where(masks.reshape(b, 1, 1, t).repeat(1, h, 1, 1).bool(), dot.reshape(b, h, t, t), float("-inf"))).reshape(*shape)
+            
         assert dot.size() == (b*h, t, t)
 
         if self.mask: # mask out the upper half of the dot matrix, excluding the diagonal
@@ -105,7 +109,7 @@ class SelfAttentionNarrow(nn.Module):
 
         self.attn_weights = None
 
-    def forward(self, x):
+    def forward(self, x, masks=None):
 
         b, t, e = x.size()
         h = self.heads
@@ -174,9 +178,9 @@ class TransformerBlock(nn.Module):
 
         self.do = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, masks=None):
 
-        attended = self.attention(x)
+        attended = self.attention(x, masks)
 
         x = self.norm1(attended + x)
 
@@ -213,13 +217,13 @@ class TransformerBlock_Agent(nn.Module):
 
         self.do = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, masks=None):
 
         _, t, e = x.size()
 
         x = x.view(-1, self.n_a, t, e).transpose(1, 2).contiguous().view(-1, self.n_a, e)
 
-        attended = self.attention(x)
+        attended = self.attention(x, masks)
 
         x = self.norm1(attended + x)
 

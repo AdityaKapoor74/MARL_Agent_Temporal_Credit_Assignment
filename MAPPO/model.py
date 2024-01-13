@@ -275,7 +275,7 @@ class Policy(nn.Module):
 		output, h = self.RNN(intermediate, hidden_state)
 		output = output.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3)
 		logits = self.Layer_2(output)
-
+		
 		logits = torch.where(mask_actions, logits, self.mask_value)
 		return F.softmax(logits, dim=-1), h
 

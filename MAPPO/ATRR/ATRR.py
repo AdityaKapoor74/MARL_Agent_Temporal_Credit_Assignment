@@ -88,7 +88,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.do = nn.Dropout(dropout)
 			
-	def forward(self, x):
+	def forward(self, x, masks=None):
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
 		:return: predicted log-probability vectors for each token based on the preceding tokens.
@@ -98,7 +98,6 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, e = x.size()
 		if not self.comp:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, e)
-			print(self.summary_embedding(torch.LongTensor([0])).shape)
 			x = torch.cat([self.summary_embedding(torch.LongTensor([0])).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device)])
 			x = x.view(b*(n_a+1), t, e) + positions
 		else:
@@ -123,17 +122,17 @@ class Time_Agent_Transformer(nn.Module):
 				agent_weights.append(self.tblocks[i].attention.attn_weights)
 				i += 1
 
-
-		x = torch.cat([self.summary_embedding(torch.LongTensor([1])).unsqueeze(0).repeat(b, 1, 1), x.view(b, n_a+1, t, -1)[:, 0, :, :]], dim=1)
+		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]))+self.summary_embedding(torch.LongTensor([1]))).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = self.final_temporal_block(x)
+		x = self.final_temporal_block(x, masks)
 
-		x = self.rblocks(x[:, 0, :])
+		x = self.rblocks(x[:, -1, :])
 				
 		x_episode_wise = self.toreward(x).view(b, 1).contiguous()
 
-		temporal_weights = self.final_temporal_block.attention.attn_weights[:, 0, 1:]
-		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2)
+		temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * masks[: , :-1]
+		
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * masks[: , :-1].unsqueeze(-1)
 
 		return x_episode_wise, temporal_weights, agent_weights
 

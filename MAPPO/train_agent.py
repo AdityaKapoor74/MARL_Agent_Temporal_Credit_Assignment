@@ -400,7 +400,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
@@ -441,8 +441,8 @@ if __name__ == '__main__':
 
 				# REWARD MODEL
 				"use_reward_model": True,
-				"reward_n_heads": 3,
-				"reward_depth": 3,
+				"reward_n_heads": 3, # 3
+				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
