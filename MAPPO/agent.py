@@ -438,7 +438,7 @@ class PPOAgent:
 				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
 				masks = 1-torch.from_numpy(self.buffer.dones[:,:-1,:]).float()
 				team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
-				_, temporal_weights, agent_weights = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device), 
+				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device), 
 					team_masks=torch.cat([team_masks, torch.tensor([1]).unsqueeze(0).repeat(team_masks.shape[0], 1)], dim=-1).to(self.device),
 					agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device))
 				# episodic_rewards = torch.from_numpy(self.buffer.rewards).float().sum(dim=1)
