@@ -364,6 +364,7 @@ class RewardRolloutBuffer:
 		# find current index in the buffer
 		episode_num = self.episode_num % self.num_episodes_capacity
 		if episode_num-self.num_new_policy_episodes < 0:
+			print(self.states[episode_num-self.num_new_policy_episodes].shape, self.states[:episode_num].shape)
 			new_states = torch.from_numpy(np.append(self.states[episode_num-self.num_new_policy_episodes], self.states[:episode_num], axis=0)).float()
 			new_episodic_rewards = torch.from_numpy(np.append(self.episodic_rewards[episode_num-self.num_new_policy_episodes], self.episodic_rewards[:episode_num], axis=0)).float()
 			new_one_hot_actions = torch.from_numpy(np.append(self.one_hot_actions[episode_num-self.num_new_policy_episodes], self.one_hot_actions[:episode_num], axis=0)).float()
