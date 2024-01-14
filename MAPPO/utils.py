@@ -322,8 +322,6 @@ class RewardRolloutBuffer:
 
 		self.episode_num += 1
 
-		print("EPISODE NUM; END", self.episode_num)
-
 		# self.clear()
 
 		self.time_step = 0
@@ -353,7 +351,6 @@ class RewardRolloutBuffer:
 		else:
 			episode_num = self.episode_num
 		
-		print(episode_num, self.batch_size)
 		rand_batch = random.sample(range(0, episode_num), self.batch_size)
 
 		states = torch.from_numpy(self.states[rand_batch]).float()
@@ -367,10 +364,10 @@ class RewardRolloutBuffer:
 		# find current index in the buffer
 		episode_num = self.episode_num % self.num_episodes_capacity
 		if episode_num-self.num_new_policy_episodes < 0:
-			new_states = torch.from_numpy(np.append(self.states[episode_num-self.num_new_policy_episodes], self.states[:episode_num], axis=-1)).float()
-			new_episodic_rewards = torch.from_numpy(np.append(self.episodic_rewards[episode_num-self.num_new_policy_episodes], self.episodic_rewards[:episode_num], axis=-1)).float()
-			new_one_hot_actions = torch.from_numpy(np.append(self.one_hot_actions[episode_num-self.num_new_policy_episodes], self.one_hot_actions[:episode_num], axis=-1)).float()
-			new_masks = 1-torch.from_numpy(np.append(self.dones[episode_num-self.num_new_policy_episodes], self.dones[:episode_num], axis=-1)).float()
+			new_states = torch.from_numpy(np.append(self.states[episode_num-self.num_new_policy_episodes], self.states[:episode_num], axis=0)).float()
+			new_episodic_rewards = torch.from_numpy(np.append(self.episodic_rewards[episode_num-self.num_new_policy_episodes], self.episodic_rewards[:episode_num], axis=0)).float()
+			new_one_hot_actions = torch.from_numpy(np.append(self.one_hot_actions[episode_num-self.num_new_policy_episodes], self.one_hot_actions[:episode_num], axis=0)).float()
+			new_masks = 1-torch.from_numpy(np.append(self.dones[episode_num-self.num_new_policy_episodes], self.dones[:episode_num], axis=0)).float()
 		else:
 			new_states = torch.from_numpy(self.states[episode_num-self.num_new_policy_episodes: episode_num]).float()
 			new_episodic_rewards = torch.from_numpy(self.episodic_rewards[episode_num-self.num_new_policy_episodes: episode_num]).float()
