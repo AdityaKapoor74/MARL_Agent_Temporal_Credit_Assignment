@@ -19,10 +19,11 @@ class Time_Agent_Transformer(nn.Module):
 		self.comp = comp
 		self.n_agents = n_agents
 		self.device = device
-		if emb>100:
-			self.comp_emb = 100
-		else:
-			self.comp_emb = emb
+		self.comp_emb = 256
+		# if emb>100:
+		# 	self.comp_emb = 100
+		# else:
+		# 	self.comp_emb = emb
 		print(self.comp_emb, '-'*50)
 
 		# seq_length = seq_length + 1 # adding 1 for CLS like token embedding
