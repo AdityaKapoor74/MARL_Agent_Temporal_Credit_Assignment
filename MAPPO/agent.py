@@ -431,6 +431,7 @@ class PPOAgent:
 					shape = reward_time_wise.shape
 					reward_time_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)*((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
 
+				print(reward_time_wise.shape)
 				self.buffer.rewards = reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents).cpu().numpy() #(reward_time_wise.unsqueeze(-1).repeat(1, 1, self.num_agents)*(1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device))).cpu().numpy()
 		elif self.experiment_type == "ATRR":
 			with torch.no_grad():
@@ -445,6 +446,7 @@ class PPOAgent:
 	
 				# reward_time_wise = episodic_rewards.unsqueeze(-2).to(self.device) * temporal_weights.unsqueeze(-1)
 				reward_time_wise = reward_episode_wise.unsqueeze(-2).to(self.device) * temporal_weights.unsqueeze(-1)
+				print(reward_time_wise.shape)
 				# if self.norm_rewards:
 				# 	shape = reward_time_wise.shape
 				# 	reward_time_wise = self.reward_normalizer.denormalize(reward_time_wise.view(-1)).view(shape)*((1-torch.from_numpy(self.buffer.dones[:,:-1,:]).to(self.device)).sum(dim=-1)>0).float()
