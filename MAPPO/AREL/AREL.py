@@ -187,7 +187,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.do = nn.Dropout(dropout)
 			
-	def forward(self, x):
+	def forward(self, x, team_masks=None, agent_masks=None):
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
 		:return: predicted log-probability vectors for each token based on the preceding tokens.
@@ -204,12 +204,22 @@ class Time_Agent_Transformer(nn.Module):
 
 		# x = self.do(x)
 
-		x = self.tblocks(x)
+		if agent_masks is not None:
+			i = 0
+			while i < len(self.tblocks):
+				x = self.tblocks[i](x, masks=agent_masks)
+				i+=1
+
+		else:
+			x = self.tblocks(x)
 				
 		x = self.rblocks(x).view(b, n_a, t, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
 				
 		x_time_wise = self.toreward(x).view(b, t).contiguous()
-		
+
+		if team_masks is not None:
+			x_time_wise = self.toreward(x).view(b, t).contiguous() * team_masks.to(self.device)
+
 		x_episode_wise = x_time_wise.sum(1)
 
 		return x_episode_wise, x_time_wise

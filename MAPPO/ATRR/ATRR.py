@@ -108,7 +108,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# x = self.do(x)
 
-		temporal_weights, agent_weights = [], []
+		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 
 		i = 0
 
@@ -116,11 +116,13 @@ class Time_Agent_Transformer(nn.Module):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
 			# temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			temporal_scores.append(self.tblocks[i].attention.attn_scores)
 			i += 1
 			if self.agent_attn:
 				# odd numbers have agent attention
 				x = self.tblocks[i](x, masks=agent_masks)
 				agent_weights.append(self.tblocks[i].attention.attn_weights)
+				agent_scores.append(self.tblocks[i].attention.attn_scores)
 				i += 1
 
 		x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
@@ -132,8 +134,12 @@ class Time_Agent_Transformer(nn.Module):
 		x_episode_wise = self.toreward(x).view(b, 1).contiguous()
 
 		temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
+		temporal_scores = torch.stack(temporal_scores, dim=0)
+		# print(temporal_scores.shape)
 
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
+		agent_scores = torch.stack(agent_scores, dim=0)
+		# print(agent_scores.shape)
 
 		return x_episode_wise, temporal_weights, agent_weights
 

@@ -32,6 +32,7 @@ class SelfAttentionWide(nn.Module):
         self.unifyheads = nn.Linear(heads * emb, emb)
 
         self.attn_weights = None
+        self.attn_scores = None
 
     def forward(self, x, masks=None, agent=False, temporal_only=False):
 
@@ -58,6 +59,8 @@ class SelfAttentionWide(nn.Module):
         # - get dot product of queries and keys, and scale
         dot = torch.bmm(queries, keys.transpose(1, 2))
 
+        self.attn_scores = dot
+
         if masks is not None:
             shape = dot.shape
             n_agents = masks.shape[-1]
@@ -69,7 +72,7 @@ class SelfAttentionWide(nn.Module):
                 dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), float("-inf"))).reshape(*shape)
             else:
                 dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), float("-inf"))).reshape(*shape)
-            
+
         assert dot.size() == (b*h, t, t)
 
         if self.mask: # mask out the upper half of the dot matrix, excluding the diagonal
@@ -116,8 +119,9 @@ class SelfAttentionNarrow(nn.Module):
         self.unifyheads = nn.Linear(heads * s, emb)
 
         self.attn_weights = None
+        self.attn_scores = None
 
-    def forward(self, x, masks=None):
+    def forward(self, x, masks=None, agent=False, temporal_only=False):
 
         b, t, e = x.size()
         h = self.heads
@@ -149,10 +153,19 @@ class SelfAttentionNarrow(nn.Module):
         # - get dot product of queries and keys, and scale
         dot = torch.bmm(queries, keys.transpose(1, 2))
 
+        self.attn_scores = dot
+
         if masks is not None:
             shape = dot.shape
             n_agents = masks.shape[-1]
-            dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), float("-inf"))).reshape(*shape)
+            if agent:
+                t_ = masks.shape[1]
+                dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), float("-inf"))).reshape(*shape)
+            elif temporal_only:
+                t_ = masks.shape[-1]
+                dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), float("-inf"))).reshape(*shape)
+            else:
+                dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), float("-inf"))).reshape(*shape)
 
         assert dot.size() == (b*h, t, t)
 
