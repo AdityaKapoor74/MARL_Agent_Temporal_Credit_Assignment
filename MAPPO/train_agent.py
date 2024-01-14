@@ -447,7 +447,7 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
-				"num_episodes_capacity": 64, # 40000
+				"num_episodes_capacity": 40000, # 40000
 				"batch_size": 32, # 32
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
