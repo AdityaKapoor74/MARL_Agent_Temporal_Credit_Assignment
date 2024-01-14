@@ -79,13 +79,13 @@ class Time_Agent_Transformer(nn.Module):
 			
 			rblocks = []
 
-			rblocks.append(nn.Linear(self.comp_emb, 50))
+			rblocks.append(nn.Linear(self.comp_emb, 64))
 			
-			rblocks.append(nn.Linear(50, 50))
+			rblocks.append(nn.Linear(64, 64))
 			
 			self.rblocks = nn.Sequential(*rblocks)
 										   
-			self.toreward = nn.Linear(50, 1)
+			self.toreward = nn.Linear(64, 1)
 
 			self.do = nn.Dropout(dropout)
 			
@@ -104,8 +104,8 @@ class Time_Agent_Transformer(nn.Module):
 			x = x.view(b*(n_a+1), t, e) + positions
 		else:
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, self.comp_emb)
-			x = torch.cat([self.summary_embedding(torch.LongTensor([0]).to(self.device)).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1)
-			x = self.compress_input(x).view(b*(n_a+1), t, self.comp_emb) + positions
+			x = self.compress_input(x)
+			x = torch.cat([self.summary_embedding(torch.LongTensor([0]).to(self.device)).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1).view(b*(n_a+1), t, self.comp_emb) + positions
 
 		# x = self.do(x)
 
