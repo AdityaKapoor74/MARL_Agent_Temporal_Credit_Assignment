@@ -364,11 +364,21 @@ class RewardRolloutBuffer:
 		# find current index in the buffer
 		episode_num = self.episode_num % self.num_episodes_capacity
 		if episode_num-self.num_new_policy_episodes < 0:
-			print(self.states[episode_num-self.num_new_policy_episodes].shape, self.states[:episode_num].shape)
-			new_states = torch.from_numpy(np.append(self.states[episode_num-self.num_new_policy_episodes], self.states[:episode_num], axis=0)).float()
-			new_episodic_rewards = torch.from_numpy(np.append(self.episodic_rewards[episode_num-self.num_new_policy_episodes], self.episodic_rewards[:episode_num], axis=0)).float()
-			new_one_hot_actions = torch.from_numpy(np.append(self.one_hot_actions[episode_num-self.num_new_policy_episodes], self.one_hot_actions[:episode_num], axis=0)).float()
-			new_masks = 1-torch.from_numpy(np.append(self.dones[episode_num-self.num_new_policy_episodes], self.dones[:episode_num], axis=0)).float()
+			if len(self.states[episode_num-self.num_new_policy_episodes].shape) > len(self.states[:episode_num].shape):
+				new_states = np.append(self.states[episode_num-self.num_new_policy_episodes], np.expand_dims(self.states[:episode_num], axis=0), axis=0)
+				new_episodic_rewards = np.append(self.episodic_rewards[episode_num-self.num_new_policy_episodes], np.expand_dims(self.episodic_rewards[:episode_num], axis=0), axis=0)
+				new_one_hot_actions = np.append(self.one_hot_actions[episode_num-self.num_new_policy_episodes], np.expand_dims(self.one_hot_actions[:episode_num], axis=0), axis=0)
+				new_masks = np.append(self.dones[episode_num-self.num_new_policy_episodes], np.expand_dims(self.dones[:episode_num], axis=0), axis=0)
+			elif len(self.states[episode_num-self.num_new_policy_episodes].shape) < len(self.states[:episode_num].shape):
+				new_states = np.append(np.expand_dims(self.states[episode_num-self.num_new_policy_episodes], axis=0), self.states[:episode_num], axis=0)
+				new_episodic_rewards = np.append(np.expand_dims(self.episodic_rewards[episode_num-self.num_new_policy_episodes], axis=0), self.episodic_rewards[:episode_num], axis=0)
+				new_one_hot_actions = np.append(np.expand_dims(self.one_hot_actions[episode_num-self.num_new_policy_episodes], axis=0), self.one_hot_actions[:episode_num], axis=0)
+				new_masks = np.append(np.expand_dims(self.dones[episode_num-self.num_new_policy_episodes], axis=0), self.dones[:episode_num], axis=0)
+			
+			new_states = torch.from_numpy(new_states).float()
+			new_episodic_rewards = torch.from_numpy(new_episodic_rewards).float()
+			new_one_hot_actions = torch.from_numpy(new_one_hot_actions).float()
+			new_masks = 1-torch.from_numpy(new_masks).float()
 		else:
 			new_states = torch.from_numpy(self.states[episode_num-self.num_new_policy_episodes: episode_num]).float()
 			new_episodic_rewards = torch.from_numpy(self.episodic_rewards[episode_num-self.num_new_policy_episodes: episode_num]).float()
