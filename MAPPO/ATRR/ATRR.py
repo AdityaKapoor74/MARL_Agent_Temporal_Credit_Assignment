@@ -19,7 +19,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.comp = comp
 		self.n_agents = n_agents
 		self.device = device
-		self.comp_emb = 256
+		self.comp_emb = 128
 		# if emb>100:
 		# 	self.comp_emb = 100
 		# else:
