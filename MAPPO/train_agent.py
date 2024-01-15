@@ -287,12 +287,13 @@ class MAPPO:
 
 					final_timestep = step
 
-					predicted_episode_reward = self.agents.evaluate_reward_model()
+					if self.use_reward_model:
+						predicted_episode_reward = self.agents.evaluate_reward_model()
+						self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 
 					if self.save_comet_ml_plot:
 						self.comet_ml.log_metric('Episode_Length', step, episode)
 						self.comet_ml.log_metric('Reward', episode_reward, episode)
-						self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 						self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
 						self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
 						self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
@@ -400,7 +401,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING

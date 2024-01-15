@@ -146,9 +146,11 @@ class SelfAttentionNarrow(nn.Module):
             n_agents = masks.shape[-1]
             if agent:
                 t_ = masks.shape[1]
-                dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), -1e5)).reshape(*shape)
+                dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), -1e9)).reshape(*shape)
+                dot = (torch.where(masks.reshape(-1, t_, 1, n_agents, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), -1e9)).reshape(*shape)
             else:
-                dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), -1e5)).reshape(*shape)
+                dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), -1e9)).reshape(*shape)
+                dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), -1e9)).reshape(*shape)
 
         assert dot.size() == (b*h, t, t)
 
