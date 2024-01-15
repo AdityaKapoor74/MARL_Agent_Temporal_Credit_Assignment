@@ -456,8 +456,8 @@ if __name__ == '__main__':
 				"reward_grad_clip_value": 10.0,
 				"reward_warmup": 1000, # 1000
 				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 200, # 100
-				"fine_tune_epochs": 0, # 10
+				"reward_model_update_epochs": 100, # 100
+				"fine_tune_epochs": 10, # 10
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
