@@ -186,6 +186,8 @@ class MAPPO:
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
 
+			action_list = []
+
 			episodic_team_reward = [0]*self.num_agents
 			episodic_agent_reward = [0]*self.num_agents
 			
@@ -213,6 +215,8 @@ class MAPPO:
 						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, last_one_hot_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
 				else:
 					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, last_one_hot_actions, mask_actions, rnn_hidden_state_actor)
+
+				action_list.append(actions)
 
 				one_hot_actions = np.zeros((self.num_agents, self.num_actions))
 				for i, act in enumerate(actions):
@@ -289,6 +293,7 @@ class MAPPO:
 
 					if self.use_reward_model:
 						predicted_episode_reward = self.agents.evaluate_reward_model()
+						print(action_list)
 						self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 
 					if self.save_comet_ml_plot:
@@ -497,8 +502,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 8e-3, #8e-3
-				"entropy_pen_final": 8e-3,
+				"entropy_pen": 2e-2, #8e-3
+				"entropy_pen_final": 2e-2,
 				"entropy_pen_steps": 2000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
