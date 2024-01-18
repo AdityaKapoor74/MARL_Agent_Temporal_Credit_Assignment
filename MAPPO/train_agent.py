@@ -455,17 +455,17 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
-				"num_episodes_capacity": 40000, # 40000
-				"batch_size": 128, # 128
+				"num_episodes_capacity": 10, # 40000
+				"batch_size": 10, # 128
 				"reward_lr": 2e-5,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"reward_warmup": 1000, # 1000
-				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 100, # 100
-				"fine_tune_epochs": 2, # 10
+				"update_reward_model_freq": 10, # 200
+				"reward_model_update_epochs": 10, # 100
+				"fine_tune_epochs": 10, # 10
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
