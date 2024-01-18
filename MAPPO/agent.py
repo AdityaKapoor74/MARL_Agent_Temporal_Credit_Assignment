@@ -360,14 +360,16 @@ class PPOAgent:
 
 
 		elif self.experiment_type == "ATRR":
+			agent_masks = torch.cat([masks, torch.ones(masks.shape[0], 1, masks.shape[2])], dim=1)
+
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device), 
 				team_masks=torch.cat([team_masks, torch.tensor([1]).unsqueeze(0).repeat(team_masks.shape[0], 1)], dim=-1).to(self.device),
 				# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
-				agent_masks=torch.cat([masks, torch.ones(masks.shape[0], 1, masks.shape[2])], dim=1).to(self.device)
+				agent_masks=agent_masks.to(self.device)
 				)
 			
 			entropy_temporal_weights = -torch.sum(torch.sum((temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)) * team_masks.to(self.device)), dim=-1))/team_masks.sum()
-			entropy_agent_weights = -torch.sum(torch.sum((agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)) * masks.reshape(-1, self.num_agents).to(self.device)), dim=-1))/masks.sum()
+			entropy_agent_weights = -torch.sum(torch.sum((agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)) * agent_masks.reshape(-1, self.num_agents).to(self.device)), dim=-1))/agent_masks.sum()
 			
 			loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_rewards.to(self.device))
 			
