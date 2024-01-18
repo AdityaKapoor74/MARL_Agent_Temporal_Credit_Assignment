@@ -294,7 +294,6 @@ class MAPPO:
 					if self.use_reward_model:
 						predicted_episode_reward = self.agents.evaluate_reward_model()
 						print(action_list)
-						self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 
 					if self.save_comet_ml_plot:
 						self.comet_ml.log_metric('Episode_Length', step, episode)
@@ -303,6 +302,9 @@ class MAPPO:
 						self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
 						self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
 						self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
+
+						if self.use_reward_model:
+							self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, episode)
 
 					# update entropy params
 					self.agents.update_parameters()
@@ -502,8 +504,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 2e-2, #8e-3
-				"entropy_pen_final": 2e-2,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 2000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
