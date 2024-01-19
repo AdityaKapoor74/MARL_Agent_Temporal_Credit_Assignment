@@ -462,7 +462,7 @@ if __name__ == '__main__':
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
-				"reward_warmup": 0, # 1000
+				"reward_warmup": 1000, # 1000
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 100, # 100
 				"fine_tune_epochs": 2, # 10
