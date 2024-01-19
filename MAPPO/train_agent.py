@@ -450,14 +450,14 @@ if __name__ == '__main__':
 				# REWARD MODEL
 				"use_reward_model": True,
 				"reward_n_heads": 3, # 3
-				"reward_depth": 3, # 3
+				"reward_depth": 1, # 3
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000, # 40000
 				"batch_size": 128, # 128
-				"reward_lr": 1e-3,
+				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
