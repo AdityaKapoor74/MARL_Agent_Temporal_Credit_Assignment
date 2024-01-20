@@ -452,7 +452,7 @@ if __name__ == '__main__':
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
-				"reward_dropout": 0.2,
+				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000, # 40000
