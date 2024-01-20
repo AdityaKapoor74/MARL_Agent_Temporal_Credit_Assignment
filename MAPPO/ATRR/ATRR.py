@@ -37,7 +37,7 @@ class Time_Agent_Transformer(nn.Module):
 			# self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
 
 			# one temporal embedding for each agent
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=self.n_agents).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length+1).to(self.device)
 		
@@ -67,7 +67,7 @@ class Time_Agent_Transformer(nn.Module):
 			# self.summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
 			
 			# one temporal embedding for each agent
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=self.n_agents).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=1).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
 
@@ -114,7 +114,8 @@ class Time_Agent_Transformer(nn.Module):
 			# x = x.view(b*(n_a+1), t, e) + positions
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
 			# concatenate temporal embedding for each agent
-			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(n_a, device=(self.device if self.device is not None else d()))).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e).expand(b, n_a, 1, e)], dim=-2)
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(n_a, device=(self.device if self.device is not None else d()))).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
+			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
 			x = x.view(b*n_a, t+1, e) + positions
 		else:
 			# positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d()))[:t])[None, :, :].expand(b*(n_a+1), t, self.comp_emb)
@@ -122,7 +123,8 @@ class Time_Agent_Transformer(nn.Module):
 			# x = torch.cat([self.summary_embedding(torch.LongTensor([0]).to(self.device)).unsqueeze(0).unsqueeze(0).repeat(b, 1, t, 1).to(self.device), x], dim=1).view(b*(n_a+1), t, self.comp_emb) + positions
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
 			# concatenate temporal embedding for each agent
-			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(n_a, device=(self.device if self.device is not None else d()))).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(n_a, device=(self.device if self.device is not None else d()))).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
+			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
 			x = self.compress_input(x).view(b*n_a, t+1, -1) + positions
 
 		# x = self.do(x)
@@ -147,7 +149,7 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = x.view(b, n_a, t+1, -1).sum(dim=1)
+		x = x.view(b, n_a, t+1, -1).mean(dim=1)
 
 		x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
