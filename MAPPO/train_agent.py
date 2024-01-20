@@ -466,7 +466,7 @@ if __name__ == '__main__':
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 100, # 100
 				"fine_tune_epochs": 1, # 10
-				"fine_tune_reward_lr": 2e-5,
+				"fine_tune_reward_lr": 1e-4,
 				"fine_tune_batch_size": 100,
 				"norm_rewards": False,
 				"clamp_rewards": False,
