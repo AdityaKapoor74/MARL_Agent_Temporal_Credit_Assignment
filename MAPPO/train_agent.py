@@ -450,9 +450,9 @@ if __name__ == '__main__':
 				# REWARD MODEL
 				"use_reward_model": True,
 				"reward_n_heads": 3, # 3
-				"reward_depth": 1, # 3
+				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
-				"reward_dropout": 0.0,
+				"reward_dropout": 0.2,
 				"reward_attn_net_wide": True,
 				"reward_comp": True,
 				"num_episodes_capacity": 40000, # 40000
@@ -465,7 +465,9 @@ if __name__ == '__main__':
 				"reward_warmup": 1000, # 1000
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 100, # 100
-				"fine_tune_epochs": 2, # 10
+				"fine_tune_epochs": 1, # 10
+				"fine_tune_reward_lr": 2e-5,
+				"fine_tune_batch_size": 30,
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,

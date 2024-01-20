@@ -51,6 +51,8 @@ class PPOAgent:
 		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
 		self.reward_n_heads = dictionary["reward_n_heads"]
 		self.norm_rewards = dictionary["norm_rewards"]
+		self.fine_tune_reward_lr = dictionary["fine_tune_reward_lr"]
+		self.fine_tune_batch_size = dictionary["fine_tune_batch_size"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -164,7 +166,6 @@ class PPOAgent:
 		if self.use_reward_model:
 
 			self.reward_buffer = RewardRolloutBuffer(
-				num_new_policy_episodes=self.update_ppo_agent,
 				num_episodes_capacity=self.num_episodes_capacity, 
 				max_time_steps=self.max_time_steps, 
 				num_agents=self.num_agents, 
@@ -172,6 +173,7 @@ class PPOAgent:
 				obs_shape=self.actor_observation_shape,
 				num_actions=self.num_actions, 
 				batch_size=self.batch_size,
+				fine_tune_batch_size=self.fine_tune_batch_size,
 				)
 
 			if self.experiment_type == "AREL":
@@ -327,8 +329,14 @@ class PPOAgent:
 	def update_reward_model(self, fine_tune=False, episode=None):
 		if fine_tune:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample_new_data()
+
+			for param_group in self.reward_optimizer.param_groups:
+    			param_group['lr'] = self.fine_tune_reward_lr
 		else:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
+
+			for param_group in self.reward_optimizer.param_groups:
+    			param_group['lr'] = self.reward_lr
 
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
