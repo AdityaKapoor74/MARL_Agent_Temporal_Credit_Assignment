@@ -331,12 +331,12 @@ class PPOAgent:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample_new_data()
 
 			for param_group in self.reward_optimizer.param_groups:
-    			param_group['lr'] = self.fine_tune_reward_lr
+				param_group['lr'] = self.fine_tune_reward_lr
 		else:
 			states, episodic_rewards, one_hot_actions, masks = self.reward_buffer.sample()
 
 			for param_group in self.reward_optimizer.param_groups:
-    			param_group['lr'] = self.reward_lr
+				param_group['lr'] = self.reward_lr
 
 		team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
