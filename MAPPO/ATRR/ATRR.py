@@ -269,6 +269,7 @@ class Time_Agent_Transformer(nn.Module):
 		x_episode_wise = self.toreward(x).view(b, 1).contiguous()
 
 		temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
+
 		temporal_scores = torch.stack(temporal_scores, dim=0)
 		# print(temporal_scores.shape)
 
