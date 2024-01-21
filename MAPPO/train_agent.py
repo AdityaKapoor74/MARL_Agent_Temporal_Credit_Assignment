@@ -454,7 +454,10 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": True,
+				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_linear_compression_dim": 128,
+				"reward_hypernet_hidden_dim": 64,
+				"reward_hypernet_final_dim": 64,
 				"num_episodes_capacity": 40000, # 40000
 				"batch_size": 128, # 128
 				"reward_lr": 1e-4,

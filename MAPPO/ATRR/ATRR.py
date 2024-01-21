@@ -20,7 +20,7 @@ def init_(m, gain=0.01, activate=False):
 
 class HyperNetwork(nn.Module):
 	def __init__(self, num_actions, hidden_dim, final_dim, obs_dim):
-		super(QMIXNetwork, self).__init__()
+		super(HyperNetwork, self).__init__()
 		self.num_actions = num_actions
 		self.hidden_dim = hidden_dim
 		self.final_dim = final_dim
@@ -48,7 +48,7 @@ class HyperNetwork(nn.Module):
 
 	def forward(self, one_hot_actions, obs):
 		one_hot_actions = one_hot_actions.reshape(-1, 1, self.num_actions)
-		w1 = torch.abs(self.hyper_w1(obs))
+		w1 = self.hyper_w1(obs)
 		b1 = self.hyper_b1(obs)
 		w1 = w1.reshape(-1, self.num_actions, self.hidden_dim)
 		b1 = b1.reshape(-1, 1, self.hidden_dim)
@@ -82,7 +82,10 @@ class Time_Agent_Transformer(nn.Module):
 		agent=True, 
 		dropout=0.0, 
 		wide=True, 
-		comp=True, 
+		comp="no_compression", 
+		hypernet_hidden_dim=128,
+		hypernet_final_dim=128,
+		linear_compression_dim=128,
 		device=None
 		):
 		super().__init__()
@@ -93,14 +96,17 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.obs_shape = obs_shape
 		self.action_shape = action_shape
-		self.comp_emb = 128
+		if comp == "linear_compression":
+			self.comp_emb = linear_compression_dim
+		else:
+			self.comp_emb = hypernet_final_dim
 
 		print(self.comp_emb, '-'*50)
 
 		self.depth = depth
 		self.agent_attn = agent
 
-		if not comp:
+		if comp == "no_compression":
 			# one temporal embedding for each agent
 			self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=1).to(self.device)
 
@@ -124,7 +130,7 @@ class Time_Agent_Transformer(nn.Module):
 			self.toreward = init_(nn.Linear(emb, 1))
 
 			self.do = nn.Dropout(dropout)
-		else:
+		elif comp == "linear_compression":
 			self.compress_input = nn.Sequential(
 					init_(nn.Linear(obs_shape, self.comp_emb)),
 					nn.LayerNorm(self.comp_emb),
@@ -163,6 +169,43 @@ class Time_Agent_Transformer(nn.Module):
 			self.toreward = init_(nn.Linear(64, 1))
 
 			self.do = nn.Dropout(dropout)
+
+		elif comp == "hypernet_compression":
+
+			self.hypernet = HyperNetwork(action_shape, hypernet_hidden_dim, hypernet_final_dim, obs_shape)
+
+			# one temporal embedding for each agent
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
+
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
+
+
+			tblocks = []
+			for i in range(depth):
+				tblocks.append(
+					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
+				if agent:
+					tblocks.append(
+						# adding an extra agent which is analogous to CLS token
+						# TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
+						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
+						mask=False, dropout=dropout, wide=wide))
+
+			self.tblocks = nn.Sequential(*tblocks)
+
+			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			
+			rblocks = []
+
+			rblocks.append(init_(nn.Linear(self.comp_emb, 64)))
+			
+			rblocks.append(init_(nn.Linear(64, 64)))
+			
+			self.rblocks = nn.Sequential(*rblocks)
+										   
+			self.toreward = init_(nn.Linear(64, 1))
+
+			self.do = nn.Dropout(dropout)
 			
 	def forward(self, obs, one_hot_actions, team_masks=None, agent_masks=None):
 
@@ -173,14 +216,14 @@ class Time_Agent_Transformer(nn.Module):
 		# tokens = self.token_embedding(x)
 		
 		
-		if not self.comp:
+		if self.comp == "no_compression":
 			x = torch.cat([obs, one_hot_actions], dim=-1).to(self.device)
 			b, n_a, t, e = x.size()
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
 			# concatenate temporal embedding for each agent
 			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
 			x = x.view(b*n_a, t+1, e) + positions
-		else:
+		elif self.comp == "linear_compression":
 			b, n_a, t, _ = obs.size()
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb+self.action_shape)
 			x = self.compress_input(obs)
@@ -188,7 +231,13 @@ class Time_Agent_Transformer(nn.Module):
 			b, n_a, t, e = x.size()
 			# concatenate temporal embedding for each agent
 			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
-
+		elif self.comp == "hypernet_compression":
+			b, n_a, t, _ = obs.size()
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
+			x = self.hypernet(one_hot_actions, obs).view(b, n_a, t, -1)
+			b, n_a, t, e = x.size()
+			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+		
 		# x = self.do(x)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []

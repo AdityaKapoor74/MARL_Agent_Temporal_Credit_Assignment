@@ -208,6 +208,9 @@ class PPOAgent:
 					dropout=dictionary["reward_dropout"], 
 					wide=dictionary["reward_attn_net_wide"], 
 					comp=dictionary["reward_comp"], 
+					linear_compression_dim=dictionary["reward_linear_compression_dim"],
+					hypernet_hidden_dim=dictionary["reward_hypernet_hidden_dim"],
+					hypernet_final_dim=dictionary["reward_hypernet_final_dim"],
 					device=self.device,
 					).to(self.device)
 
