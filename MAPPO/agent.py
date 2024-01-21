@@ -198,7 +198,8 @@ class PPOAgent:
 			elif self.experiment_type == "ATRR":
 				from ATRR import ATRR
 				self.reward_model = ATRR.Time_Agent_Transformer(
-					emb=self.actor_observation_shape+self.num_actions, 
+					obs_shape=self.actor_observation_shape,
+					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=self.max_time_steps, 
@@ -288,11 +289,13 @@ class PPOAgent:
 			states, one_hot_actions, dones = self.buffer.states_actor[self.buffer.episode_num], self.buffer.one_hot_actions[self.buffer.episode_num], self.buffer.dones[self.buffer.episode_num]
 			states = torch.from_numpy(states).float().unsqueeze(0)
 			one_hot_actions = torch.from_numpy(one_hot_actions).float().unsqueeze(0)
-			state_actions = torch.cat([states, one_hot_actions], dim=-1)
 			masks = 1 - torch.from_numpy(dones[:-1, :]).float()
 			team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
 
 			if self.experiment_type == "AREL":
+
+				state_actions = torch.cat([states, one_hot_actions], dim=-1)
+
 				reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0,2,1,3).to(self.device),
 					team_masks=team_masks.unsqueeze(0).to(self.device),
 					agent_masks=masks.unsqueeze(0).to(self.device)
@@ -308,7 +311,9 @@ class PPOAgent:
 				
 				return reward_episode_wise
 			elif self.experiment_type == "ATRR":
-				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0,2,1,3).to(self.device), 
+				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+					states.permute(0,2,1,3).to(self.device), 
+					one_hot_actions.permute(0,2,1,3).to(self.device), 
 					team_masks=torch.cat([team_masks, torch.tensor([1])], dim=-1).unsqueeze(0).to(self.device),
 					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], 1)], dim=-1).unsqueeze(0).to(self.device)
 					agent_masks=torch.cat([masks, torch.ones(1, masks.shape[1])], dim=0).unsqueeze(0).to(self.device)
@@ -346,10 +351,9 @@ class PPOAgent:
 			
 			episodic_rewards = self.reward_normalizer.normalize(episodic_rewards.view(-1)).view(shape)
 
-		
-		state_actions = torch.cat([states, one_hot_actions], dim=-1)
-
 		if self.experiment_type == "AREL":
+			state_actions = torch.cat([states, one_hot_actions], dim=-1)
+
 			reward_episode_wise, reward_time_wise = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device),
 				team_masks=team_masks.to(self.device),
 				agent_masks=masks.to(self.device)
@@ -370,7 +374,9 @@ class PPOAgent:
 		elif self.experiment_type == "ATRR":
 			agent_masks = torch.cat([masks, torch.ones(masks.shape[0], 1, masks.shape[2])], dim=1)
 
-			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(state_actions.permute(0, 2, 1, 3).to(self.device), 
+			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+				states.permute(0, 2, 1, 3).to(self.device), 
+				one_hot_actions.permute(0, 2, 1, 3).to(self.device), 
 				team_masks=torch.cat([team_masks, torch.tensor([1]).unsqueeze(0).repeat(team_masks.shape[0], 1)], dim=-1).to(self.device),
 				# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
 				agent_masks=agent_masks.to(self.device)
@@ -455,7 +461,9 @@ class PPOAgent:
 				one_hot_actions = torch.from_numpy(self.buffer.one_hot_actions).float()
 				masks = 1-torch.from_numpy(self.buffer.dones[:,:-1,:]).float()
 				team_masks = (masks.sum(dim=-1)[:, ] > 0).float()
-				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(torch.cat([states, one_hot_actions], dim=-1).permute(0,2,1,3).to(self.device), 
+				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+					states.permute(0,2,1,3).to(self.device), 
+					one_hot_actions.permute(0,2,1,3).to(self.device),
 					team_masks=torch.cat([team_masks, torch.tensor([1]).unsqueeze(0).repeat(team_masks.shape[0], 1)], dim=-1).to(self.device),
 					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
 					agent_masks=torch.cat([masks, torch.ones(masks.shape[0], 1, masks.shape[2])], dim=1).to(self.device)
