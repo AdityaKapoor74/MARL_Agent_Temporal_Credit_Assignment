@@ -504,7 +504,7 @@ class PPOAgent:
 				advantage_mean = torch.nanmean(advantage_copy)
 				advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 				
-				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*masks.view(*shape)
+				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))* masks.view(*shape)
 
 			target_shape = q_values_old.shape
 			q_values, attention_weights_q, score_q, _ = self.critic_network_q(
