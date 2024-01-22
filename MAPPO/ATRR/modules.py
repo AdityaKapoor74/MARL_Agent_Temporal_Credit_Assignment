@@ -216,9 +216,9 @@ class TransformerBlock(nn.Module):
 		self.norm2 = nn.LayerNorm(emb)
 
 		self.ff = nn.Sequential(
-			nn.Linear(emb, ff_hidden_mult * emb),
+			init_(nn.Linear(emb, ff_hidden_mult * emb), activate=True),
 			nn.GELU(),
-			nn.Linear(ff_hidden_mult * emb, emb)
+			init_(nn.Linear(ff_hidden_mult * emb, emb), activate=True)
 		)
 
 		self.do = nn.Dropout(dropout)
@@ -255,9 +255,9 @@ class TransformerBlock_Agent(nn.Module):
 		self.norm2 = nn.LayerNorm(emb)
 
 		self.ff = nn.Sequential(
-			nn.Linear(emb, ff_hidden_mult * emb),
+			init_(nn.Linear(emb, ff_hidden_mult * emb), activate=True),
 			nn.GELU(),
-			nn.Linear(ff_hidden_mult * emb, emb)
+			init_(nn.Linear(ff_hidden_mult * emb, emb), True)
 		)
 
 		self.do = nn.Dropout(dropout)

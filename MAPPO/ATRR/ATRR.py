@@ -26,22 +26,22 @@ class HyperNetwork(nn.Module):
 		self.final_dim = final_dim
 
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim)),
+			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(hidden_dim, num_actions * hidden_dim))
+			init_(nn.Linear(hidden_dim, num_actions * hidden_dim), activate=True)
 			)
 		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim)),
+			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim))
+			init_(nn.Linear(hidden_dim, hidden_dim), activate=True)
 			)
 		self.hyper_w2 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim)),
+			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(hidden_dim, final_dim*hidden_dim))
 			)
 		self.hyper_b2 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim)),
+			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(hidden_dim, hidden_dim))
 			)
@@ -127,14 +127,20 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 
-			self.toreward = init_(nn.Linear(emb, 1))
+			self.rblocks = nn.Sequential(
+				init_(nn.Linear(emb, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 1))
+				)
 
 			self.do = nn.Dropout(dropout)
 		elif comp == "linear_compression":
 			self.compress_input = nn.Sequential(
-					init_(nn.Linear(obs_shape, self.comp_emb)),
-					nn.LayerNorm(self.comp_emb),
+					init_(nn.Linear(obs_shape, self.comp_emb), activate=True),
 					nn.GELU(),
+					nn.LayerNorm(self.comp_emb),
 					)
 
 			# one temporal embedding for each agent
@@ -158,16 +164,14 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
-			rblocks = []
-
-			rblocks.append(init_(nn.Linear(self.comp_emb+action_shape, 64)))
-			
-			rblocks.append(init_(nn.Linear(64, 64)))
-			
-			self.rblocks = nn.Sequential(*rblocks)
+			self.rblocks = nn.Sequential(
+				init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 1))
+				)
 										   
-			self.toreward = init_(nn.Linear(64, 1))
-
 			self.do = nn.Dropout(dropout)
 
 		elif comp == "hypernet_compression":
@@ -195,15 +199,13 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
-			rblocks = []
-
-			rblocks.append(init_(nn.Linear(self.comp_emb, 64)))
-			
-			rblocks.append(init_(nn.Linear(64, 64)))
-			
-			self.rblocks = nn.Sequential(*rblocks)
-										   
-			self.toreward = init_(nn.Linear(64, 1))
+			self.rblocks = nn.Sequential(
+				init_(nn.Linear(self.comp_emb, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 64), activate=True),
+				nn.GELU(),
+				init_(nn.Linear(64, 1))
+				)
 
 			self.do = nn.Dropout(dropout)
 			
@@ -264,9 +266,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
-		x = self.rblocks(x[:, -1, :])
-				
-		x_episode_wise = self.toreward(x).view(b, 1).contiguous()
+		x_episode_wise = self.rblocks(x[:, -1, :]).view(b, 1).contiguous()
 
 		temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
 
