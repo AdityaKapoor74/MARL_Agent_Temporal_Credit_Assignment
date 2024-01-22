@@ -13,7 +13,8 @@ def init(module, weight_init, bias_init, gain=1):
 		if module.bias is not None:
 			init.zeros_(module.bias)
 	elif isinstance(module, nn.Linear):
-		weight_init(module.weight.data, gain=gain)
+		# weight_init(module.weight.data, gain=gain)
+		weight_init(module.weight.data)
 		if module.bias is not None:
 			bias_init(module.bias.data)
 	return module
