@@ -454,7 +454,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_comp": "linear_compression", # no_compression, linear_compression, hypernet_compression
 				"reward_linear_compression_dim": 128,
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
@@ -463,7 +463,7 @@ if __name__ == '__main__':
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": True,
+				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
 				"reward_warmup": 1000, # 1000
 				"update_reward_model_freq": 200, # 200
