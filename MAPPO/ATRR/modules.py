@@ -8,9 +8,14 @@ import torch.nn.functional as F
 import random, math
 
 def init(module, weight_init, bias_init, gain=1):
-	weight_init(module.weight.data, gain=gain)
-	if module.bias is not None:
-		bias_init(module.bias.data)
+	if isinstance(module, nn.LayerNorm):
+		init.ones_(module.weight)
+		if module.bias is not None:
+			init.zeros_(module.bias)
+	elif isinstance(module, nn.Linear):
+		weight_init(module.weight.data, gain=gain)
+		if module.bias is not None:
+			bias_init(module.bias.data)
 	return module
 
 def init_(m, gain=0.01, activate=False):

@@ -7,9 +7,14 @@ from .modules import TransformerBlock, TransformerBlock_Agent
 from .util import d
 
 def init(module, weight_init, bias_init, gain=1):
-	weight_init(module.weight.data, gain=gain)
-	if module.bias is not None:
-		bias_init(module.bias.data)
+	if isinstance(module, nn.LayerNorm):
+		init.ones_(module.weight)
+		if module.bias is not None:
+			init.zeros_(module.bias)
+	elif isinstance(module, nn.Linear):
+		weight_init(module.weight.data, gain=gain)
+		if module.bias is not None:
+			bias_init(module.bias.data)
 	return module
 
 def init_(m, gain=0.01, activate=False):
@@ -140,7 +145,7 @@ class Time_Agent_Transformer(nn.Module):
 			self.compress_input = nn.Sequential(
 					init_(nn.Linear(obs_shape, self.comp_emb), activate=True),
 					nn.GELU(),
-					nn.LayerNorm(self.comp_emb),
+					# nn.LayerNorm(self.comp_emb),
 					)
 
 			# one temporal embedding for each agent
