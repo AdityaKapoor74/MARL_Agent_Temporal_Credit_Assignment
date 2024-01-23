@@ -240,7 +240,7 @@ class QMIXAgent:
 			print("Huber Loss")
 			print(F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)))
 			print("Reward Var")
-			print(self.variance_loss_coeff*reward_var)
+			print(reward_var)
 			reward_loss = F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.variance_loss_coeff*reward_var
 
 		elif self.experiment_type == "ATRR":
