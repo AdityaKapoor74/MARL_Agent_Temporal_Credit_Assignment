@@ -229,10 +229,14 @@ class QMIXAgent:
 				agent_masks=agent_masks_batch.to(self.device)
 				)
 
+
 			shape = reward_time_wise.shape
 			reward_copy = copy.deepcopy(reward_time_wise.detach())
 			reward_copy[mask_batch.view(*shape) == 0.0] = 0.0 
 			reward_mean = (reward_copy.sum(dim=-1)/mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
+			print("Check for NaN")
+			print(torch.isnan(reward_time_wise).any())
+			print(torch.isnan(reward_mean).any())
 			reward_var = (reward_time_wise - reward_mean)**2
 			reward_var[mask_batch.view(*shape) == 0.0] = 0.0
 			reward_var = reward_var.sum() / mask_batch.sum()
