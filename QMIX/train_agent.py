@@ -181,9 +181,9 @@ class QMIX:
 					# time.sleep(0.1)
 					# Advance a step and render a new image
 					with torch.no_grad():
-						actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions, np.array(info["avail_actions"]))
+						actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions)
 				else:
-					actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions, np.array(info["avail_actions"]))
+					actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions)
 
 				next_last_one_hot_action = np.zeros((self.num_agents,self.num_actions))
 				for i,act in enumerate(actions):
@@ -323,7 +323,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
