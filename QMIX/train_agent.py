@@ -110,10 +110,6 @@ class QMIX:
 			except OSError as error: 
 				print("Policy Eval Directory can not be created")
 
-		self.comet_ml = None
-		if dictionary["save_comet_ml_plot"]:
-			self.comet_ml = comet_ml
-
 
 	def make_gif(self,images,fname,fps=10, scale=1.0):
 		from moviepy.editor import ImageSequenceClip
