@@ -21,7 +21,7 @@ class RNNQNetwork(nn.Module):
 
 		self.apply(weights_init)
 
-	def forward(self, states_actions, mask_actions):
+	def forward(self, states_actions, mask_actions=None):
 
 		x = F.gelu(self.Layer1(states_actions))
 		self.rnn_hidden_state = self.RNN(x, self.rnn_hidden_state)
