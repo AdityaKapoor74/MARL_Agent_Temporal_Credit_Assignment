@@ -13,6 +13,7 @@ class RNNQNetwork(nn.Module):
 	def __init__(self, num_inputs, num_actions, hidden_dim):
 		super(RNNQNetwork, self).__init__()
 
+		self.mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
 		self.rnn_hidden_state = None
 		self.Layer1 = nn.Linear(num_inputs + num_actions, hidden_dim)
 		self.RNN = nn.GRUCell(hidden_dim, hidden_dim)
@@ -20,11 +21,16 @@ class RNNQNetwork(nn.Module):
 
 		self.apply(weights_init)
 
-	def forward(self, states_actions):
+	def forward(self, states_actions, mask_actions):
 
 		x = F.gelu(self.Layer1(states_actions))
 		self.rnn_hidden_state = self.RNN(x, self.rnn_hidden_state)
 		Q_a_values = self.Layer2(self.rnn_hidden_state)
+		
+		if mask_actions is not None:
+			Q_a_values = torch.where(mask_actions, Q_a_values, self.mask_value)
+
+
 		return Q_a_values
 
 
