@@ -321,7 +321,6 @@ if __name__ == '__main__':
 
 	torch.autograd.set_detect_anomaly(True)
 
-
 	for i in range(1,6):
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
@@ -342,10 +341,10 @@ if __name__ == '__main__':
 				"gif_checkpoint":1,
 				"load_models": False,
 				"model_path": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": False,
+				"save_comet_ml_plot": True,
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,

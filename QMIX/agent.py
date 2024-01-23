@@ -230,22 +230,23 @@ class QMIXAgent:
 				)
 
 
-			shape = reward_time_wise.shape
-			reward_copy = copy.deepcopy(reward_time_wise.detach())
-			reward_copy[mask_batch.view(*shape) == 0.0] = 0.0 
-			reward_mean = (reward_copy.sum(dim=-1)/mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
-			print("Check for NaN")
-			print(torch.isnan(reward_time_wise).any())
-			print(torch.isnan(reward_mean).any())
-			reward_var = (reward_time_wise - reward_mean)**2
-			reward_var[mask_batch.view(*shape) == 0.0] = 0.0
-			reward_var = reward_var.sum() / mask_batch.sum()
+			# shape = reward_time_wise.shape
+			# reward_copy = copy.deepcopy(reward_time_wise.detach())
+			# reward_copy[mask_batch.view(*shape) == 0.0] = 0.0 
+			# reward_mean = (reward_copy.sum(dim=-1)/mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
+			# print("Check for NaN")
+			# print(torch.isnan(reward_time_wise).any())
+			# print(torch.isnan(reward_mean).any())
+			# reward_var = (reward_time_wise - reward_mean)**2
+			# reward_var[mask_batch.view(*shape) == 0.0] = 0.0
+			# reward_var = reward_var.sum() / mask_batch.sum()
 
-			print("Huber Loss")
-			print(F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)))
-			print("Reward Var")
-			print(reward_var)
-			reward_loss = F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.variance_loss_coeff*reward_var
+			# print("Huber Loss")
+			# print(F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)))
+			# print("Reward Var")
+			# print(reward_var)
+			reward_var = torch.tensor([-1])
+			reward_loss = F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
 		elif self.experiment_type == "ATRR":
 			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
