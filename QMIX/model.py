@@ -26,9 +26,9 @@ class RNNQNetwork(nn.Module):
 		x = F.gelu(self.Layer1(states_actions))
 		self.rnn_hidden_state = self.RNN(x, self.rnn_hidden_state)
 		Q_a_values = self.Layer2(self.rnn_hidden_state)
-		
+
 		if mask_actions is not None:
-			Q_a_values = torch.where(mask_actions, Q_a_values, self.mask_value)
+			Q_a_values = torch.where(mask_actions.bool(), Q_a_values, self.mask_value)
 
 
 		return Q_a_values
