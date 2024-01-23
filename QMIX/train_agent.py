@@ -240,17 +240,6 @@ class QMIX:
 			self.epsilon_greedy = self.epsilon_greedy - self.epsilon_decay_rate if self.epsilon_greedy - self.epsilon_decay_rate > self.epsilon_greedy_min else self.epsilon_greedy_min
 			self.buffer.end_episode()
 
-			if self.eval_policy:
-				self.rewards.append(episode_reward)
-				self.timesteps.append(final_timestep)
-
-			if episode > self.save_model_checkpoint and self.eval_policy:
-				self.rewards_mean_per_1000_eps.append(sum(self.rewards[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
-				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
-
-			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
-				torch.save(self.agents.Q_network.state_dict(), self.model_path+'_Q_epsiode'+str(episode)+'.pt')
-				torch.save(self.agents.QMix_network.state_dict(), self.model_path+'_QMix_epsiode'+str(episode)+'.pt')
 
 			if self.learn and self.batch_size <= self.buffer.length and episode != 0 and episode%self.update_episode_interval == 0:
 				reward_loss_batch, grad_norm_reward_batch, Q_loss_batch, grad_norm_Q_batch = 0.0, 0.0, 0.0, 0.0
@@ -281,12 +270,12 @@ class QMIX:
 						self.scheduler_reward.step()
 
 				if self.soft_update:
-					soft_update(self.target_Q_network, self.Q_network, self.tau)
-					soft_update(self.target_QMix_network, self.QMix_network, self.tau)
+					soft_update(self.agents.target_Q_network, self.agents.Q_network, self.tau)
+					soft_update(self.agents.target_QMix_network, self.agents.QMix_network, self.tau)
 				else:
 					if episode % self.target_update_interval == 0:
-						hard_update(self.target_Q_network, self.Q_network)
-						hard_update(self.target_QMix_network, self.QMix_network)
+						hard_update(self.agents.target_Q_network, self.agents.Q_network)
+						hard_update(self.agents.target_QMix_network, self.agents.QMix_network)
 
 				if self.comet_ml is not None:
 					self.comet_ml.log_metric('Q Loss', Q_loss_batch, episode)
@@ -300,6 +289,21 @@ class QMIX:
 						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 						self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
 
+
+
+			if self.eval_policy:
+				self.rewards.append(episode_reward)
+				self.timesteps.append(final_timestep)
+
+			if episode > self.save_model_checkpoint and self.eval_policy:
+				self.rewards_mean_per_1000_eps.append(sum(self.rewards[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
+				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
+
+			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
+				torch.save(self.agents.Q_network.state_dict(), self.model_path+'_Q_epsiode'+str(episode)+'.pt')
+				torch.save(self.agents.QMix_network.state_dict(), self.model_path+'_QMix_epsiode'+str(episode)+'.pt')
+
+			
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
 			# 	self.make_gif(np.array(images),self.gif_path)
@@ -319,7 +323,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
