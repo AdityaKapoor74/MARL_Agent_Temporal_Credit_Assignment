@@ -278,9 +278,9 @@ class QMIX:
 						hard_update(self.agents.target_QMix_network, self.agents.QMix_network)
 
 				if self.comet_ml is not None:
-					self.comet_ml.log_metric('Q Loss', Q_loss_batch, episode)
+					self.comet_ml.log_metric('Q_Loss', Q_loss_batch, episode)
 					self.comet_ml.log_metric('Q_Grad_Norm', grad_norm_Q_batch, episode)
-					self.comet_ml.log_metric('Reward Loss', reward_loss_batch, episode)
+					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
 					self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
 
 					if self.experiment_type == "AREL":
