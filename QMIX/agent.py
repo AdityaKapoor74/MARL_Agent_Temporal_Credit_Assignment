@@ -230,7 +230,7 @@ class QMIXAgent:
 				)
 
 
-			# shape = reward_time_wise.shape
+			shape = reward_time_wise.shape
 			# reward_copy = copy.deepcopy(reward_time_wise.detach())
 			# reward_copy[mask_batch.view(*shape) == 0.0] = 0.0 
 			# reward_mean = (reward_copy.sum(dim=-1)/mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
