@@ -123,16 +123,17 @@ class Time_Agent_Transformer(nn.Module):
 	"""
 
 	def __init__(self, emb, heads, depth, seq_length, n_agents, agent=True, 
-										dropout=0.0, wide=True, comp=True, norm_rewards=False, device=None):
+										dropout=0.0, wide=True, comp=True, norm_rewards=False, linear_compression_dim=128, device=None):
 		super().__init__()
 
 		self.comp = comp
 		self.n_agents = n_agents
 		self.device = device
-		if emb>100:
-			self.comp_emb = 100
-		else:
-			self.comp_emb = emb
+		self.comp_emb = linear_compression_dim
+		# if emb>100:
+		# 	self.comp_emb = 100
+		# else:
+		# 	self.comp_emb = emb
 		print(self.comp_emb, '-'*50)
 
 		if not comp:

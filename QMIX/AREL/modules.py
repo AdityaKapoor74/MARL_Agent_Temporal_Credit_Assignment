@@ -27,7 +27,7 @@ class SelfAttentionWide(nn.Module):
         self.toqueries = nn.Linear(emb, emb * heads, bias=False)
         self.tovalues = nn.Linear(emb, emb * heads, bias=False)
 
-        self.softmax = nn.Softmax(dim=2)
+        self.softmax = nn.Softmax(dim=-1)
 
         self.unifyheads = nn.Linear(heads * emb, emb)
 
@@ -157,7 +157,7 @@ class SelfAttentionNarrow(nn.Module):
         if self.mask: # mask out the upper half of the dot matrix, excluding the diagonal
             mask_(dot, maskval=float('-inf'), mask_diagonal=False)
 
-        dot = F.softmax(dot, dim=2)
+        dot = F.softmax(dot, dim=-1)
         # - dot now has row-wise self-attention probabilities
 
         # apply the self attention to the values

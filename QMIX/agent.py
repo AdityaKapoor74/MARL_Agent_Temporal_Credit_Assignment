@@ -114,6 +114,7 @@ class QMIXAgent:
 					wide=dictionary["reward_attn_net_wide"], 
 					comp=dictionary["reward_comp"], 
 					norm_rewards=dictionary["norm_rewards"],
+					linear_compression_dim=dictionary["reward_linear_compression_dim"],
 					device=self.device,
 					).to(self.device)
 
