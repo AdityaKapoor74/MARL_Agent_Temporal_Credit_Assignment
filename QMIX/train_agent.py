@@ -63,6 +63,9 @@ class QMIX:
 		self.epsilon_greedy_min = dictionary["epsilon_greedy_min"]
 		self.epsilon_decay_rate = (self.epsilon_greedy - self.epsilon_greedy_min) / dictionary["epsilon_greedy_decay_episodes"]
 
+		self.reward_batch_size = dictionary["reward_batch_size"]
+		self.update_reward_model_freq = dictionary["update_reward_model_freq"]
+		self.reward_model_update_epochs = dictionary["reward_model_update_epochs"]
 
 		self.comet_ml = None
 		if self.save_comet_ml_plot:
@@ -240,34 +243,52 @@ class QMIX:
 			self.epsilon_greedy = self.epsilon_greedy - self.epsilon_decay_rate if self.epsilon_greedy - self.epsilon_decay_rate > self.epsilon_greedy_min else self.epsilon_greedy_min
 			self.buffer.end_episode()
 
-
-			if self.learn and self.batch_size <= self.buffer.length and episode != 0 and episode%self.update_episode_interval == 0:
-				reward_loss_batch, grad_norm_reward_batch, Q_loss_batch, grad_norm_Q_batch = 0.0, 0.0, 0.0, 0.0
+			if self.learn and self.use_reward_model and self.reward_batch_size <= self.buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
+				reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 				if self.experiment_type == "AREL":
 					reward_var_batch = 0.0
 				elif self.experiment_type == "ATRR":
 					entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+				for i in range(self.reward_model_update_epochs):
+					sample = self.buffer.sample(num_episodes=self.reward_batch_size)
+					if self.experiment_type == "AREL":
+						reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
+						reward_var_batch += (reward_var/self.reward_model_update_epochs)
+					elif self.experiment_type == "ATRR":
+						reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update(sample, episode)
+						entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
+						entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
+
+					reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
+					grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
+
+					if self.scheduler_need:
+						self.scheduler_reward.step()
+
+				if self.comet_ml is not None:
+					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
+					self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
+
+					if self.experiment_type == "AREL":
+						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
+					elif self.experiment_type == "ATRR":
+						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
+						self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
+
+
+			if self.learn and self.batch_size <= self.buffer.length and episode != 0 and episode%self.update_episode_interval == 0:
+				Q_loss_batch, grad_norm_Q_batch = 0.0, 0.0
+				
 				for i in range(self.num_updates):
 					sample = self.buffer.sample(num_episodes=self.batch_size)
-					if self.experiment_type == "AREL":
-						Q_loss, grad_norm_Q, reward_loss, reward_var, grad_norm_value_reward = self.agents.update(sample, episode)
-						reward_var_batch += (reward_var/self.num_updates)
-					elif self.experiment_type == "ATRR":
-						Q_loss, grad_norm_Q, reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update(sample, episode)
-						entropy_temporal_weights_batch += (entropy_temporal_weights/self.num_updates)
-						entropy_agent_weights_batch += (entropy_agent_weights/self.num_updates)
-
+					
+					Q_loss, grad_norm_Q = self.agents.update(sample)
+					
 					Q_loss_batch += (Q_loss/self.num_updates)
 					grad_norm_Q_batch += (grad_norm_Q/self.num_updates)
-					reward_loss_batch += (reward_loss/self.num_updates)
-					grad_norm_reward_batch += (grad_norm_value_reward/self.num_updates)
-
 
 				if self.scheduler_need:
 					self.agents.scheduler.step()
-
-					if self.use_reward_model:
-						self.scheduler_reward.step()
 
 				if self.soft_update:
 					soft_update(self.agents.target_Q_network, self.agents.Q_network, self.tau)
@@ -280,9 +301,7 @@ class QMIX:
 				if self.comet_ml is not None:
 					self.comet_ml.log_metric('Q_Loss', Q_loss_batch, episode)
 					self.comet_ml.log_metric('Q_Grad_Norm', grad_norm_Q_batch, episode)
-					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
-					self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
-
+					
 					if self.experiment_type == "AREL":
 						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
 					elif self.experiment_type == "ATRR":
@@ -325,7 +344,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
@@ -373,15 +392,15 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				# "batch_size": 32, # 128
+				"reward_batch_size": 64, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
 				# "reward_warmup": 5000, # 1000
-				# "update_reward_model_freq": 100, # 200
-				# "reward_model_update_epochs": 100, # 100
+				"update_reward_model_freq": 200, # 200
+				"reward_model_update_epochs": 200, # 100
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,

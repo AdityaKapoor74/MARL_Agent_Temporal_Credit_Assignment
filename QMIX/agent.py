@@ -198,20 +198,14 @@ class QMIXAgent:
 		# return ret[:, 0:-1]
 		return ret
 
-
-	def update(self, sample, episode):
+	def update_reward_model(self, sample):
 		# # sample episodes from replay buffer
-		state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, max_episode_len = sample
+		state_batch, _, _, _, next_last_one_hot_actions_batch, _, reward_batch, _, mask_batch, agent_masks_batch, _ = sample
 		# # convert list to tensor
 		state_batch = torch.FloatTensor(state_batch)
-		actions_batch = torch.FloatTensor(actions_batch)
-		last_one_hot_actions_batch = torch.FloatTensor(last_one_hot_actions_batch)
-		next_state_batch = torch.FloatTensor(next_state_batch)
 		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
-		next_mask_actions_batch = torch.FloatTensor(next_mask_actions_batch)
 		reward_batch = torch.FloatTensor(reward_batch)
 		episodic_reward_batch = reward_batch.sum(dim=1)
-		done_batch = torch.FloatTensor(done_batch)
 		mask_batch = torch.FloatTensor(mask_batch)
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
 
@@ -279,6 +273,28 @@ class QMIXAgent:
 			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
 		self.reward_optimizer.step()
 
+		if self.experiment_type == "AREL":
+			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
+		elif self.experiment_type == "ATRR":
+			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
+
+
+	def update(self, sample):
+		# # sample episodes from replay buffer
+		state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, max_episode_len = sample
+		# # convert list to tensor
+		state_batch = torch.FloatTensor(state_batch)
+		actions_batch = torch.FloatTensor(actions_batch)
+		last_one_hot_actions_batch = torch.FloatTensor(last_one_hot_actions_batch)
+		next_state_batch = torch.FloatTensor(next_state_batch)
+		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
+		next_mask_actions_batch = torch.FloatTensor(next_mask_actions_batch)
+		reward_batch = torch.FloatTensor(reward_batch)
+		episodic_reward_batch = reward_batch.sum(dim=1)
+		done_batch = torch.FloatTensor(done_batch)
+		mask_batch = torch.FloatTensor(mask_batch)
+		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
+
 		self.Q_network.rnn_hidden_state = None
 		self.target_Q_network.rnn_hidden_state = None
 
@@ -335,7 +351,4 @@ class QMIXAgent:
 
 		torch.cuda.empty_cache()
 
-		if self.experiment_type == "AREL":
-			return Q_loss.item(), grad_norm, reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
-		elif self.experiment_type == "ATRR":
-			return Q_loss.item(), grad_norm, reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
+		return Q_loss.item(), grad_norm
