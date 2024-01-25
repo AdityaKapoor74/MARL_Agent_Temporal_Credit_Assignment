@@ -255,7 +255,7 @@ class QMIX:
 						reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 						reward_var_batch += (reward_var/self.reward_model_update_epochs)
 					elif self.experiment_type == "ATRR":
-						reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update(sample, episode)
+						reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 						entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 						entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
 
