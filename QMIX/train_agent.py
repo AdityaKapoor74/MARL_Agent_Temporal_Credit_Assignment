@@ -301,13 +301,6 @@ class QMIX:
 				if self.comet_ml is not None:
 					self.comet_ml.log_metric('Q_Loss', Q_loss_batch, episode)
 					self.comet_ml.log_metric('Q_Grad_Norm', grad_norm_Q_batch, episode)
-					
-					if self.experiment_type == "AREL":
-						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
-					elif self.experiment_type == "ATRR":
-						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
-						self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
-
 
 
 			if self.eval_policy:
@@ -344,7 +337,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
+		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
@@ -387,7 +380,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_comp": "linear_compression", # no_compression, linear_compression, hypernet_compression
 				"reward_linear_compression_dim": 64,
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
