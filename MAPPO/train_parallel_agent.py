@@ -471,7 +471,6 @@ class MAPPO:
                                     self.reward_plot_counter += 1
 
                     if self.learn and self.agents.should_update_agent():
-                        # input("About to update agent")
                         if self.use_reward_model is False:
                             self.agents.update(self.num_episodes_done)
                         else:
