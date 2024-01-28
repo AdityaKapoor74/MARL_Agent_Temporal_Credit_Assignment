@@ -432,10 +432,10 @@ if __name__ == '__main__':
 				"model_path_policy": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/actor_networks/actor_epsiode_100000.pt",
 				"model_path_policy_optimizer": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/critic_optim_epsiode_100000.pt",
 				"model_path_q_critic_optimizer": "tests/MultiAgentCreditAssignment/models/5m_vs_6m_temporal_team_MAPPO_1/critic_networks/policy_optim_epsiode_100000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"learn":True,
 				"max_episodes": 50000,
 				"max_time_steps": 100,
@@ -454,20 +454,23 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": True,
-				"num_episodes_capacity": 40000, # 40000
-				"batch_size": 128, # 128
+				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_linear_compression_dim": 128,
+				"reward_hypernet_hidden_dim": 64,
+				"reward_hypernet_final_dim": 64,
+				"num_episodes_capacity": 2000, # 40000
+				"batch_size": 32, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": True,
+				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
-				"reward_warmup": 1000, # 1000
-				"update_reward_model_freq": 200, # 200
+				"reward_warmup": 5000, # 1000
+				"update_reward_model_freq": 100, # 200
 				"reward_model_update_epochs": 100, # 100
 				"fine_tune_epochs": 1, # 10
 				"fine_tune_reward_lr": 1e-4,
-				"fine_tune_batch_size": 30,
+				"fine_tune_batch_size": 10,
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
