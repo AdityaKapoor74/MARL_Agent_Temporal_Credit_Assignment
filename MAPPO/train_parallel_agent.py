@@ -371,10 +371,10 @@ class MAPPO:
                     if self.save_comet_ml_plot:
                         self.comet_ml.log_metric('Episode_Length', step, self.num_episodes_done)
                         self.comet_ml.log_metric('Reward', episode_reward[worker_index], self.num_episodes_done)
-                        self.comet_ml.log_metric('Num Enemies', info["num_enemies"], self.num_episodes_done)
-                        self.comet_ml.log_metric('Num Allies', info["num_allies"], self.num_episodes_done)
-                        self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], self.num_episodes_done)
-                        self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], self.num_episodes_done)
+                        self.comet_ml.log_metric('Num Enemies', info["last_info"]["num_enemies"][worker_index], self.num_episodes_done)
+                        self.comet_ml.log_metric('Num Allies',  info["last_info"]["num_allies"][worker_index], self.num_episodes_done)
+                        self.comet_ml.log_metric('All Enemies Dead', info["last_info"]["all_enemies_dead"][worker_index], self.num_episodes_done)
+                        self.comet_ml.log_metric('All Allies Dead', info["last_info"]["all_allies_dead"][worker_index], self.num_episodes_done)
 
                         if self.use_reward_model:
                             self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, self.num_episodes_done)
