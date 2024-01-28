@@ -225,7 +225,6 @@ class MAPPO:
 
             
             next_states_actor, rewards, next_dones, info = self.envs.step(actions)
-            os.system("clear")
             print(next_dones)
             print("")
             self.worker_step_counter += 1
