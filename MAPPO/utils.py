@@ -2,6 +2,7 @@ import torch
 from torch import Tensor
 import numpy as np
 import random
+from collections import deque
 
 from model import ValueNorm, RunningMeanStd
 
@@ -267,7 +268,173 @@ class RolloutBuffer:
 			nstep_values[:, t_start, :] = nstep_return_t
 		
 		return nstep_values
+	
+class RolloutBufferShared(RolloutBuffer):
+	def __init__(
+		self,
+		num_workers, 
+		num_episodes, 
+		max_time_steps, 
+		num_agents, 
+		num_enemies,
+		obs_shape_critic_ally, 
+		obs_shape_critic_enemy, 
+		obs_shape_actor, 
+		rnn_num_layers_actor,
+		actor_hidden_state,
+		rnn_num_layers_q,
+		q_hidden_state,
+		num_actions, 
+		data_chunk_length,
+		norm_returns_q,
+		clamp_rewards,
+		clamp_rewards_value_min,
+		clamp_rewards_value_max,
+		target_calc_style,
+		td_lambda,
+		gae_lambda,
+		n_steps,
+		gamma,
+		Q_PopArt,
+	):
+		super(RolloutBufferShared, self).__init__(
+			num_episodes, 
+			max_time_steps, 
+			num_agents, 
+			num_enemies,
+			obs_shape_critic_ally, 
+			obs_shape_critic_enemy, 
+			obs_shape_actor, 
+			rnn_num_layers_actor,
+			actor_hidden_state,
+			rnn_num_layers_q,
+			q_hidden_state,
+			num_actions, 
+			data_chunk_length,
+			norm_returns_q,
+			clamp_rewards,
+			clamp_rewards_value_min,
+			clamp_rewards_value_max,
+			target_calc_style,
+			td_lambda,
+			gae_lambda,
+			n_steps,
+			gamma,
+			Q_PopArt,
+		)
 
+		self.num_workers = num_workers
+		# counters for each rollout thread
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+	@property
+	def episodes_completely_filled(self):
+		return np.min(self.worker_episode_counter)
+	
+	@property
+	def next_episode_index_to_fill(self):
+		return np.max(self.worker_episode_counter) + 1
+
+	def clear(self):
+		super().clear()
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+	def push(
+		self, 
+		state_critic_allies, 
+		state_critic_enemies, 
+		q_value,
+		hidden_state_q,
+		state_actor, 
+		hidden_state_actor, 
+		logprobs, 
+		actions, 
+		last_one_hot_actions, 
+		one_hot_actions, 
+		action_masks, 
+		rewards, 
+		dones,
+		worker_step_counter
+	):
+		assert state_critic_allies.shape[0] == self.num_workers
+		assert state_critic_enemies.shape[0] == self.num_workers
+		assert hidden_state_q.shape[0] == self.num_workers
+		assert q_value.shape[0] == self.num_workers
+		assert state_actor.shape[0] == self.num_workers
+		assert hidden_state_actor.shape[0] == self.num_workers
+		assert logprobs.shape[0] == self.num_workers
+		assert actions.shape[0] == self.num_workers
+		assert last_one_hot_actions.shape[0] == self.num_workers
+		assert one_hot_actions.shape[0] == self.num_workers
+		assert action_masks.shape[0] == self.num_workers
+		assert rewards.shape[0] == self.num_workers
+		assert dones.shape[0] == self.num_workers
+		assert worker_step_counter.shape[0] == self.num_workers
+		print("From push buffer")
+		print(f"Episode_counter: {self.worker_episode_counter}")
+		print(f"Timesteps: {self.time_steps}")
+		for worker_index in range(self.num_workers):
+			episode_num = self.worker_episode_counter[worker_index]
+			time_step = self.time_steps[worker_index]
+			if episode_num >= self.num_episodes:
+				print(f"skipping worker {worker_index} since it has collected more than needed")
+				# the workers that have collected all required episodes for this update should not store anything more
+				continue
+			if time_step == 0 and worker_step_counter[worker_index] != 1:
+				# because of the above skip, after updation completes, it might be the case that the workers are somewhere in the middle of an ongoing episode
+				# so we will just do nothing till that episode completes. After it completes, storing would resume.
+				print(f"skipping worker {worker_index} till it resets")
+				continue
+			self.states_critic_allies[episode_num][time_step] = state_critic_allies[worker_index]
+			self.states_critic_enemies[episode_num][time_step] = state_critic_enemies[worker_index]
+			self.hidden_state_q[episode_num][time_step] = hidden_state_q[worker_index]
+			self.Q_values[episode_num][time_step] = q_value[worker_index]
+			self.states_actor[episode_num][time_step] = state_actor[worker_index]
+			self.hidden_state_actor[episode_num][time_step] = hidden_state_actor[worker_index]
+			self.logprobs[episode_num][time_step] = logprobs[worker_index]
+			self.actions[episode_num][time_step] = actions[worker_index]
+			self.last_one_hot_actions[episode_num][time_step] = last_one_hot_actions[worker_index]
+			self.one_hot_actions[episode_num][time_step] = one_hot_actions[worker_index]
+			self.action_masks[episode_num][time_step] = action_masks[worker_index]
+			self.rewards[episode_num][time_step] = rewards[worker_index]
+			self.dones[episode_num][time_step] = dones[worker_index]
+			print(f"Filled for {worker_index}")
+			if self.time_steps[worker_index] < self.max_time_steps-1:
+				self.time_steps[worker_index] += 1
+		print("")
+
+	def end_episode(
+		self, 
+		t, 
+		q_value, 
+		dones,
+		worker_indices
+	):
+		assert t.shape[0] == len(worker_indices)
+		assert q_value.shape[0] == len(worker_indices)
+		assert dones.shape[0] == len(worker_indices)
+
+		for i, worker_index in enumerate(worker_indices):
+			episode_num = self.worker_episode_counter[worker_index]
+			time_step = self.time_steps[worker_index]
+			if time_step == 0:
+				# Do nothing in case the worker has not stored anything
+				continue
+			time_step = self.time_steps[worker_index]
+			self.Q_values[episode_num][time_step+1] = q_value[i]
+			self.dones[episode_num][time_step+1] = dones[i]
+
+			self.episode_length[episode_num] = t[i]
+			self.episode_num += 1
+			self.time_steps[worker_index] = 0
+			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
+			print("From episode end buffer")
+			print(f"Ending episode for worker {worker_index}")
+			print(f"Episodes {self.worker_episode_counter}")
+			print(f"Time Steps: {self.time_steps}")
+			print("")
 
 
 class RewardRolloutBuffer:
@@ -384,5 +551,109 @@ class RewardRolloutBuffer:
 			new_episodic_rewards = torch.from_numpy(self.episodic_rewards[episode_num-self.fine_tune_batch_size: episode_num]).float()
 			new_one_hot_actions = torch.from_numpy(self.one_hot_actions[episode_num-self.fine_tune_batch_size: episode_num]).float()
 			new_masks = 1-torch.from_numpy(self.dones[episode_num-self.fine_tune_batch_size: episode_num]).float()
+
+		return new_states, new_episodic_rewards, new_one_hot_actions, new_masks
+	
+class RewardRolloutBufferShared(RewardRolloutBuffer):
+	def __init__(self, num_workers, num_episodes_capacity, max_time_steps, num_agents, num_enemies, obs_shape, num_actions, batch_size, fine_tune_batch_size):
+		super(RewardRolloutBufferShared, self).__init__(num_episodes_capacity, max_time_steps, num_agents, num_enemies, obs_shape, num_actions, batch_size, fine_tune_batch_size)
+		self.num_workers = num_workers
+		self.episodes_completely_filled = np.zeros(self.num_episodes_capacity, dtype=int)  # this will be used to identify the episodes in the buffer that are completely filled. 
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+		self.deque = deque([])
+		
+		assert self.num_workers < self.num_episodes_capacity
+		
+	@property
+	def next_episode_index_to_fill(self):
+		return np.max(self.worker_episode_counter) + 1
+	
+	@property
+	def episodes_filled(self):
+		return np.min(self.worker_episode_counter)
+
+	def clear(self):
+		super().clear()
+		self.episodes_completely_filled = np.zeros(self.num_episodes_capacity, dtype=int)
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+	def push(
+		self, 
+		states,
+		one_hot_actions, 
+		dones
+	):
+		print("From reward push buffer")
+		print(f"Episode_counter: {self.worker_episode_counter}")
+		print(f"Timesteps: {self.time_steps}")
+
+		assert states.shape[0] == self.num_workers
+		assert one_hot_actions.shape[0] == self.num_workers
+		assert dones.shape[0] == self.num_workers
+		for worker_index in range(self.num_workers):
+			episode_num = self.worker_episode_counter[worker_index] % self.num_episodes_capacity
+			self.episodes_completely_filled[episode_num] = 0
+			time_step = self.time_steps[worker_index]
+
+			self.states[episode_num][time_step] = states[worker_index]
+			self.one_hot_actions[episode_num][time_step] = one_hot_actions[worker_index]
+			self.dones[episode_num][time_step] = dones[worker_index]
+
+			if self.time_steps[worker_index] < self.max_time_steps-1:
+				self.time_steps[worker_index] += 1
+		print("")
+
+	def end_episode(self, episodic_reward, t, worker_indices):
+		assert episodic_reward.shape[0] == len(worker_indices)
+		assert t.shape[0] == len(worker_indices)
+		for i, worker_index in enumerate(worker_indices):
+			episode_num = self.worker_episode_counter[worker_index] % self.num_episodes_capacity
+
+			self.episodic_rewards[episode_num] = episodic_reward[i]
+			
+			self.episode_length[episode_num] = t[i]
+
+			self.episodes_completely_filled[episode_num] = 1
+
+			self.deque.append(episode_num)
+			if len(self.deque) > self.fine_tune_batch_size: self.deque.popleft()
+
+			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
+
+			# self.clear()
+
+			self.time_steps[worker_index] = 0
+
+			print("From episode end reward buffer")
+			print(f"Ending episode for worker {worker_index}")
+			print(f"Episodes {self.worker_episode_counter}")
+			print(f"Time Steps: {self.time_steps}")
+			print("")
+
+	def sample(self):
+		indices = np.where(self.episodes_completely_filled == 1)[0]
+		assert indices.shape[0] >= self.batch_size
+		rand_batch = np.random.choice(indices, self.batch_size, replace=False)
+		
+		states = torch.from_numpy(self.states[rand_batch]).float()
+		episodic_rewards = torch.from_numpy(self.episodic_rewards[rand_batch]).float()
+		one_hot_actions = torch.from_numpy(self.one_hot_actions[rand_batch]).float()
+		masks = 1-torch.from_numpy(self.dones[rand_batch]).float()
+
+		assert states.shape == (self.batch_size, self.max_time_steps, self.num_agents, self.obs_shape)
+		assert episodic_rewards.shape == (self.batch_size,)
+		assert one_hot_actions.shape == (self.batch_size, self.max_time_steps, self.num_agents, self.num_actions)
+		assert masks.shape == (self.batch_size, self.max_time_steps, self.num_agents)
+
+		return states, episodic_rewards, one_hot_actions, masks
+	
+	def sample_new_data(self):
+		indices = np.array(list(self.deque), dtype=int)
+		new_states = torch.from_numpy(self.states[indices]).float()
+		new_episodic_rewards = torch.from_numpy(self.episodic_rewards[indices]).float()
+		new_one_hot_actions = torch.from_numpy(self.one_hot_actions[indices]).float()
+		new_masks = 1-torch.from_numpy(self.dones[indices]).float()
 
 		return new_states, new_episodic_rewards, new_one_hot_actions, new_masks
