@@ -290,10 +290,38 @@ class QMIXAgent:
 		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
 		next_mask_actions_batch = torch.FloatTensor(next_mask_actions_batch)
 		reward_batch = torch.FloatTensor(reward_batch)
-		episodic_reward_batch = reward_batch.sum(dim=1)
 		done_batch = torch.FloatTensor(done_batch)
 		mask_batch = torch.FloatTensor(mask_batch)
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
+
+		if self.experiment_type == "AREL":
+			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
+
+			with torch.no_grad():
+				reward_episode_wise, reward_time_wise = self.reward_model(
+					state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+					team_masks=mask_batch.to(self.device),
+					agent_masks=agent_masks_batch.to(self.device)
+					)
+
+			reward_batch = reward_time_wise.cpu()
+
+
+		elif self.experiment_type == "ATRR":
+			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
+
+			with torch.no_grad():
+				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+					state_batch.permute(0, 2, 1, 3).to(self.device), 
+					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+					team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
+					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
+					agent_masks=agent_masks.to(self.device)
+					)
+
+			reward_batch = (reward_episode_wise * temporal_weights).cpu()
+
+
 
 		self.Q_network.rnn_hidden_state = None
 		self.target_Q_network.rnn_hidden_state = None

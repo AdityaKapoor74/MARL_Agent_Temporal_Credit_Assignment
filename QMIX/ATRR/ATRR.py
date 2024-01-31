@@ -280,7 +280,8 @@ class Time_Agent_Transformer(nn.Module):
 		# print(temporal_scores.shape)
 
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
-		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t+1, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).mean(dim=-2) * agent_masks
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t+1, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
+
 		agent_scores = torch.stack(agent_scores, dim=0)
 		# print(agent_scores.shape)
 
