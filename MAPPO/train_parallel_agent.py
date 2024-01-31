@@ -200,15 +200,11 @@ class MAPPO:
         episodic_agent_reward = [[0]*self.num_agents for _ in range(self.num_workers)]
         
 
-        images = []
-
         episode_reward = [0 for _ in range(self.num_workers)]
         episode_indiv_rewards = [[0 for i in range(self.num_agents)] for _ in range(self.num_workers)]
-        final_timestep = [self.max_time_steps for _ in range(self.num_workers)]
 
         rnn_hidden_state_q = np.zeros((self.num_workers, self.rnn_num_layers_q, self.num_agents, self.rnn_hidden_q))
         rnn_hidden_state_actor = np.zeros((self.num_workers, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
-        is_first_step = True
         
         while self.num_episodes_done < self.max_episodes:
             actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action_batch(states_actor, last_one_hot_actions, mask_actions, rnn_hidden_state_actor)
@@ -247,9 +243,6 @@ class MAPPO:
             # next_mask_actions.shape = (num_workers, 5, 12)
             # next_indiv_dones.shape = (num_workers, 5)
 
-            if self.learn:
-                if self.experiment_type == "temporal_team":
-                    rewards_to_send = [rewards]*self.num_agents
                 
             if self.learn:
                 if self.experiment_type == "temporal_team":
@@ -276,7 +269,7 @@ class MAPPO:
                     rewards_to_send = []
                     for worker_index in range(self.num_workers):
                         episodic_team_reward[worker_index] = [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
-                        if next_dones[worker_index] or self.envs.num_steps[worker_index] == 0:  # second condition is when the max_steps is reached. On episode truncation, num_steps is updated to 0
+                        if next_dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
                             rewards_to_send.append(np.array(episodic_team_reward[worker_index]))
                         else:
                             rewards_to_send.append(np.zeros(self.num_agents))
@@ -290,7 +283,7 @@ class MAPPO:
                             assert info["did_reset"][worker_index]
                             individual_rewards = info["last_info"]["indiv_rewards"][worker_index]
                         episodic_agent_reward[worker_index] = [a_r+r for a_r, r in zip(episodic_agent_reward[worker_index], individual_rewards)]
-                        if (not next_dones[worker_index]) and (self.env.num_steps[worker_index] == 0):  # condition for pure truncation
+                        if (not next_dones[worker_index]) and (self.worker_step_counter[worker_index] == self.max_time_steps):
                             rewards_to_send.append(np.array(episodic_agent_reward[worker_index]))
                         else:
                             rewards_to_send_worker = []
@@ -312,7 +305,7 @@ class MAPPO:
                     rewards_to_send = []
                     for worker_index in range(self.num_workers):
                         episodic_team_reward[worker_index] = [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
-                        if next_dones[worker_index] or self.envs.num_steps[worker_index] == 0:
+                        if next_dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
                             rewards_to_send.append(np.array(episodic_team_reward[worker_index]))
                         else:
                             rewards_to_send.append(np.zeros(self.num_agents))
@@ -396,9 +389,9 @@ class MAPPO:
                                                                                                             np.expand_dims(last_one_hot_actions[worker_index], axis=0), 
                                                                                                             last_mask_actions, 
                                                                                                             np.expand_dims(rnn_hidden_state_actor[worker_index], axis=0))
-                        assert np.array(actions).shape == (1, 5)
-                        assert action_logprob.shape == (1, 5)
-                        assert next_rnn_hidden_state_actor.shape == (1, self.rnn_num_layers_actor, 5, 64)
+                        assert np.array(actions).shape == (1, self.num_agents)
+                        assert action_logprob.shape == (1, self.num_agents)
+                        assert next_rnn_hidden_state_actor.shape == (1, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor)
                         # actions -> list; np.array(actions).shape = (1, 5)
                         # action_logprob.shape = (1, 5)
                         # next_rnn_hidden_state_actor.shape = (1, rnn_num_layers_actor, 5, 64)
@@ -411,7 +404,7 @@ class MAPPO:
                                                                     np.expand_dims(rnn_hidden_state_q[worker_index], axis=0), 
                                                                     last_indiv_dones)
                         
-                        assert q_value.shape == (1, 5)
+                        assert q_value.shape == (1, self.num_agents)
 
                         self.agents.buffer.end_episode(np.array([step]), q_value, last_indiv_dones, [worker_index])
 
@@ -542,30 +535,33 @@ if __name__ == '__main__':
                 "env": env_name,
 
                 # REWARD MODEL
-                "use_reward_model": False,
-                "reward_n_heads": 3, # 3
-                "reward_depth": 3, # 3
-                "reward_agent_attn": True,
-                "reward_dropout": 0.0,
-                "reward_attn_net_wide": True,
-                "reward_comp": True,
-                "num_episodes_capacity": 40000, # 40000
-                "batch_size": 128, # 128
-                "reward_lr": 1e-4,
-                "reward_weight_decay": 1e-5,
-                "variance_loss_coeff": 0.0,
-                "enable_reward_grad_clip": True,
-                "reward_grad_clip_value": 0.5,
-                "reward_warmup": 1000, # 1000
-                "update_reward_model_freq": 200, # 200
-                "reward_model_update_epochs": 100, # 100
-                "fine_tune_epochs": 1, # 10
-                "fine_tune_reward_lr": 1e-4,
-                "fine_tune_batch_size": 30,
-                "norm_rewards": False,
-                "clamp_rewards": False,
-                "clamp_rewards_value_min": 0.0,
-                "clamp_rewards_value_max": 2.0,
+                "use_reward_model": True,
+				"reward_n_heads": 3, # 3
+				"reward_depth": 3, # 3
+				"reward_agent_attn": True,
+				"reward_dropout": 0.0,
+				"reward_attn_net_wide": True,
+				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_linear_compression_dim": 128,
+				"reward_hypernet_hidden_dim": 64,
+				"reward_hypernet_final_dim": 64,
+				"num_episodes_capacity": 2000, # 40000
+				"batch_size": 32, # 128
+				"reward_lr": 1e-4,
+				"reward_weight_decay": 1e-5,
+				"variance_loss_coeff": 0.0,
+				"enable_reward_grad_clip": False,
+				"reward_grad_clip_value": 0.5,
+				"reward_warmup": 5000, # 1000
+				"update_reward_model_freq": 100, # 200
+				"reward_model_update_epochs": 100, # 100
+				"fine_tune_epochs": 1, # 10
+				"fine_tune_reward_lr": 1e-4,
+				"fine_tune_batch_size": 10,
+				"norm_rewards": False,
+				"clamp_rewards": False,
+				"clamp_rewards_value_min": 0.0,
+				"clamp_rewards_value_max": 2.0,
 
                 # CRITIC
                 "rnn_num_layers_q": 1,
