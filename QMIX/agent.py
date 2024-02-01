@@ -118,7 +118,7 @@ class QMIXAgent:
 					device=self.device,
 					).to(self.device)
 
-			elif self.experiment_type == "ATRR":
+			elif "ATRR" in self.experiment_type:
 				from ATRR import ATRR
 				self.reward_model = ATRR.Time_Agent_Transformer(
 					obs_shape=self.obs_input_dim,
@@ -243,7 +243,7 @@ class QMIXAgent:
 			reward_var = torch.tensor([-1])
 			reward_loss = F.huber_loss((reward_time_wise*mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
-		elif self.experiment_type == "ATRR":
+		elif "ATRR" in self.experiment_type:
 			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
 
 			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
@@ -275,7 +275,7 @@ class QMIXAgent:
 
 		if self.experiment_type == "AREL":
 			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
-		elif self.experiment_type == "ATRR":
+		elif "ATRR" in self.experiment_type:
 			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
 
 
@@ -307,7 +307,7 @@ class QMIXAgent:
 			reward_batch = reward_time_wise.cpu()
 
 
-		elif self.experiment_type == "ATRR":
+		elif "ATRR" in self.experiment_type:
 			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
 
 			with torch.no_grad():
@@ -318,6 +318,7 @@ class QMIXAgent:
 					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
 					agent_masks=agent_masks.to(self.device)
 					)
+
 
 			reward_batch = (reward_episode_wise * temporal_weights).cpu()
 
