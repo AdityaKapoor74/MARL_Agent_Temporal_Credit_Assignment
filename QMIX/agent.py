@@ -181,18 +181,18 @@ class QMIXAgent:
 		return returns_tensor
 
 	
-	def build_td_lambda_targets(self, rewards, terminated, mask, target_qs):
+	def build_td_lambda_targets(self, rewards, mask, target_qs):
 		# Assumes  <target_qs > in B*T*A and <reward >, <terminated >  in B*T*A, <mask > in (at least) B*T-1*1
 		# Initialise  last  lambda -return  for  not  terminated  episodes
 		# print(rewards.shape, terminated.shape, mask.shape, target_qs.shape)
 		ret = target_qs.new_zeros(*target_qs.shape)
-		ret = target_qs * (1-terminated)
+		ret = target_qs * mask
 		next_Q = torch.zeros(target_qs[:, -1].shape).to(self.device) # assume the Q value next to last is 0
 		# ret[:, -1] = target_qs[:, -1] * (1 - (torch.sum(terminated, dim=1)>0).int())
 		# Backwards  recursive  update  of the "forward  view"
 		for t in range(ret.shape[1] - 1, -1,  -1):
 			ret[:, t] = self.lambda_ * self.gamma * next_Q + mask[:, t] \
-						* (rewards[:, t] + (1 - self.lambda_) * self.gamma * target_qs[:, t] * (1 - terminated[:, t]))
+						* (rewards[:, t] + (1 - self.lambda_) * self.gamma * target_qs[:, t] * mask[:, t])
 			next_Q = ret[:, t]
 		# Returns lambda-return from t=0 to t=T-1, i.e. in B*T-1*A
 		# return ret[:, 0:-1]
@@ -322,13 +322,20 @@ class QMIXAgent:
 
 			reward_batch = (reward_episode_wise * temporal_weights).cpu()
 
+			if self.experiment_type == "ATRR_agent":
+				reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
+
 
 
 		self.Q_network.rnn_hidden_state = None
 		self.target_Q_network.rnn_hidden_state = None
 
-		Q_mix_values = []
-		target_Q_mix_values = []
+		if self.experiment_type != "ATRR_agent":
+			Q_mix_values = []
+			target_Q_mix_values = []
+		else:
+			Q_vals_ = []
+			Q_targets_ = []
 
 		for t in range(max_episode_len):
 			# train in time order
@@ -345,7 +352,9 @@ class QMIXAgent:
 			final_state_slice = torch.cat([states_slice, last_one_hot_actions_slice], dim=-1)
 			Q_values = self.Q_network(final_state_slice.to(self.device))
 			Q_evals = torch.gather(Q_values, dim=-1, index=actions_slice.long().unsqueeze(-1).to(self.device)).squeeze(-1)
-			Q_mix = self.QMix_network(Q_evals, state_batch[:,t].reshape(-1, self.num_agents*self.obs_input_dim).to(self.device)).squeeze(-1).squeeze(-1) * mask_slice.to(self.device)
+
+			if self.experiment_type != "ATRR_agent":
+				Q_mix = self.QMix_network(Q_evals, state_batch[:,t].reshape(-1, self.num_agents*self.obs_input_dim).to(self.device)).squeeze(-1).squeeze(-1) * mask_slice.to(self.device)
 
 			with torch.no_grad():
 				next_final_state_slice = torch.cat([next_states_slice, next_last_one_hot_actions_slice], dim=-1)
@@ -353,19 +362,32 @@ class QMIXAgent:
 				Q_targets = self.target_Q_network(next_final_state_slice.to(self.device))
 				a_argmax = torch.argmax(Q_evals_next+(1-next_mask_actions_slice.to(self.device)*(-1e9)), dim=-1, keepdim=True)
 				Q_targets = torch.gather(Q_targets, dim=-1, index=a_argmax.to(self.device)).squeeze(-1)
-				Q_mix_target = self.target_QMix_network(Q_targets, next_state_batch[:, t].reshape(-1, self.num_agents*self.obs_input_dim).to(self.device)).squeeze(-1).squeeze(-1)
 				
-			Q_mix_values.append(Q_mix)
-			target_Q_mix_values.append(Q_mix_target)
+				if self.experiment_type != "ATRR_agent":
+					Q_mix_target = self.target_QMix_network(Q_targets, next_state_batch[:, t].reshape(-1, self.num_agents*self.obs_input_dim).to(self.device)).squeeze(-1).squeeze(-1)
+				
+			if self.experiment_type != "ATRR_agent":
+				Q_mix_values.append(Q_mix)
+				target_Q_mix_values.append(Q_mix_target)
+			else:
+				Q_vals_.append(Q_evals.reshape(-1, self.num_agents))
+				Q_targets_.append(Q_targets.reshape(-1, self.num_agents))
 
+		if self.experiment_type != "ATRR_agent":
+			Q_mix_values = torch.stack(Q_mix_values, dim=1).to(self.device)
+			target_Q_mix_values = torch.stack(target_Q_mix_values, dim=1).to(self.device)
 
-		Q_mix_values = torch.stack(Q_mix_values, dim=1).to(self.device)
-		target_Q_mix_values = torch.stack(target_Q_mix_values, dim=1).to(self.device)
+			target_Q_mix_values = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), mask_batch[:, :max_episode_len].to(self.device), target_Q_mix_values)
 
-		target_Q_mix_values = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), done_batch[:, :max_episode_len].to(self.device), mask_batch[:, :max_episode_len].to(self.device), target_Q_mix_values)
+			Q_loss = self.loss_fn(Q_mix_values, target_Q_mix_values.detach()) / mask_batch.to(self.device).sum()
+		else:
+			Q_vals_ = torch.stack(Q_vals_, dim=1).to(self.device)
+			Q_targets_ = torch.stack(Q_targets_, dim=1).to(self.device)
 
-		Q_loss = self.loss_fn(Q_mix_values, target_Q_mix_values.detach()) / mask_batch.to(self.device).sum()
-
+			Q_targets_ = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), agent_masks_batch[:, :max_episode_len].to(self.device), Q_targets_)
+		
+			Q_loss = self.loss_fn(Q_vals_, Q_targets_.detach()) / mask_batch.to(self.device).sum()
+ 
 		self.optimizer.zero_grad()
 		Q_loss.backward()
 		if self.enable_grad_clip:

@@ -209,7 +209,7 @@ class QMIX:
 							rewards_to_send = episodic_team_reward
 						else:
 							rewards_to_send = 0
-					elif self.experiment_type == "AREL" or self.experiment_type == "ATRR":
+					elif self.experiment_type == "AREL" or "ATRR" in self.experiment_type:
 						episodic_team_reward = episodic_team_reward+rewards
 						if all(next_indiv_dones) or step == self.max_time_steps:
 							rewards_to_send = episodic_team_reward
@@ -247,14 +247,14 @@ class QMIX:
 				reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 				if self.experiment_type == "AREL":
 					reward_var_batch = 0.0
-				elif self.experiment_type == "ATRR":
+				elif "ATRR" in self.experiment_type:
 					entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 				for i in range(self.reward_model_update_epochs):
 					sample = self.buffer.sample(num_episodes=self.reward_batch_size)
 					if self.experiment_type == "AREL":
 						reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 						reward_var_batch += (reward_var/self.reward_model_update_epochs)
-					elif self.experiment_type == "ATRR":
+					elif "ATRR" in self.experiment_type:
 						reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 						entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 						entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
@@ -271,7 +271,7 @@ class QMIX:
 
 					if self.experiment_type == "AREL":
 						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
-					elif self.experiment_type == "ATRR":
+					elif "ATRR" in self.experiment_type:
 						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 						self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
 
@@ -337,7 +337,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
