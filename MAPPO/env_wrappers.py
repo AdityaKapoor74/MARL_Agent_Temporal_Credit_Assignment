@@ -171,7 +171,7 @@ class ShareVecEnv(ABC):
         return self.viewer
 
 
-def shareworker(remote, parent_remote, env_fn_wrapper):
+def shareworker(remote, parent_remote, env_fn_wrapper, implicit_reset):
     with warnings.catch_warnings():  # ignoring Gym API deprecation warnings
         warnings.simplefilter("ignore")
         parent_remote.close()
@@ -183,12 +183,13 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
                 ob, reward, done, info = env.step(data)
                 info["did_reset"] = False
                 if done or should_truncate:
-                    next_ob, next_info = env.reset(return_info=True)
-                    next_info["last_obs"] = ob
-                    next_info["last_info"] = info
-                    next_info["did_reset"] = True
-                    ob = next_ob
-                    info = next_info
+                    if implicit_reset:  # for sync process case, implicit_reset would be False, and the user is expected to call envs.reset()
+                        next_ob, next_info = env.reset(return_info=True)
+                        next_info["last_obs"] = ob
+                        next_info["last_info"] = info
+                        next_info["did_reset"] = True
+                        ob = next_ob
+                        info = next_info
                 remote.send((ob, reward, done, info))
             elif cmd == 'reset':
                 assert type(data) == dict
@@ -223,7 +224,7 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
 
 
 class ShareSubprocVecEnv(ShareVecEnv):
-    def __init__(self, env_fns, spaces=None, truncation_steps=None):
+    def __init__(self, env_fns, spaces=None, truncation_steps=None, is_sync=False):
         """
         envs: list of gym environments to run in subprocesses
         """
@@ -231,13 +232,17 @@ class ShareSubprocVecEnv(ShareVecEnv):
         self.closed = False
         nenvs = len(env_fns)
         self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-        self.ps = [Process(target=shareworker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
+        self.reset_obs = None
+        self.reset_info = None
+        self.is_sync = is_sync
+        self.worker_dones = [False] * nenvs
+        self.ps = [Process(target=shareworker, args=(work_remote, remote, CloudpickleWrapper(env_fn), not is_sync))
                    for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
         for p in self.ps:
             p.daemon = True  # if the main process crashes, we should not cause things to hang
             p.start()
-        for remote in self.work_remotes:
-            remote.close()
+        for remote in self.work_remotes: 
+            remote.close()  # main process should not be able to send from the remote end
         self.remotes[0].send(('get_spaces', None))
         observation_space, action_space = self.remotes[0].recv()
         self._state: AsyncState = AsyncState.DEFAULT
@@ -273,7 +278,8 @@ class ShareSubprocVecEnv(ShareVecEnv):
             should_truncate = self._should_truncate(process_index)
             if should_truncate:
                 self.num_steps[process_index] = 0
-            remote.send(('step', (action, should_truncate)))
+            if not self.is_sync or not self.worker_dones[process_index]:
+                remote.send(('step', (action, should_truncate)))
         self.waiting = True
         self._state = AsyncState.WAITING_STEP
 
@@ -284,13 +290,31 @@ class ShareSubprocVecEnv(ShareVecEnv):
                 "Calling `step_wait` without any prior call " "to `step_async`.",
                 AsyncState.WAITING_STEP.value,
             )
-        
-        results = [remote.recv() for remote in self.remotes]
+        if not self.is_sync:
+            results = [remote.recv() for remote in self.remotes]
+        else:
+            assert type(self.reset_obs) == np.ndarray, "Step called before reset"
+            dummy_obs = np.zeros(self.reset_obs[0].shape)
+            dummy_reward = 0.0
+            dummy_done = False
+            dummy_info = {}
+
+            results = []
+            for process_index, remote in enumerate(self.remotes):
+                if self.worker_dones[process_index]:
+                    results.append((dummy_obs, dummy_reward, dummy_done, dummy_info))
+                else:
+                    results.append(remote.recv())
+
         self._state = AsyncState.DEFAULT
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
         done_mask = 1 - np.array(dones, dtype=int)
         self.num_steps *= done_mask  # making num_steps = 0 for processes whose episodes are terminated.
+        for i, done in enumerate(dones):
+            if self.worker_dones[i]: continue
+            if done or self.num_steps[i]==0: 
+                self.worker_dones[i] = True
         combined_info = {}
         for i, info in enumerate(infos):
             self._add_info(combined_info, info, i)
@@ -329,6 +353,10 @@ class ShareSubprocVecEnv(ShareVecEnv):
             )
         
         observations, infos = zip(*[pipe.recv() for pipe in self.remotes])
+        if self.is_sync:
+            self.reset_obs = np.stack(observations)
+            self.reset_info = infos
+        self.worker_dones = [False] * self.num_envs
         self._state = AsyncState.DEFAULT
 
         self.num_steps = np.zeros(self.num_envs, dtype=int)

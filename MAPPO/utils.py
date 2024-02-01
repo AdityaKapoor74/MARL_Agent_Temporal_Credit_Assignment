@@ -356,7 +356,8 @@ class RolloutBufferShared(RolloutBuffer):
 		action_masks, 
 		rewards, 
 		dones,
-		worker_step_counter
+		worker_step_counter,
+		masks=None
 	):
 		assert state_critic_allies.shape[0] == self.num_workers
 		assert state_critic_enemies.shape[0] == self.num_workers
@@ -376,13 +377,20 @@ class RolloutBufferShared(RolloutBuffer):
 		print(f"Episode_counter: {self.worker_episode_counter}")
 		print(f"Timesteps: {self.time_steps}")
 		for worker_index in range(self.num_workers):
+			if type(masks) == np.ndarray and masks[worker_index]:  # the masks array indicates whether the current worker's data should be ignored
+				print(f"Skipping worker {worker_index} since it is masked.")
+				continue
 			episode_num = self.worker_episode_counter[worker_index]
 			time_step = self.time_steps[worker_index]
+
 			if episode_num >= self.num_episodes:
 				print(f"skipping worker {worker_index} since it has collected more than needed")
 				# the workers that have collected all required episodes for this update should not store anything more
 				continue
+
+			# the below condition might hold only when running train_parallel_agent_async.py 
 			if time_step == 0 and worker_step_counter[worker_index] != 1:
+				assert masks == None
 				# because of the above skip, after updation completes, it might be the case that the workers are somewhere in the middle of an ongoing episode
 				# so we will just do nothing till that episode completes. After it completes, storing would resume.
 				print(f"skipping worker {worker_index} till it resets")
@@ -582,8 +590,9 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 	def push(
 		self, 
 		states,
-		one_hot_actions, 
-		dones
+		one_hot_actions,
+		dones,
+		masks=None
 	):
 		print("From reward push buffer")
 		print(f"Episode_counter: {self.worker_episode_counter}")
@@ -593,6 +602,8 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		assert one_hot_actions.shape[0] == self.num_workers
 		assert dones.shape[0] == self.num_workers
 		for worker_index in range(self.num_workers):
+			if type(masks) == np.ndarray and masks[worker_index]:
+				continue
 			episode_num = self.worker_episode_counter[worker_index] % self.num_episodes_capacity
 			self.episodes_completely_filled[episode_num] = 0
 			time_step = self.time_steps[worker_index]
