@@ -131,7 +131,9 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 
-			self.final_temporal_block = TransformerBlock(emb=emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			self.pre_final_temporal_block_norm = nn.LayerNorm(obs_shape+action_shape)
+
+			self.final_temporal_block = TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 
 			self.rblocks = nn.Sequential(
 				init_(nn.Linear(emb, 64), activate=True),
@@ -168,6 +170,8 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 
+			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb+action_shape)
+
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
 			self.rblocks = nn.Sequential(
@@ -202,6 +206,8 @@ class Time_Agent_Transformer(nn.Module):
 						mask=False, dropout=dropout, wide=wide))
 
 			self.tblocks = nn.Sequential(*tblocks)
+
+			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
@@ -268,7 +274,9 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = x.view(b, n_a, t+1, -1).mean(dim=1)
+		x = x.view(b, n_a, t+1, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
+
+		x = self.pre_final_temporal_block_norm(x)
 
 		x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
