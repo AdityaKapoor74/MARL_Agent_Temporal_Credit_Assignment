@@ -337,7 +337,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
@@ -380,7 +380,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": "hypernet_compression", # no_compression, linear_compression, hypernet_compression
+				"reward_comp": "linear_compression", # no_compression, linear_compression, hypernet_compression
 				"reward_linear_compression_dim": 64,
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
