@@ -212,7 +212,7 @@ class QMIXAgent:
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
 
 		if self.norm_rewards:
-			shape = episodic_rewards.shape
+			shape = episodic_reward_batch.shape
 			self.reward_normalizer.update(episodic_reward_batch.view(-1))
 			
 			episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
