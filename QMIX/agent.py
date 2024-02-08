@@ -319,6 +319,9 @@ class QMIXAgent:
 					agent_masks=agent_masks.to(self.device)
 					)
 
+			if self.norm_rewards:
+				shape = reward_episode_wise.shape
+				reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
 
 			reward_batch = (reward_episode_wise * temporal_weights).cpu()
 

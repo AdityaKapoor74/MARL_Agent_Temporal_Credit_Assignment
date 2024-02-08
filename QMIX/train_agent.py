@@ -337,22 +337,22 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
+		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
 
 		dictionary = {
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
-				"model_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+'_'+extension+'/models/',
-				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+'_'+extension+'/',
-				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+'_'+extension+'/',
+				"model_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+extension+'/models/',
+				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+'_'+extension+'/',
+				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+extension+'/',
 				"test_num":test_num,
 				"extension":extension,
 				"experiment_type": experiment_type,
 				"gif": False,
 				"gif_checkpoint":1,
 				"load_models": False,
-				"model_path": "../../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
+				"model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
 				"eval_policy": True,
 				"save_model": True,
 				"save_model_checkpoint": 1000,
@@ -389,12 +389,12 @@ if __name__ == '__main__':
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": True,
+				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 100
-				"norm_rewards": False,
+				"norm_rewards": True,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
