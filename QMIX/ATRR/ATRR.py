@@ -2,6 +2,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+import math
+import numpy as np
+
 from .modules import TransformerBlock, TransformerBlock_Agent
 
 from .util import d
@@ -22,6 +25,102 @@ def init_(m, gain=0.01, activate=False):
 	if activate:
 		gain = nn.init.calculate_gain('relu')
 	return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+
+
+class PopArt(torch.nn.Module):
+	
+	def __init__(self, input_shape, output_shape, norm_axes=1, beta=0.99999, epsilon=1e-5, device=torch.device("cpu")):
+		
+		super(PopArt, self).__init__()
+
+		self.beta = beta
+		self.epsilon = epsilon
+		self.norm_axes = norm_axes
+		self.tpdv = dict(dtype=torch.float32, device=device)
+
+		self.input_shape = input_shape
+		self.output_shape = output_shape
+
+		self.weight = nn.Parameter(torch.Tensor(output_shape, input_shape)).to(**self.tpdv)
+		self.bias = nn.Parameter(torch.Tensor(output_shape)).to(**self.tpdv)
+		
+		self.stddev = nn.Parameter(torch.ones(output_shape), requires_grad=False).to(**self.tpdv)
+		self.mean = nn.Parameter(torch.zeros(output_shape), requires_grad=False).to(**self.tpdv)
+		self.mean_sq = nn.Parameter(torch.zeros(output_shape), requires_grad=False).to(**self.tpdv)
+		self.debiasing_term = nn.Parameter(torch.tensor(0.0), requires_grad=False).to(**self.tpdv)
+
+		self.reset_parameters()
+
+	def reset_parameters(self):
+		torch.nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+		if self.bias is not None:
+			fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
+			bound = 1 / math.sqrt(fan_in)
+			torch.nn.init.uniform_(self.bias, -bound, bound)
+		self.mean.zero_()
+		self.mean_sq.zero_()
+		self.debiasing_term.zero_()
+
+	def forward(self, input_vector):
+		if type(input_vector) == np.ndarray:
+			input_vector = torch.from_numpy(input_vector)
+		input_vector = input_vector.to(**self.tpdv)
+
+		return F.linear(input_vector, self.weight, self.bias)
+	
+	@torch.no_grad()
+	def update(self, input_vector):
+		if type(input_vector) == np.ndarray:
+			input_vector = torch.from_numpy(input_vector)
+		input_vector = input_vector.to(**self.tpdv)
+		
+		old_mean, old_var = self.debiased_mean_var()
+		old_stddev = torch.sqrt(old_var)
+
+		batch_mean = input_vector.mean(dim=tuple(range(self.norm_axes)))
+		batch_sq_mean = (input_vector ** 2).mean(dim=tuple(range(self.norm_axes)))
+		
+		self.mean.mul_(self.beta).add_(batch_mean * (1.0 - self.beta))
+		self.mean_sq.mul_(self.beta).add_(batch_sq_mean * (1.0 - self.beta))
+		self.debiasing_term.mul_(self.beta).add_(1.0 * (1.0 - self.beta))
+
+		self.stddev.data = (self.mean_sq - self.mean ** 2).sqrt().clamp(min=1e-4)
+		
+		new_mean, new_var = self.debiased_mean_var()
+		new_stddev = torch.sqrt(new_var)
+		
+		self.weight.data = self.weight.data * old_stddev / new_stddev
+		self.bias.data = (old_stddev * self.bias.data + old_mean - new_mean) / new_stddev
+
+	def debiased_mean_var(self):
+		debiased_mean = self.mean / self.debiasing_term.clamp(min=self.epsilon)
+		debiased_mean_sq = self.mean_sq / self.debiasing_term.clamp(min=self.epsilon)
+		debiased_var = (debiased_mean_sq - debiased_mean ** 2).clamp(min=1e-2)
+		return debiased_mean, debiased_var
+
+	def normalize(self, input_vector):
+		if type(input_vector) == np.ndarray:
+			input_vector = torch.from_numpy(input_vector)
+		input_vector_device = input_vector.device
+		input_vector = input_vector.to(**self.tpdv)
+
+		mean, var = self.debiased_mean_var()
+		out = (input_vector - mean[(None,) * self.norm_axes]) / torch.sqrt(var)[(None,) * self.norm_axes]
+		
+		return out.to(input_vector_device)
+
+	def denormalize(self, input_vector):
+		if type(input_vector) == np.ndarray:
+			input_vector = torch.from_numpy(input_vector)
+		input_vector_device = input_vector.device
+		input_vector = input_vector.to(**self.tpdv)
+
+		mean, var = self.debiased_mean_var()
+		out = input_vector * torch.sqrt(var)[(None,) * self.norm_axes] + mean[(None,) * self.norm_axes]
+		
+		# out = out.cpu().numpy()
+
+		return out.to(input_vector_device)
 
 
 class HyperNetwork(nn.Module):
@@ -92,6 +191,7 @@ class Time_Agent_Transformer(nn.Module):
 		hypernet_hidden_dim=128,
 		hypernet_final_dim=128,
 		linear_compression_dim=128,
+		norm_rewards=False,
 		device=None
 		):
 		super().__init__()
@@ -135,13 +235,22 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 
-			self.rblocks = nn.Sequential(
+			if norm_rewards:
+				self.rblocks = nn.Sequential(
 				init_(nn.Linear(emb, 64), activate=True),
 				nn.GELU(),
 				init_(nn.Linear(64, 64), activate=True),
 				nn.GELU(),
-				init_(nn.Linear(64, 1))
+				init_(PopArt(64, 1))
 				)
+			else:
+				self.rblocks = nn.Sequential(
+					init_(nn.Linear(emb, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 1))
+					)
 
 			self.do = nn.Dropout(dropout)
 		elif comp == "linear_compression":
@@ -174,13 +283,23 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
-			self.rblocks = nn.Sequential(
-				init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(64, 64), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(64, 1))
-				)
+			if norm_rewards:
+				self.rblocks = nn.Sequential(
+					init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 64), activate=True),
+					nn.GELU(),
+					init_(PopArt(64, 1))
+					)
+			else:
+				self.rblocks = nn.Sequential(
+					init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 1))
+					)
+			
 										   
 			self.do = nn.Dropout(dropout)
 
@@ -211,13 +330,22 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
-			self.rblocks = nn.Sequential(
-				init_(nn.Linear(self.comp_emb, 64), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(64, 64), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(64, 1))
-				)
+			if norm_rewards:
+				self.rblocks = nn.Sequential(
+					init_(nn.Linear(self.comp_emb, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 64), activate=True),
+					nn.GELU(),
+					init_(PopArt(64, 1))
+					)
+			else:
+				self.rblocks = nn.Sequential(
+					init_(nn.Linear(self.comp_emb, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 64), activate=True),
+					nn.GELU(),
+					init_(nn.Linear(64, 1))
+					)
 
 			self.do = nn.Dropout(dropout)
 			

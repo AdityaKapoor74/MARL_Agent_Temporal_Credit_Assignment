@@ -134,11 +134,13 @@ class QMIXAgent:
 					linear_compression_dim=dictionary["reward_linear_compression_dim"],
 					hypernet_hidden_dim=dictionary["reward_hypernet_hidden_dim"],
 					hypernet_final_dim=dictionary["reward_hypernet_final_dim"],
+					norm_rewards=dictionary["norm_rewards"],
 					device=self.device,
 					).to(self.device)
 
 			if self.norm_rewards:
-				self.reward_normalizer = self.reward_model.toreward
+				self.reward_normalizer = self.reward_model.rblocks[-1]
+				print(self.reward_normalizer)
 
 			self.reward_optimizer = AdamW(self.reward_model.parameters(), lr=self.reward_lr, weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			
