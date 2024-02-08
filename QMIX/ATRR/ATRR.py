@@ -241,7 +241,7 @@ class Time_Agent_Transformer(nn.Module):
 				nn.GELU(),
 				init_(nn.Linear(64, 64), activate=True),
 				nn.GELU(),
-				init_(PopArt(64, 1))
+				init_(PopArt(64, 1, device=self.device))
 				)
 			else:
 				self.rblocks = nn.Sequential(
@@ -289,7 +289,7 @@ class Time_Agent_Transformer(nn.Module):
 					nn.GELU(),
 					init_(nn.Linear(64, 64), activate=True),
 					nn.GELU(),
-					init_(PopArt(64, 1))
+					init_(PopArt(64, 1, device=self.device))
 					)
 			else:
 				self.rblocks = nn.Sequential(
@@ -336,7 +336,7 @@ class Time_Agent_Transformer(nn.Module):
 					nn.GELU(),
 					init_(nn.Linear(64, 64), activate=True),
 					nn.GELU(),
-					init_(PopArt(64, 1))
+					init_(PopArt(64, 1, device=self.device))
 					)
 			else:
 				self.rblocks = nn.Sequential(
