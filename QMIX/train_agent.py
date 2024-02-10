@@ -386,14 +386,14 @@ if __name__ == '__main__':
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 64, # 128
-				"reward_lr": 1e-3,
+				"reward_lr": 1e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 400, # 100
+				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
