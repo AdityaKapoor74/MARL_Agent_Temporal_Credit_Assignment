@@ -403,7 +403,7 @@ if __name__ == '__main__':
 				"env": env_name,
 
 				# MODEL
-				"learning_rate": 2e-3, #1e-3
+				"learning_rate": 3e-3, #1e-3
 				"enable_grad_clip": True,
 				"grad_clip": 0.5,
 				"rnn_hidden_dim": 64,
