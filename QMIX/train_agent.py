@@ -386,7 +386,7 @@ if __name__ == '__main__':
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 64, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 1e-5,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": False,
@@ -403,7 +403,7 @@ if __name__ == '__main__':
 				"env": env_name,
 
 				# MODEL
-				"learning_rate": 3e-3, #1e-3
+				"learning_rate": 1e-3, #1e-3
 				"enable_grad_clip": True,
 				"grad_clip": 0.5,
 				"rnn_hidden_dim": 64,
