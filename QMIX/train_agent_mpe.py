@@ -9,8 +9,8 @@ from utils import soft_update, hard_update
 import torch
 import datetime
 
-import gym
-import smaclite  # noqa
+from multiagent.environment import MultiAgentEnv
+import multiagent.scenarios as scenarios
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -57,7 +57,7 @@ class QMIX:
 			max_episode_len = self.max_time_steps,
 			num_agents = self.num_agents,
 			q_obs_shape = self.q_observation_shape,
-			q_mix_obs_shape=self.q_mix_observation_shape,
+			q_mix_obs_shape = self.q_mix_observation_shape,
 			action_shape = self.num_actions
 			)
 
@@ -148,31 +148,47 @@ class QMIX:
 		clip.write_gif(fname, fps=fps)
 
 
+	def split_states(self,states):
+		states_critic = []
+		states_actor = []
+		for i in range(self.num_agents):
+			states_critic.append(states[i][0])
+			states_actor.append(states[i][1])
+
+		states_critic = np.asarray(states_critic)
+		states_actor = np.asarray(states_actor)
+
+		return states_critic, states_actor
+
+
 	def run(self):  
 		if self.eval_policy:
 			self.rewards = []
 			self.rewards_mean_per_1000_eps = []
 			self.timesteps = []
 			self.timesteps_mean_per_1000_eps = []
+			self.collision_rates = []
+			self.collison_rate_mean_per_1000_eps = []
 
 		for episode in range(1, self.max_episodes+1):
 
-			states, info = self.env.reset(return_info=True)
-			states = np.array(states)
-			states = np.concatenate((self.agent_ids, states), axis=-1)
-			globa_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
-			global_states_enemies = info["enemy_states"].reshape(-1)
-			global_states = np.concatenate((globa_states_allies, global_states_enemies), axis=-1)
-			mask_actions = np.array(info["avail_actions"], dtype=int)
+			states = self.env.reset()
+			global_states, states = self.split_states(states)
+			global_states = global_states.reshape(-1)
 			last_one_hot_action = np.zeros((self.num_agents, self.num_actions))
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
+
+			# remains constant since we don't mask any actions
+			mask_actions = np.ones((self.num_agents, self.num_actions))
 
 			images = []
 
 			episodic_team_reward = 0
 
 			episode_reward = 0
+			episode_collision_rate = 0
+			episode_goal_reached = 0
 			final_timestep = self.max_time_steps
 
 			self.agents.Q_network.rnn_hidden_state = None
@@ -198,42 +214,47 @@ class QMIX:
 					next_last_one_hot_action[i][act] = 1
 
 				next_states, rewards, dones, info = self.env.step(actions)
-				next_states = np.array(next_states)
-				next_states = np.concatenate((self.agent_ids, next_states), axis=-1)
-				next_globa_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
-				next_global_states_enemies = info["enemy_states"].reshape(-1)
-				next_global_states = np.concatenate((next_globa_states_allies, next_global_states_enemies), axis=-1)
-				next_mask_actions = np.array(info["avail_actions"], dtype=int)
-				next_indiv_dones = info["indiv_dones"]
+				next_global_states, next_states = self.split_states(next_states)
+				next_global_states = next_global_states.reshape(-1)
+				next_mask_actions = np.ones((self.num_agents, self.num_actions))
+				next_indiv_dones = dones
+
+				if "crossing" in self.env_name:
+					collision_rate = [value[1] for value in rewards]
+					goal_reached = [value[2] for value in rewards]
+					rewards = [value[0] for value in rewards] 
+					episode_collision_rate += np.sum(collision_rate)
+					episode_goal_reached += np.sum(goal_reached)
 
 				if self.learn:
 					# can't give agent level rewards since the algorithm cannot make use of it
 					if self.experiment_type == "temporal_team":
-						rewards_to_send = rewards
+						rewards_to_send = np.sum(rewards)
 						# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
 					elif self.experiment_type == "episodic_team":
-						episodic_team_reward = episodic_team_reward+rewards
+						episodic_team_reward = episodic_team_reward+np.sum(rewards)
 						if all(next_indiv_dones) or step == self.max_time_steps:
 							rewards_to_send = episodic_team_reward
 						else:
 							rewards_to_send = 0
 					elif self.experiment_type == "AREL" or "ATRR" in self.experiment_type:
-						episodic_team_reward = episodic_team_reward+rewards
+						episodic_team_reward = episodic_team_reward+np.sum(rewards)
 						if all(next_indiv_dones) or step == self.max_time_steps:
 							rewards_to_send = episodic_team_reward
 						else:
 							rewards_to_send = 0
 
-					self.buffer.push(states, global_states, actions, last_one_hot_action, next_states, next_global_states, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones)
+					self.buffer.push(states, global_states, actions, last_one_hot_action, next_states, next_global_states, next_last_one_hot_action, next_mask_actions, rewards_to_send, all(dones), indiv_dones)
 
 				states, global_states, mask_actions, last_one_hot_action, indiv_dones = next_states, next_global_states, next_mask_actions, next_last_one_hot_action, next_indiv_dones
 
 				episode_reward += np.sum(rewards)
 
-				if dones or step == self.max_time_steps:
+
+				if all(dones) or step == self.max_time_steps:
 
 					print("*"*100)
-					print("EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | Num Allies Alive: {} | Num Enemies Alive: {} \n".format(episode, np.round(episode_reward,decimals=4), step, self.max_time_steps, info["num_allies"], info["num_enemies"]))
+					print("EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} \n".format(episode, np.round(episode_reward,decimals=4), step, self.max_time_steps))
 					print("*"*100)
 
 					final_timestep = step
@@ -241,10 +262,8 @@ class QMIX:
 					if self.save_comet_ml_plot:
 						self.comet_ml.log_metric('Episode_Length', step, episode)
 						self.comet_ml.log_metric('Reward', episode_reward, episode)
-						self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
-						self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
-						self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
-						self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
+						self.comet_ml.log_metric('Number of Collision', episode_collision_rate, episode)
+						self.comet_ml.log_metric('Num Agents Goal Reached', np.sum(dones), episode)
 
 					break
 
@@ -314,10 +333,12 @@ class QMIX:
 			if self.eval_policy:
 				self.rewards.append(episode_reward)
 				self.timesteps.append(final_timestep)
+				self.collision_rates.append(episode_collision_rate)
 
 			if episode > self.save_model_checkpoint and self.eval_policy:
 				self.rewards_mean_per_1000_eps.append(sum(self.rewards[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
 				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
+				self.collison_rate_mean_per_1000_eps.append(sum(self.collision_rates[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
 
 			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
 				torch.save(self.agents.Q_network.state_dict(), self.model_path+'_Q_epsiode_'+str(episode)+'.pt')
@@ -333,6 +354,19 @@ class QMIX:
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir,self.test_num+"collision_rate_list"), np.array(self.collision_rates), allow_pickle=True, fix_imports=True)
+				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_collision_rate_per_1000_eps"), np.array(self.collison_rate_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+
+
+def make_env(scenario_name, benchmark=False):
+	scenario = scenarios.load(scenario_name + ".py").Scenario()
+	world = scenario.make_world()
+	if benchmark:
+		env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, scenario.benchmark_data, scenario.isFinished)
+	else:
+		env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, None, scenario.isFinished)
+	return env, scenario.actor_observation_shape, scenario.critic_observation_shape*env.n
+
 
 if __name__ == '__main__':
 
@@ -344,7 +378,7 @@ if __name__ == '__main__':
 	for i in range(1,6):
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		env_name = "5m_vs_6m"
+		env_name = "crossing_team_greedy"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
 
 		dictionary = {
@@ -361,16 +395,16 @@ if __name__ == '__main__':
 				"gif_checkpoint":1,
 				"load_models": False,
 				"model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,
 				"scheduler_need": False,
 				"max_episodes": 50000,
-				"max_time_steps": 50,
+				"max_time_steps": 100,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
 				"batch_size": 64,
@@ -424,10 +458,9 @@ if __name__ == '__main__':
 
 		seeds = [42, 142, 242, 342, 442]
 		torch.manual_seed(seeds[dictionary["iteration"]-1])
-		env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
-		obs, info = env.reset(return_info=True)
-		dictionary["num_agents"] = env.n_agents
-		dictionary["q_observation_shape"] = env.n_agents+obs[0].shape[0]
-		dictionary["q_mix_observation_shape"] = env.n_agents*(env.n_agents+info["ally_states"].shape[1])+env.n_enemies*info["enemy_states"].shape[1]
+		env, q_observation_shape, q_mix_observation_shape = make_env(scenario_name=dictionary["env"], benchmark=False)
+		dictionary["num_agents"] = env.n
+		dictionary["q_observation_shape"] = q_observation_shape # includes agent ids and other agent observations
+		dictionary["q_mix_observation_shape"] = q_mix_observation_shape
 		ma_controller = QMIX(env, dictionary)
 		ma_controller.run()

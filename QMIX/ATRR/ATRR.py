@@ -389,7 +389,7 @@ class Time_Agent_Transformer(nn.Module):
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
-			# temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			temporal_weights.append(self.tblocks[i].attention.attn_weights)
 			temporal_scores.append(self.tblocks[i].attention.attn_scores)
 			i += 1
 			if self.agent_attn:
@@ -404,13 +404,14 @@ class Time_Agent_Transformer(nn.Module):
 		
 		x = x.view(b, n_a, t+1, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 
-		x = self.pre_final_temporal_block_norm(x)
+		# x = self.pre_final_temporal_block_norm(x)
 
-		x = self.final_temporal_block(x, team_masks, temporal_only=True)
+		# x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
 		x_episode_wise = self.rblocks(x[:, -1, :]).view(b, 1).contiguous()
 
-		temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
+		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
+		temporal_weights = torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t+1, t+1).mean(dim=0).mean(dim=1)[:, -1, :-1] * team_masks[: , :-1]
 
 		temporal_scores = torch.stack(temporal_scores, dim=0)
 		# print(temporal_scores.shape)
