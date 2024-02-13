@@ -400,8 +400,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": False,
 				"reward_grad_clip_value": 0.5,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 400, # 400
+				"update_reward_model_freq": 100, # 200
+				"reward_model_update_epochs": 100, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
