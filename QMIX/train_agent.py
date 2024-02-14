@@ -396,8 +396,8 @@ if __name__ == '__main__':
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 1e-5,
-				"temporal_score_efficient": 1e-4,
-				"agent_score_efficient": 1e-4,
+				"temporal_score_efficient": 0.0,
+				"agent_score_efficient": 0.0,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 5.0,
