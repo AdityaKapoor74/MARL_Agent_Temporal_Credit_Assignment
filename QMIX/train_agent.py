@@ -396,14 +396,14 @@ if __name__ == '__main__':
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 1e-5,
-				"temporal_score_efficient": 0.0,
-				"agent_score_efficient": 0.0,
+				"temporal_score_efficient": 1e-4,
+				"agent_score_efficient": 1e-4,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 5.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 100, # 200
-				"reward_model_update_epochs": 100, # 400
+				"update_reward_model_freq": 200, # 200
+				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
