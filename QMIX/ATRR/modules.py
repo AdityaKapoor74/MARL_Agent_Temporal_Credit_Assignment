@@ -53,7 +53,7 @@ class SelfAttentionWide(nn.Module):
 
 	def forward(self, x, masks=None, agent=False, temporal_only=False):
 
-		b, t, e = x.size()
+		b, t, e = x.size() # b, n_a, e
 		h = self.heads
 		assert e == self.emb, f'Input embedding dim ({e}) should match layer embedding dim ({self.emb})'
 

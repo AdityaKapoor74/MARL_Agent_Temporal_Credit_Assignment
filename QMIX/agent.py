@@ -44,6 +44,8 @@ class QMIXAgent:
 		# self.num_episodes_capacity = dictionary["num_episodes_capacity"]
 		# self.batch_size = dictionary["batch_size"]
 		self.reward_lr = dictionary["reward_lr"]
+		self.temporal_score_coefficient = dictionary["temporal_score_efficient"]
+		self.agent_score_coefficient = dictionary["agent_score_efficient"]
 		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
 		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
@@ -249,7 +251,7 @@ class QMIXAgent:
 		elif "ATRR" in self.experiment_type:
 			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
 
-			reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+			reward_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores = self.reward_model(
 				state_batch.permute(0, 2, 1, 3).to(self.device), 
 				next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 				team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
@@ -260,7 +262,7 @@ class QMIXAgent:
 			entropy_temporal_weights = -torch.sum(torch.sum((temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)) * mask_batch.to(self.device)), dim=-1))/mask_batch.shape[0]
 			entropy_agent_weights = -torch.sum(torch.sum((agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)) * agent_masks.reshape(-1, self.num_agents).to(self.device)), dim=-1))/mask_batch.sum() #agent_masks.reshape(-1, self.num_agents).shape[0]
 			
-			reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device))
+			reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()
@@ -316,7 +318,7 @@ class QMIXAgent:
 			agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
 
 			with torch.no_grad():
-				reward_episode_wise, temporal_weights, agent_weights = self.reward_model(
+				reward_episode_wise, temporal_weights, agent_weights, _, _ = self.reward_model(
 					state_batch.permute(0, 2, 1, 3).to(self.device), 
 					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 					team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),

@@ -209,6 +209,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		print(self.comp_emb, '-'*50)
 
+		self.heads = heads
 		self.depth = depth
 		self.agent_attn = agent
 
@@ -413,16 +414,18 @@ class Time_Agent_Transformer(nn.Module):
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
 		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t+1, t+1).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :-1] * team_masks[: , :-1]
 
-		temporal_scores = torch.stack(temporal_scores, dim=0)
+		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t+1, t+1) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t+1).to(x.device)
+		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t+1, 1).to(x.device)
 		# print(temporal_scores.shape)
 
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t+1, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
 
-		agent_scores = torch.stack(agent_scores, dim=0)
+		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t+1, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t+1, 1, 1, n_a).to(x.device)
+		agent_scores = agent_scores * agent_masks.reshape(1, b, t+1, 1, n_a, 1).to(x.device)
 		# print(agent_scores.shape)
 
-		return x_episode_wise, temporal_weights, agent_weights
+		return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores
 
 
 
