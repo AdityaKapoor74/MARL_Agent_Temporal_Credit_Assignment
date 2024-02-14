@@ -399,8 +399,8 @@ if __name__ == '__main__':
 				"temporal_score_efficient": 1e-4,
 				"agent_score_efficient": 1e-4,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": False,
-				"reward_grad_clip_value": 0.5,
+				"enable_reward_grad_clip": True,
+				"reward_grad_clip_value": 5.0,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 100, # 200
 				"reward_model_update_epochs": 100, # 400
@@ -413,7 +413,7 @@ if __name__ == '__main__':
 				"env": env_name,
 
 				# MODEL
-				"learning_rate": 3e-3, #1e-3
+				"learning_rate": 5e-4, #1e-3
 				"enable_grad_clip": True,
 				"grad_clip": 0.5,
 				"rnn_hidden_dim": 64,
