@@ -215,7 +215,8 @@ class Time_Agent_Transformer(nn.Module):
 
 		if comp == "no_compression":
 			# one temporal embedding for each agent
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=1).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=1).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length+1).to(self.device)
 		
@@ -262,7 +263,8 @@ class Time_Agent_Transformer(nn.Module):
 					)
 
 			# one temporal embedding for each agent
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=seq_length+1).to(self.device)
 
@@ -309,7 +311,8 @@ class Time_Agent_Transformer(nn.Module):
 			self.hypernet = HyperNetwork(action_shape, hypernet_hidden_dim, hypernet_final_dim, obs_shape)
 
 			# one temporal embedding for each agent
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
 
@@ -364,7 +367,8 @@ class Time_Agent_Transformer(nn.Module):
 			b, n_a, t, e = x.size()
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
 			# concatenate temporal embedding for each agent
-			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
+			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b, 1, 1, e)], dim=-2)
 			x = x.view(b*n_a, t+1, e) + positions
 		elif self.comp == "linear_compression":
 			b, n_a, t, _ = obs.size()
@@ -373,13 +377,15 @@ class Time_Agent_Transformer(nn.Module):
 			x = torch.cat([x, one_hot_actions], dim=-1)
 			b, n_a, t, e = x.size()
 			# concatenate temporal embedding for each agent
-			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b, 1, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
 		elif self.comp == "hypernet_compression":
 			b, n_a, t, _ = obs.size()
 			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
 			x = self.hypernet(one_hot_actions, obs).view(b, n_a, t, -1)
 			b, n_a, t, e = x.size()
-			x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b, 1, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
 		
 		# x = self.do(x)
 
