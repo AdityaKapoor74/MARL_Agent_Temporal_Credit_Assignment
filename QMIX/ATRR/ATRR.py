@@ -216,7 +216,7 @@ class Time_Agent_Transformer(nn.Module):
 		if comp == "no_compression":
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=self.n_agents).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length+1).to(self.device)
 		
@@ -264,7 +264,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=self.n_agents).to(self.device)
 
 			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=seq_length+1).to(self.device)
 
