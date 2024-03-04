@@ -373,7 +373,7 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 64,
+				"batch_size": 32,
 				"update_episode_interval": 1,
 				"num_updates": 1,
 				"epsilon_greedy": 0.8,
@@ -395,7 +395,7 @@ if __name__ == '__main__':
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 64, # 128
 				"reward_lr": 1e-4,
-				"reward_weight_decay": 1e-5,
+				"reward_weight_decay": 5e-4,
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
 				"variance_loss_coeff": 0.0,
@@ -417,7 +417,7 @@ if __name__ == '__main__':
 				"enable_grad_clip": True,
 				"grad_clip": 0.5,
 				"rnn_hidden_dim": 64,
-				"hidden_dim": 32,
+				"hidden_dim": 64,
 				"norm_returns": False,
 				"soft_update": False,
 				"tau": 0.001,

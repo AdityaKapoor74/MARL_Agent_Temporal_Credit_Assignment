@@ -24,7 +24,8 @@ def init(module, weight_init, bias_init, gain=1):
 def init_(m, gain=0.01, activate=False):
 	if activate:
 		gain = nn.init.calculate_gain('relu')
-	return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	# return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
 class PopArt(torch.nn.Module):
@@ -207,8 +208,6 @@ class Time_Agent_Transformer(nn.Module):
 		else:
 			self.comp_emb = hypernet_final_dim
 
-		print(self.comp_emb, '-'*50)
-
 		self.heads = heads
 		self.depth = depth
 		self.agent_attn = agent
@@ -257,38 +256,38 @@ class Time_Agent_Transformer(nn.Module):
 			self.do = nn.Dropout(dropout)
 		elif comp == "linear_compression":
 			self.compress_input = nn.Sequential(
-					init_(nn.Linear(obs_shape, self.comp_emb), activate=True),
+					init_(nn.Linear(obs_shape+action_shape, self.comp_emb), activate=True),
 					nn.GELU(),
-					# nn.LayerNorm(self.comp_emb),
+					nn.LayerNorm(self.comp_emb),
 					)
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=self.n_agents).to(self.device)
+			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
 
 
 			tblocks = []
 			for i in range(depth):
 				tblocks.append(
-					TransformerBlock(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
+					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
 				if agent:
 					tblocks.append(
 						# adding an extra agent which is analogous to CLS token
 						# TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
-						TransformerBlock_Agent(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
+						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
 			self.tblocks = nn.Sequential(*tblocks)
 
-			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb+action_shape)
+			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
-			self.final_temporal_block = TransformerBlock(emb=self.comp_emb+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
-					init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
+					init_(nn.Linear(self.comp_emb, 64), activate=True),
 					nn.GELU(),
 					init_(nn.Linear(64, 64), activate=True),
 					nn.GELU(),
@@ -296,7 +295,7 @@ class Time_Agent_Transformer(nn.Module):
 					)
 			else:
 				self.rblocks = nn.Sequential(
-					init_(nn.Linear(self.comp_emb+action_shape, 64), activate=True),
+					init_(nn.Linear(self.comp_emb, 64), activate=True),
 					nn.GELU(),
 					init_(nn.Linear(64, 64), activate=True),
 					nn.GELU(),
@@ -372,9 +371,9 @@ class Time_Agent_Transformer(nn.Module):
 			x = x.view(b*n_a, t+1, e) + positions
 		elif self.comp == "linear_compression":
 			b, n_a, t, _ = obs.size()
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb+self.action_shape)
-			x = self.compress_input(obs)
-			x = torch.cat([x, one_hot_actions], dim=-1)
+			x = torch.cat([obs, one_hot_actions], dim=-1)
+			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
+			x = self.compress_input(x)
 			b, n_a, t, e = x.size()
 			# concatenate temporal embedding for each agent
 			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
