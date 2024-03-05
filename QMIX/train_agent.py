@@ -323,6 +323,9 @@ class QMIX:
 				torch.save(self.agents.Q_network.state_dict(), self.model_path+'_Q_epsiode_'+str(episode)+'.pt')
 				torch.save(self.agents.QMix_network.state_dict(), self.model_path+'_QMix_epsiode_'+str(episode)+'.pt')
 
+				if self.use_reward_model:
+					torch.save(self.agents.reward_model.state_dict(), self.model_path+'_'+self.experiment_type+'_'+str(episode)+'.pt')
+
 			
 			# elif self.gif and not(episode%self.gif_checkpoint):
 			# 	print("GENERATING GIF")
@@ -361,10 +364,10 @@ if __name__ == '__main__':
 				"gif_checkpoint":1,
 				"load_models": False,
 				"model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,
