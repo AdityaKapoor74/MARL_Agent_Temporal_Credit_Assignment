@@ -364,10 +364,10 @@ if __name__ == '__main__':
 				"gif_checkpoint":1,
 				"load_models": False,
 				"model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": False,
+				"save_comet_ml_plot": True,
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,
@@ -403,7 +403,7 @@ if __name__ == '__main__':
 				"agent_score_efficient": 0.0,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
-				"reward_grad_clip_value": 5.0,
+				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
