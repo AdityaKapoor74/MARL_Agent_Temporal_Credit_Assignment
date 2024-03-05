@@ -376,9 +376,9 @@ if __name__ == '__main__':
 				"batch_size": 32,
 				"update_episode_interval": 1,
 				"num_updates": 1,
-				"epsilon_greedy": 0.8,
+				"epsilon_greedy": 1.0,
 				"epsilon_greedy_min": 0.05,
-				"epsilon_greedy_decay_episodes": 50000,
+				"epsilon_greedy_decay_episodes": 30000,
 				"lambda": 0.8,
 
 				# REWARD MODEL
