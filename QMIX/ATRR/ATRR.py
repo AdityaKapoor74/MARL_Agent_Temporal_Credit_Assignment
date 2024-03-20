@@ -220,6 +220,7 @@ class Time_Agent_Transformer(nn.Module):
 			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length+1).to(self.device)
 		
 			tblocks = []
+			dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
@@ -230,7 +231,12 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length, n_agents= n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
+				dynamics_model.append(
+					nn.Linear(obs_shape+action_shape, obs_shape+action_shape)
+					)
+
 			self.tblocks = nn.Sequential(*tblocks)
+			self.dynamics_model = nn.Sequential(*dynamics_model)
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(obs_shape+action_shape)
 
@@ -269,6 +275,7 @@ class Time_Agent_Transformer(nn.Module):
 
 
 			tblocks = []
+			dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
@@ -279,7 +286,12 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
+				dynamics_model.append(
+					nn.Linear(self.comp_emb, self.comp_emb)
+					)
+
 			self.tblocks = nn.Sequential(*tblocks)
+			self.dynamics_model = nn.Sequential(*dynamics_model)
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
@@ -311,12 +323,13 @@ class Time_Agent_Transformer(nn.Module):
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
 
 
 			tblocks = []
+			dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
@@ -327,7 +340,12 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
+				dynamics_model.append(
+					nn.Linear(self.comp_emb, self.comp_emb)
+					)
+
 			self.tblocks = nn.Sequential(*tblocks)
+			self.dynamics_model = nn.Sequential(*dynamics_model)
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
@@ -364,40 +382,42 @@ class Time_Agent_Transformer(nn.Module):
 		if self.comp == "no_compression":
 			x = torch.cat([obs, one_hot_actions], dim=-1).to(self.device)
 			b, n_a, t, e = x.size()
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, e)
+			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, e)
 			# concatenate temporal embedding for each agent
 			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2)
-			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2)
-			x = x.view(b*n_a, t+1, e) + positions
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2)
+			x = x.view(b*n_a, t, e) + positions
 		elif self.comp == "linear_compression":
 			b, n_a, t, _ = obs.size()
 			x = torch.cat([obs, one_hot_actions], dim=-1)
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
-			x = self.compress_input(x)
-			b, n_a, t, e = x.size()
+			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
+			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) + positions
+			# b, n_a, t, e = x.size()
 			# concatenate temporal embedding for each agent
 			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
-			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2).view(b*n_a, t+1, e) + positions
 		elif self.comp == "hypernet_compression":
 			b, n_a, t, _ = obs.size()
-			positions = self.pos_embedding(torch.arange(t+1, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t+1, self.comp_emb)
-			x = self.hypernet(one_hot_actions, obs).view(b, n_a, t, -1)
-			b, n_a, t, e = x.size()
+			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
+			x = self.hypernet(one_hot_actions, obs).view(b*n_a, t, -1) + positions
+			# b, n_a, t, e = x.size()
 			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
-			x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2).view(b*n_a, t+1, e) + positions
 		
 		# x = self.do(x)
 
-		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
+		temporal_weights, agent_weights, state_latent_embeddings, dynamics_model_output, temporal_scores, agent_scores = [], [], [], [], [], []
 
-		i = 0
+		i, i_d = 0, 0
 
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
 			temporal_weights.append(self.tblocks[i].attention.attn_weights)
 			temporal_scores.append(self.tblocks[i].attention.attn_scores)
+
 			i += 1
+			
 			if self.agent_attn:
 				# odd numbers have agent attention
 				x = self.tblocks[i](x, masks=agent_masks)
@@ -405,10 +425,19 @@ class Time_Agent_Transformer(nn.Module):
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 				i += 1
 
+			state_latent_embeddings.append(x)
+			dynamics_model_output.append(self.dynamics_model[i_d](x))
+			i_d += 1
+
+
+		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, -1]
+		dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, -1]
+
+
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = x.view(b, n_a, t+1, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
+		x = x.view(b, n_a, t, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 
 		# x = self.pre_final_temporal_block_norm(x)
 
@@ -417,20 +446,20 @@ class Time_Agent_Transformer(nn.Module):
 		x_episode_wise = self.rblocks(x[:, -1, :]).view(b, 1).contiguous()
 
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
-		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t+1, t+1).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :-1] * team_masks[: , :-1]
+		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
 
-		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t+1, t+1) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t+1).to(x.device)
-		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t+1, 1).to(x.device)
+		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t, t) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t).to(x.device)
+		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t, 1).to(x.device)
 		# print(temporal_scores.shape)
 
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
-		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t+1, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
 
-		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t+1, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t+1, 1, 1, n_a).to(x.device)
-		agent_scores = agent_scores * agent_masks.reshape(1, b, t+1, 1, n_a, 1).to(x.device)
+		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t, 1, 1, n_a).to(x.device)
+		agent_scores = agent_scores * agent_masks.reshape(1, b, t, 1, n_a, 1).to(x.device)
 		# print(agent_scores.shape)
 
-		return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores
+		return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output
 
 
 

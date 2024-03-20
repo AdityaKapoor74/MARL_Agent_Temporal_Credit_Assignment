@@ -84,5 +84,7 @@ class ReplayMemory:
 
 		return state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions, reward_batch, done_batch, mask_batch, agent_masks_batch, max_episode_len
 
+
+
 	def __len__(self):
 		return self.length

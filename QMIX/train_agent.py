@@ -63,7 +63,8 @@ class QMIX:
 
 		self.epsilon_greedy = dictionary["epsilon_greedy"]
 		self.epsilon_greedy_min = dictionary["epsilon_greedy_min"]
-		self.epsilon_decay_rate = (self.epsilon_greedy - self.epsilon_greedy_min) / dictionary["epsilon_greedy_decay_episodes"]
+		self.epsilon_greedy_decay_episodes = dictionary["epsilon_greedy_decay_episodes"]
+		self.epsilon_decay_rate = (self.epsilon_greedy - self.epsilon_greedy_min) / self.epsilon_greedy_decay_episodes
 
 		self.reward_batch_size = dictionary["reward_batch_size"]
 		self.update_reward_model_freq = dictionary["update_reward_model_freq"]
@@ -169,6 +170,7 @@ class QMIX:
 			indiv_dones = np.array(indiv_dones)
 
 			images = []
+			action_list = []
 
 			episodic_team_reward = 0
 
@@ -189,7 +191,8 @@ class QMIX:
 					# time.sleep(0.1)
 					# Advance a step and render a new image
 					with torch.no_grad():
-						actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions)
+						actions = self.agents.get_action(states, last_one_hot_action, 0.1, mask_actions)
+						action_list.append(actions)
 				else:
 					actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions)
 
@@ -247,6 +250,14 @@ class QMIX:
 						self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
 
 					break
+
+			if self.gif:
+				reward_model_output = self.agents.reward_model_output(self.buffer)
+				for i in range(self.max_time_steps):
+					print("TIMESTEP:", i)
+					if i <= final_timestep:
+						print("ACTIONS:", action_list[i])
+					print("REWARD AT TIMESTEP ", i, "is", reward_model_output[0, i].item())
 
 			self.epsilon_greedy = self.epsilon_greedy - self.epsilon_decay_rate if self.epsilon_greedy - self.epsilon_decay_rate > self.epsilon_greedy_min else self.epsilon_greedy_min
 			self.buffer.end_episode()
@@ -363,7 +374,10 @@ if __name__ == '__main__':
 				"gif": False,
 				"gif_checkpoint":1,
 				"load_models": False,
-				"model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
+				"model_path_q_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_Q_epsiode_30000.pt",
+				"model_path_qmix_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_QMix_epsiode_30000.pt",
+				"model_path_reward_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_ATRR_temporal_30000.pt",
+				# "model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
 				"eval_policy": True,
 				"save_model": True,
 				"save_model_checkpoint": 1000,
