@@ -45,7 +45,7 @@ class ReplayMemory:
 		self.t += 1
 
 	def end_episode(self):
-		self.episode_len[self.episode] = self.t
+		self.episode_len[self.episode] = self.t-1
 		if self.length < self.capacity:
 			self.length += 1
 		self.episode = (self.episode + 1) % self.capacity
@@ -79,10 +79,11 @@ class ReplayMemory:
 		done_batch = np.take(self.buffer['done'], batch_indices, axis=0)
 		mask_batch = np.take(self.buffer['mask'], batch_indices, axis=0)
 		agent_masks_batch = np.take(self.buffer['agent_masks'], batch_indices, axis=0)
+		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
 		max_episode_len = int(np.max(self.episode_len[batch_indices]))
 
-		return state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions, reward_batch, done_batch, mask_batch, agent_masks_batch, max_episode_len
+		return state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions, reward_batch, done_batch, mask_batch, agent_masks_batch, episode_len_batch, max_episode_len
 
 
 

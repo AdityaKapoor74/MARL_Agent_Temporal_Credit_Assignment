@@ -224,6 +224,7 @@ class QMIXAgent:
 		next_last_one_hot_actions_batch = torch.from_numpy(buffer.buffer['next_last_one_hot_actions'][latest_sample_index]).float().unsqueeze(0)
 		mask_batch = torch.from_numpy(buffer.buffer['mask'][latest_sample_index]).float().unsqueeze(0)
 		agent_masks_batch = torch.from_numpy(buffer.buffer['agent_masks'][latest_sample_index]).float().unsqueeze(0)
+		episode_len_batch = torch.from_numpy(buffer.episode_len[latest_sample_index]).long().unsqueeze(0)
 		
 		if self.experiment_type == "AREL":
 			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
@@ -259,7 +260,7 @@ class QMIXAgent:
 
 	def update_reward_model(self, sample):
 		# # sample episodes from replay buffer
-		state_batch, _, _, _, _, _, next_last_one_hot_actions_batch, _, reward_batch, _, mask_batch, agent_masks_batch, _ = sample
+		state_batch, _, _, _, _, _, next_last_one_hot_actions_batch, _, reward_batch, _, mask_batch, agent_masks_batch, episode_len_batch, _ = sample
 		# # convert list to tensor
 		state_batch = torch.FloatTensor(state_batch)
 		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
@@ -267,6 +268,7 @@ class QMIXAgent:
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		mask_batch = torch.FloatTensor(mask_batch)
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
+		episode_len_batch = torch.LongTensor(episode_len_batch)
 
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
@@ -311,7 +313,8 @@ class QMIXAgent:
 				# team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
 				# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
 				team_masks=mask_batch.to(self.device),
-				agent_masks=agent_masks_batch.to(self.device)
+				agent_masks=agent_masks_batch.to(self.device),
+				episode_len=episode_len_batch.to(self.device),
 				)
 
 			entropy_temporal_weights = -torch.sum(torch.sum((temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)) * mask_batch.to(self.device)), dim=-1))/mask_batch.shape[0]
@@ -341,7 +344,7 @@ class QMIXAgent:
 
 	def update(self, sample):
 		# # sample episodes from replay buffer
-		state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, max_episode_len = sample
+		state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, episode_len_batch, max_episode_len = sample
 		# # convert list to tensor
 		state_batch = torch.FloatTensor(state_batch)
 		global_state_batch = torch.FloatTensor(global_state_batch)
@@ -355,6 +358,7 @@ class QMIXAgent:
 		done_batch = torch.FloatTensor(done_batch)
 		mask_batch = torch.FloatTensor(mask_batch)
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
+		episode_len_batch = torch.LongTensor(episode_len_batch)
 
 		if self.experiment_type == "AREL":
 			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
@@ -379,7 +383,8 @@ class QMIXAgent:
 					# team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
 					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
 					team_masks=mask_batch.to(self.device),
-					agent_masks=agent_masks_batch.to(self.device)
+					agent_masks=agent_masks_batch.to(self.device),
+					episode_len=episode_len_batch.to(self.device),
 					)
 
 			if self.norm_rewards:

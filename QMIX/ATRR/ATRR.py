@@ -215,9 +215,9 @@ class Time_Agent_Transformer(nn.Module):
 		if comp == "no_compression":
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=self.n_agents).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=self.n_agents).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length).to(self.device)
 		
 			tblocks = []
 			dynamics_model = []
@@ -238,9 +238,9 @@ class Time_Agent_Transformer(nn.Module):
 			self.tblocks = nn.Sequential(*tblocks)
 			self.dynamics_model = nn.Sequential(*dynamics_model)
 
-			self.pre_final_temporal_block_norm = nn.LayerNorm(obs_shape+action_shape)
+			# self.pre_final_temporal_block_norm = nn.LayerNorm(obs_shape+action_shape)
 
-			self.final_temporal_block = TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			# self.final_temporal_block = TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide)
 
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
@@ -269,21 +269,21 @@ class Time_Agent_Transformer(nn.Module):
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
-			self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
+			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=self.n_agents).to(self.device)
 
-			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length+1).to(self.device)
+			self.pos_embedding = nn.Embedding(embedding_dim=self.comp_emb, num_embeddings=seq_length).to(self.device)
 
 
 			tblocks = []
 			dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
-					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
+					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 				if agent:
 					tblocks.append(
 						# adding an extra agent which is analogous to CLS token
 						# TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
-						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
+						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
 				dynamics_model.append(
@@ -293,9 +293,9 @@ class Time_Agent_Transformer(nn.Module):
 			self.tblocks = nn.Sequential(*tblocks)
 			self.dynamics_model = nn.Sequential(*dynamics_model)
 
-			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
+			# self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
-			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			# self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide)
 			
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
@@ -332,12 +332,12 @@ class Time_Agent_Transformer(nn.Module):
 			dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
-					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide))
+					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 				if agent:
 					tblocks.append(
 						# adding an extra agent which is analogous to CLS token
 						# TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents= n_agents+1,
-						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, n_agents=n_agents,
+						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
 				dynamics_model.append(
@@ -349,7 +349,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
-			self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
+			# self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
 			
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
@@ -370,7 +370,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.do = nn.Dropout(dropout)
 			
-	def forward(self, obs, one_hot_actions, team_masks=None, agent_masks=None):
+	def forward(self, obs, one_hot_actions, team_masks=None, agent_masks=None, episode_len=None):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
@@ -417,6 +417,10 @@ class Time_Agent_Transformer(nn.Module):
 			temporal_scores.append(self.tblocks[i].attention.attn_scores)
 
 			i += 1
+
+			state_latent_embeddings.append(x)
+			dynamics_model_output.append(self.dynamics_model[i_d](x))
+			i_d += 1
 			
 			if self.agent_attn:
 				# odd numbers have agent attention
@@ -424,10 +428,6 @@ class Time_Agent_Transformer(nn.Module):
 				agent_weights.append(self.tblocks[i].attention.attn_weights)
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 				i += 1
-
-			state_latent_embeddings.append(x)
-			dynamics_model_output.append(self.dynamics_model[i_d](x))
-			i_d += 1
 
 
 		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, -1]
@@ -443,7 +443,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
-		x_episode_wise = self.rblocks(x[:, -1, :]).view(b, 1).contiguous()
+		x_episode_wise = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
 
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
 		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
