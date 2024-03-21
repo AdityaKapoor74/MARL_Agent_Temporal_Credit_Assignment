@@ -232,7 +232,13 @@ class Time_Agent_Transformer(nn.Module):
 						mask=False, dropout=dropout, wide=wide))
 
 				dynamics_model.append(
-					nn.Linear(obs_shape+action_shape, obs_shape+action_shape)
+					# nn.Linear(obs_shape+action_shape, obs_shape+action_shape)
+					nn.Sequential(
+						init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+						nn.GELU(),
+						nn.LayerNorm(obs_shape+action_shape),
+						init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+						)
 					)
 
 			self.tblocks = nn.Sequential(*tblocks)
@@ -287,7 +293,13 @@ class Time_Agent_Transformer(nn.Module):
 						mask=False, dropout=dropout, wide=wide))
 
 				dynamics_model.append(
-					nn.Linear(self.comp_emb, self.comp_emb)
+					# nn.Linear(self.comp_emb, self.comp_emb)
+					nn.Sequential(
+						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+						nn.GELU(),
+						nn.LayerNorm(self.comp_emb),
+						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+						)
 					)
 
 			self.tblocks = nn.Sequential(*tblocks)
@@ -341,7 +353,13 @@ class Time_Agent_Transformer(nn.Module):
 						mask=False, dropout=dropout, wide=wide))
 
 				dynamics_model.append(
-					nn.Linear(self.comp_emb, self.comp_emb)
+					# nn.Linear(self.comp_emb, self.comp_emb)
+					nn.Sequential(
+						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+						nn.GELU(),
+						nn.LayerNorm(self.comp_emb),
+						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+						)
 					)
 
 			self.tblocks = nn.Sequential(*tblocks)
