@@ -416,7 +416,7 @@ if __name__ == '__main__':
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
 				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": False,
+				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
