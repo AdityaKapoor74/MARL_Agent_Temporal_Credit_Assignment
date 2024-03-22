@@ -464,7 +464,8 @@ class Time_Agent_Transformer(nn.Module):
 		x_episode_wise = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
 
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
-		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
+		# temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
+		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t)[-1, :, :, :, :].sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
 
 		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t, t) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t).to(x.device)
 		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t, 1).to(x.device)
