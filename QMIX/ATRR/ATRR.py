@@ -243,6 +243,12 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(
+			# 			init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+			# 			nn.GELU(),
+			# 			nn.LayerNorm(obs_shape+action_shape),
+			# 			init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+			# 			)
 
 			# self.pre_final_temporal_block_norm = nn.LayerNorm(obs_shape+action_shape)
 
@@ -304,6 +310,12 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(
+			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			# 			nn.GELU(),
+			# 			nn.LayerNorm(self.comp_emb),
+			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			# 			)
 
 			# self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
@@ -364,6 +376,12 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.tblocks = nn.Sequential(*tblocks)
 			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(
+			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			# 			nn.GELU(),
+			# 			nn.LayerNorm(self.comp_emb),
+			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			# 			)
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
@@ -435,10 +453,6 @@ class Time_Agent_Transformer(nn.Module):
 			temporal_scores.append(self.tblocks[i].attention.attn_scores)
 
 			i += 1
-
-			state_latent_embeddings.append(x)
-			dynamics_model_output.append(self.dynamics_model[i_d](x))
-			i_d += 1
 			
 			if self.agent_attn:
 				# odd numbers have agent attention
@@ -447,9 +461,16 @@ class Time_Agent_Transformer(nn.Module):
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 				i += 1
 
+			state_latent_embeddings.append(x)
+			dynamics_model_output.append(self.dynamics_model[i_d](x))
+			i_d += 1
 
-		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, -1]
-		dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, -1]
+
+		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, :]
+		dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, :]
+
+		# state_latent_embeddings = x.detach().clone().view(b, n_a, t, -1)[:, :, 1:, -1]
+		# dynamics_model_output = self.dynamics_model(x).view(b, n_a, t, -1)[:, :, :-1, -1]
 
 
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
