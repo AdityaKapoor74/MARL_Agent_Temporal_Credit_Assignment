@@ -320,7 +320,12 @@ class QMIXAgent:
 			entropy_temporal_weights = -torch.sum(torch.sum((temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)) * mask_batch.to(self.device)), dim=-1))/mask_batch.shape[0]
 			entropy_agent_weights = -torch.sum(torch.sum((agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)) * agent_masks_batch.reshape(-1, self.num_agents).to(self.device)), dim=-1))/mask_batch.sum() #agent_masks.reshape(-1, self.num_agents).shape[0]
 			
-			reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + F.huber_loss(state_latent_embeddings.detach(), dynamics_model_output) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			# div = torch.mean(torch.distributions.kl.kl_divergence(dynamics_model_output, state_latent_embeddings.detach()))
+			# self.free_nats = 3
+			# div = torch.max(div, div.new_full(div.size(), self.free_nats))
+			reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			# reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + div + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			# reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + F.huber_loss(state_latent_embeddings.detach(), dynamics_model_output) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()
