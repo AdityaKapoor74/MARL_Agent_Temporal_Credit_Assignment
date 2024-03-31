@@ -8,6 +8,7 @@ from torch.optim import Adam, AdamW, RMSprop
 import torch.nn.functional as F
 from model import QMIXNetwork, RNNQNetwork, AgentQNetwork
 from utils import hard_update
+import torch.optim as optim
 
 
 EPS = 1e-2
