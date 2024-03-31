@@ -220,7 +220,7 @@ class Time_Agent_Transformer(nn.Module):
 			self.pos_embedding = nn.Embedding(embedding_dim=obs_shape+action_shape, num_embeddings=seq_length).to(self.device)
 		
 			tblocks = []
-			dynamics_model = []
+			# dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
@@ -231,18 +231,18 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=obs_shape+action_shape, heads=heads, seq_length=seq_length, n_agents= n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
-				dynamics_model.append(
-					# nn.Linear(obs_shape+action_shape, obs_shape+action_shape)
-					nn.Sequential(
-						init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
-						nn.GELU(),
-						nn.LayerNorm(obs_shape+action_shape),
-						init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
-						)
-					)
+				# dynamics_model.append(
+				# 	# nn.Linear(obs_shape+action_shape, obs_shape+action_shape)
+				# 	nn.Sequential(
+				# 		init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+				# 		nn.GELU(),
+				# 		nn.LayerNorm(obs_shape+action_shape),
+				# 		init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
+				# 		)
+				# 	)
 
 			self.tblocks = nn.Sequential(*tblocks)
-			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(*dynamics_model)
 			# self.dynamics_model = nn.Sequential(
 			# 			init_(nn.Linear(obs_shape+action_shape, obs_shape+action_shape), activate=True),
 			# 			nn.GELU(),
@@ -256,7 +256,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
-				init_(nn.Linear(emb, 64), activate=True),
+				init_(nn.Linear(obs_shape+action_shape, 64), activate=True),
 				nn.GELU(),
 				init_(nn.Linear(64, 64), activate=True),
 				nn.GELU(),
@@ -264,7 +264,7 @@ class Time_Agent_Transformer(nn.Module):
 				)
 			else:
 				self.rblocks = nn.Sequential(
-					init_(nn.Linear(emb, 64), activate=True),
+					init_(nn.Linear(obs_shape+action_shape, 64), activate=True),
 					nn.GELU(),
 					init_(nn.Linear(64, 64), activate=True),
 					nn.GELU(),
@@ -287,7 +287,7 @@ class Time_Agent_Transformer(nn.Module):
 
 
 			tblocks = []
-			dynamics_model = []
+			# dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
@@ -298,18 +298,18 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
-				dynamics_model.append(
-					# nn.Linear(self.comp_emb, self.comp_emb)
-					nn.Sequential(
-						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-						nn.GELU(),
-						nn.LayerNorm(self.comp_emb),
-						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-						)
-					)
+				# dynamics_model.append(
+				# 	# nn.Linear(self.comp_emb, self.comp_emb)
+				# 	nn.Sequential(
+				# 		init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# 		nn.GELU(),
+				# 		nn.LayerNorm(self.comp_emb),
+				# 		init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# 		)
+				# 	)
 
 			self.tblocks = nn.Sequential(*tblocks)
-			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(*dynamics_model)
 			# self.dynamics_model = nn.Sequential(
 			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 			# 			nn.GELU(),
@@ -353,7 +353,7 @@ class Time_Agent_Transformer(nn.Module):
 
 
 			tblocks = []
-			dynamics_model = []
+			# dynamics_model = []
 			for i in range(depth):
 				tblocks.append(
 					TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
@@ -364,18 +364,18 @@ class Time_Agent_Transformer(nn.Module):
 						TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 						mask=False, dropout=dropout, wide=wide))
 
-				dynamics_model.append(
-					# nn.Linear(self.comp_emb, self.comp_emb)
-					nn.Sequential(
-						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-						nn.GELU(),
-						nn.LayerNorm(self.comp_emb),
-						init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-						)
-					)
+				# dynamics_model.append(
+				# 	# nn.Linear(self.comp_emb, self.comp_emb)
+				# 	nn.Sequential(
+				# 		init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# 		nn.GELU(),
+				# 		nn.LayerNorm(self.comp_emb),
+				# 		init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# 		)
+				# 	)
 
 			self.tblocks = nn.Sequential(*tblocks)
-			self.dynamics_model = nn.Sequential(*dynamics_model)
+			# self.dynamics_model = nn.Sequential(*dynamics_model)
 			# self.dynamics_model = nn.Sequential(
 			# 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 			# 			nn.GELU(),
@@ -462,12 +462,12 @@ class Time_Agent_Transformer(nn.Module):
 				i += 1
 
 			state_latent_embeddings.append(x)
-			dynamics_model_output.append(self.dynamics_model[i_d](x))
+			# dynamics_model_output.append(self.dynamics_model[i_d](x))
 			i_d += 1
 
 
 		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, :]
-		dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, :]
+		# dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, :]
 
 		# state_latent_embeddings = x.detach().clone().view(b, n_a, t, -1)[:, :, 1:, -1]
 		# dynamics_model_output = self.dynamics_model(x).view(b, n_a, t, -1)[:, :, :-1, -1]
