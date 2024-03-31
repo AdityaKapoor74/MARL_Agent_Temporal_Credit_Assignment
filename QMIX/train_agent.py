@@ -73,6 +73,7 @@ class QMIX:
 		self.comet_ml = None
 		if self.save_comet_ml_plot:
 			self.comet_ml = Experiment("im5zK8gFkz6j07uflhc3hXk8I",project_name=dictionary["test_num"])
+			self.comet_ml.set_name(dictionary["experiment_name"])
 			self.comet_ml.log_parameters(dictionary)
 
 
@@ -359,8 +360,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
-
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
+		experiment_name = "ATRR_lr_1e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -397,6 +398,7 @@ if __name__ == '__main__':
 				"epsilon_greedy_min": 0.05,
 				"epsilon_greedy_decay_episodes": 30000,
 				"lambda": 0.8,
+				"experiment_name": experiment_name,
 
 				# REWARD MODEL
 				"use_reward_model": True,
