@@ -299,7 +299,7 @@ class TransformerBlock_Agent(nn.Module):
 		self.ff = nn.Sequential(
 			init_(nn.Linear(emb, ff_hidden_mult * emb), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(ff_hidden_mult * emb, emb), True)
+			init_(nn.Linear(ff_hidden_mult * emb, emb), activate=True)
 		)
 
 		self.do = nn.Dropout(dropout)
