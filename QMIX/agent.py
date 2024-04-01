@@ -474,8 +474,9 @@ class QMIXAgent:
 		else:
 			grad_norm = 0
 			for p in self.model_parameters:
-				param_norm = p.grad.detach().data.norm(2)
-				grad_norm += param_norm.item() ** 2
+				if p.grad is not None:
+					param_norm = p.grad.detach().data.norm(2)
+					grad_norm += param_norm.item() ** 2
 			grad_norm = grad_norm ** 0.5
 		self.optimizer.step()
 
