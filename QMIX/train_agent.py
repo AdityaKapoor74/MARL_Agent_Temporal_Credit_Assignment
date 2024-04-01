@@ -361,7 +361,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
-		experiment_name = "ATRR_lr_1e-4"
+		experiment_name = "ATRR_lr_5e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -413,7 +413,7 @@ if __name__ == '__main__':
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 64, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 5e-4,
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
