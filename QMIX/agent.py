@@ -397,7 +397,8 @@ class QMIXAgent:
 				shape = reward_episode_wise.shape
 				reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
 
-			reward_batch = (reward_episode_wise * temporal_weights).cpu()
+			# reward_batch = (reward_episode_wise * temporal_weights).cpu()
+			reward_batch = temporal_weights.cpu()  # EXPERIMENT WITH ONLY TEMPORAL WEIGHTS [not multiplying with episodic reward]
 
 			if self.experiment_type == "ATRR_agent":
 				reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
