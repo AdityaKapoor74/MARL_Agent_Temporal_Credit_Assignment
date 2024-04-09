@@ -221,7 +221,7 @@ class QMIX:
 							rewards_to_send = episodic_team_reward
 						else:
 							rewards_to_send = 0
-					elif self.experiment_type == "AREL" or "ATRR" in self.experiment_type:
+					elif "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
 						episodic_team_reward = episodic_team_reward+rewards
 						if all(next_indiv_dones) or step == self.max_time_steps:
 							rewards_to_send = episodic_team_reward
@@ -265,13 +265,13 @@ class QMIX:
 
 			if self.learn and self.use_reward_model and self.reward_batch_size <= self.buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
 				reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
-				if self.experiment_type == "AREL":
+				if "AREL" in self.experiment_type:
 					reward_var_batch = 0.0
 				elif "ATRR" in self.experiment_type:
 					entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 				for i in range(self.reward_model_update_epochs):
 					sample = self.buffer.sample(num_episodes=self.reward_batch_size)
-					if self.experiment_type == "AREL":
+					if "AREL" in self.experiment_type:
 						reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 						reward_var_batch += (reward_var/self.reward_model_update_epochs)
 					elif "ATRR" in self.experiment_type:
@@ -289,7 +289,7 @@ class QMIX:
 					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
 					self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
 
-					if self.experiment_type == "AREL":
+					if "AREL" in self.experiment_type:
 						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
 					elif "ATRR" in self.experiment_type:
 						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
@@ -360,7 +360,7 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER
+		experiment_type = "AREL_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
 		experiment_name = "ATRR_redistribute_using_weights_only"
 		dictionary = {
 				# TRAINING

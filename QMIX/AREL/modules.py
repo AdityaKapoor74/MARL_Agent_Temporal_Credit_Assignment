@@ -30,10 +30,13 @@ class SelfAttentionWide(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
         self.unifyheads = nn.Linear(heads * emb, emb)
+        
+        self.attn_weights = None
+        self.attn_scores = None
 
     def forward(self, x, masks=None, agent=False):
 
-        b, t, e = x.size()
+        b, t, e = x.size()  # (b*n_a, t, e)
         h = self.heads
         assert e == self.emb, f'Input embedding dim ({e}) should match layer embedding dim ({self.emb})'
 
@@ -56,7 +59,9 @@ class SelfAttentionWide(nn.Module):
         # - get dot product of queries and keys, and scale
         dot = torch.bmm(queries, keys.transpose(1, 2))
 
-        if masks is not None:
+        self.attn_scores = dot
+
+        if masks is not None:  # masks.shape = (b, t, n_agents)
             shape = dot.shape
             n_agents = masks.shape[-1]
             if agent:
@@ -73,6 +78,8 @@ class SelfAttentionWide(nn.Module):
         # dot = F.softmax(dot, dim=2)
         dot = self.softmax(dot)
         # - dot now has row-wise self-attention probabilities
+
+        self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
 
         # apply the self attention to the values
         out = torch.bmm(dot, values).view(b, h, t, e)
@@ -233,7 +240,7 @@ class TransformerBlock_Agent(nn.Module):
 
         x = x.view(-1, self.n_a, t, e).transpose(1, 2).contiguous().view(-1, self.n_a, e)
 
-        attended = self.attention(x, masks)
+        attended = self.attention(x, masks, agent=True)
 
         x = self.norm1(attended + x)
 
