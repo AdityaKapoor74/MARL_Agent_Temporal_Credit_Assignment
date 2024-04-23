@@ -361,7 +361,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_with_final_temporal_block_lr_1e-5"
+		experiment_name = "ATRR_with_final_temporal_block_lr_5e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
