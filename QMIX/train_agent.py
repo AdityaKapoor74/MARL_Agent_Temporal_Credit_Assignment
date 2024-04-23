@@ -361,7 +361,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_with_final_temporal_block_lr_5e-4"
+		experiment_name = "ATRR_with_final_temporal_block_lr_5e-4_scheduler"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,
-				"scheduler_need": False,
+				"scheduler_need": True,
 				"max_episodes": 50000,
 				"max_time_steps": 50,
 				"gamma": 0.99,

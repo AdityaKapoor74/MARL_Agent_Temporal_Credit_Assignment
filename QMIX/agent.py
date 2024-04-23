@@ -106,7 +106,7 @@ class QMIXAgent:
 				
 
 		if self.scheduler_need:
-			self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1000, 20000], gamma=0.1)
+			self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[10000, 30000], gamma=1.0)
 		
 		if self.use_reward_model:
 
@@ -164,7 +164,7 @@ class QMIXAgent:
 			self.reward_optimizer = AdamW(self.reward_model.parameters(), lr=self.reward_lr, weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			
 			if self.scheduler_need:
-				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[1000, 20000], gamma=0.1)
+				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.2)
 
 	def get_action(self, state, last_one_hot_action, epsilon_greedy, mask_actions):
 		if np.random.uniform() < epsilon_greedy:
