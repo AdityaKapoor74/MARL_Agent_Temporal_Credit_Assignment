@@ -282,6 +282,7 @@ class TransformerBlock(nn.Module):
 		return x
 
 
+
 class TransformerBlock_Agent(nn.Module):
 
 	def __init__(self, emb, heads, mask, seq_length, n_agents, ff_hidden_mult=4, dropout=0.0, wide=True):

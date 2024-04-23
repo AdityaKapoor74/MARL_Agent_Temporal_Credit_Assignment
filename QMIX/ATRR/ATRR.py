@@ -321,6 +321,14 @@ class Time_Agent_Transformer(nn.Module):
 
 			# self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide)
 			
+			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
+
+			self.final_temporal_block = []
+			for i in range(depth):
+				self.final_temporal_block.append(TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+			self.final_temporal_block = nn.Sequential(*self.final_temporal_block)
+
+
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
 					init_(nn.Linear(self.comp_emb, 64), activate=True),
@@ -385,8 +393,11 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
-			# self.final_temporal_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length+1, mask=True, dropout=dropout, wide=wide)
-			
+			self.final_temporal_block = []
+			for i in range(depth):
+				self.final_temporal_block.append(TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+			self.final_temporal_block = nn.Sequential(*self.final_temporal_block)
+
 			if norm_rewards:
 				self.rblocks = nn.Sequential(
 					init_(nn.Linear(self.comp_emb, 64), activate=True),
@@ -449,8 +460,8 @@ class Time_Agent_Transformer(nn.Module):
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
-			temporal_weights.append(self.tblocks[i].attention.attn_weights)
-			temporal_scores.append(self.tblocks[i].attention.attn_scores)
+			# temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			# temporal_scores.append(self.tblocks[i].attention.attn_scores)
 
 			i += 1
 			
@@ -476,7 +487,14 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = x.view(b, n_a, t, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
+		x = self.pre_final_temporal_block_norm((x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2))/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
+
+		for i in range(len(self.final_temporal_block)):
+			x = self.final_temporal_block[i](x, masks=team_masks, temporal_only=True)
+			temporal_weights.append(self.final_temporal_block[i].attention.attn_weights)
+			temporal_scores.append(self.final_temporal_block[i].attention.attn_scores)
+
+		# x = x.view(b, n_a, t, -1).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 
 		# x = self.pre_final_temporal_block_norm(x)
 
@@ -486,11 +504,16 @@ class Time_Agent_Transformer(nn.Module):
 
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
 		# temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
-		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t)[-1, :, :, :, :].sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
+		# temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t)[-1, :, :, :, :].sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
 
-		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t, t) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t).to(x.device)
-		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t, 1).to(x.device)
+		# temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t, t) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t).to(x.device)
+		# temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t, 1).to(x.device)
 		# print(temporal_scores.shape)
+
+		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.reshape(1, b, 1, t, 1).to(x.device)
+		temporal_scores = (temporal_scores * team_masks.reshape(1, b, 1, 1, t).to(x.device))
+		temporal_weights = torch.stack(temporal_weights, dim=0).reshape(self.depth, b, t, t) * team_masks.reshape(1, b, t, 1).to(x.device)
+		temporal_weights = (temporal_weights * team_masks.reshape(1, b, 1, t).to(x.device))[-1, :, -1, :]
 
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks

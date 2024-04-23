@@ -361,7 +361,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_lr_5e-5"
+		experiment_name = "ATRR_with_final_temporal_block_lr_1e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -413,7 +413,7 @@ if __name__ == '__main__':
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 64, # 128
-				"reward_lr": 5e-5,
+				"reward_lr": 1e-4,
 				"reward_weight_decay": 5e-4,
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
@@ -421,7 +421,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
+				"update_reward_model_freq": 33, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
