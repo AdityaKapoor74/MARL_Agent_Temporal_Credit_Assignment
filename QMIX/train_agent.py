@@ -361,7 +361,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_with_final_temporal_block_lr_5e-4_scheduler"
+		experiment_name = "ATRR_with_final_temporal_block_lr_1e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 				"norm_returns": False,
 				"learn":True,
 				"parallel_training": False,
-				"scheduler_need": True,
+				"scheduler_need": False,
 				"max_episodes": 50000,
 				"max_time_steps": 50,
 				"gamma": 0.99,
@@ -421,8 +421,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 400, # 400
+				"update_reward_model_freq": 100, # 200
+				"reward_model_update_epochs": 100, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
