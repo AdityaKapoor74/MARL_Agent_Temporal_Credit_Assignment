@@ -283,7 +283,7 @@ class QMIX:
 					grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
 
 					if self.scheduler_need:
-						self.scheduler_reward.step()
+						self.agents.scheduler_reward.step()
 
 				if self.comet_ml is not None:
 					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
