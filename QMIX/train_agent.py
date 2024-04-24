@@ -408,7 +408,7 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"reward_comp": "linear_compression", # no_compression, linear_compression, hypernet_compression
-				"reward_linear_compression_dim": 64,
+				"reward_linear_compression_dim": 128,
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
@@ -422,7 +422,7 @@ if __name__ == '__main__':
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 200, # 400
+				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
