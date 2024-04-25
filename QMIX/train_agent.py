@@ -50,15 +50,25 @@ class QMIX:
 
 		self.q_observation_shape = dictionary["q_observation_shape"]
 		self.q_mix_observation_shape = dictionary["q_mix_observation_shape"]
+		self.data_chunk_length = dictionary["data_chunk_length"]
+		self.rnn_hidden_dim = dictionary["rnn_hidden_dim"]
+		self.rnn_num_layers = dictionary["rnn_num_layers"]
 		self.replay_buffer_size = dictionary["replay_buffer_size"]
 		self.batch_size = dictionary["batch_size"] # number of datapoints to sample
 		self.buffer = ReplayMemory(
+			experiment_type = self.experiment_type,
 			capacity = self.replay_buffer_size,
 			max_episode_len = self.max_time_steps,
 			num_agents = self.num_agents,
 			q_obs_shape = self.q_observation_shape,
-			q_mix_obs_shape=self.q_mix_observation_shape,
-			action_shape = self.num_actions
+			q_mix_obs_shape = self.q_mix_observation_shape,
+			rnn_num_layers = self.rnn_num_layers,
+			rnn_hidden_state_shape = self.rnn_hidden_dim,
+			data_chunk_length = self.data_chunk_length,
+			action_shape = self.num_actions,
+			gamma = dictionary["gamma"],
+			lambda_ = dictionary["lambda"],
+			device = self.device,
 			)
 
 		self.epsilon_greedy = dictionary["epsilon_greedy"]
@@ -160,15 +170,16 @@ class QMIX:
 		for episode in range(1, self.max_episodes+1):
 
 			states, info = self.env.reset(return_info=True)
+			mask_actions = np.array(info["avail_actions"]) #(np.array(info["avail_actions"]) - 1) * 1e5
+			last_one_hot_action = np.zeros((self.num_agents, self.num_actions))
 			states = np.array(states)
 			states = np.concatenate((self.agent_ids, states), axis=-1)
-			globa_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
-			global_states_enemies = info["enemy_states"].reshape(-1)
-			global_states = np.concatenate((globa_states_allies, global_states_enemies), axis=-1)
-			mask_actions = np.array(info["avail_actions"], dtype=int)
-			last_one_hot_action = np.zeros((self.num_agents, self.num_actions))
+			states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
+			states_enemies = np.array(info["enemy_states"]).reshape(-1)
+			full_state = np.concatenate((states_allies, states_enemies), axis=-1).reshape(-1)
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
+			dones = all(indiv_dones)
 
 			images = []
 			action_list = []
@@ -178,8 +189,7 @@ class QMIX:
 			episode_reward = 0
 			final_timestep = self.max_time_steps
 
-			self.agents.Q_network.rnn_hidden_state = None
-			self.agents.target_Q_network.rnn_hidden_state = None
+			rnn_hidden_state = np.zeros((self.rnn_num_layers, self.num_agents, self.rnn_hidden_dim))
 
 			for step in range(1, self.max_time_steps+1):
 
@@ -192,22 +202,22 @@ class QMIX:
 					# time.sleep(0.1)
 					# Advance a step and render a new image
 					with torch.no_grad():
-						actions = self.agents.get_action(states, last_one_hot_action, 0.1, mask_actions)
+						actions, next_rnn_hidden_state = self.agents.get_action(states, last_one_hot_action, rnn_hidden_state, 0.05, mask_actions)
 						action_list.append(actions)
 				else:
-					actions = self.agents.get_action(states, last_one_hot_action, self.epsilon_greedy, mask_actions)
+					actions, next_rnn_hidden_state = self.agents.get_action(states, last_one_hot_action, rnn_hidden_state, self.epsilon_greedy, mask_actions)
 
 				next_last_one_hot_action = np.zeros((self.num_agents,self.num_actions))
 				for i,act in enumerate(actions):
 					next_last_one_hot_action[i][act] = 1
 
-				next_states, rewards, dones, info = self.env.step(actions)
+				next_states, rewards, next_dones, info = self.env.step(actions)
 				next_states = np.array(next_states)
 				next_states = np.concatenate((self.agent_ids, next_states), axis=-1)
-				next_globa_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
-				next_global_states_enemies = info["enemy_states"].reshape(-1)
-				next_global_states = np.concatenate((next_globa_states_allies, next_global_states_enemies), axis=-1)
-				next_mask_actions = np.array(info["avail_actions"], dtype=int)
+				next_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
+				next_states_enemies = np.array(info["enemy_states"]).reshape(-1)
+				next_full_state = np.concatenate((next_states_allies, next_states_enemies), axis=-1)
+				next_mask_actions = np.array(info["avail_actions"]) # (np.array(info["avail_actions"]) - 1) * 1e5
 				next_indiv_dones = info["indiv_dones"]
 
 				if self.learn:
@@ -228,9 +238,11 @@ class QMIX:
 						else:
 							rewards_to_send = 0
 
-					self.buffer.push(states, global_states, actions, last_one_hot_action, next_states, next_global_states, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones)
 
-				states, global_states, mask_actions, last_one_hot_action, indiv_dones = next_states, next_global_states, next_mask_actions, next_last_one_hot_action, next_indiv_dones
+					self.buffer.push(states, rnn_hidden_state, full_state, actions, last_one_hot_action, mask_actions, next_states, next_rnn_hidden_state, next_full_state, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones, next_indiv_dones)
+
+				states, full_state, mask_actions, last_one_hot_action, rnn_hidden_state = next_states, next_full_state, next_mask_actions, next_last_one_hot_action, next_rnn_hidden_state
+				dones, indiv_dones = next_dones, next_indiv_dones
 
 				episode_reward += np.sum(rewards)
 
@@ -263,52 +275,67 @@ class QMIX:
 			self.epsilon_greedy = self.epsilon_greedy - self.epsilon_decay_rate if self.epsilon_greedy - self.epsilon_decay_rate > self.epsilon_greedy_min else self.epsilon_greedy_min
 			self.buffer.end_episode()
 
-			if self.learn and self.use_reward_model and self.reward_batch_size <= self.buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
-				reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
-				if "AREL" in self.experiment_type:
-					reward_var_batch = 0.0
-				elif "ATRR" in self.experiment_type:
-					entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
-				for i in range(self.reward_model_update_epochs):
-					sample = self.buffer.sample(num_episodes=self.reward_batch_size)
+			if self.learn:
+				if self.use_reward_model and self.reward_batch_size <= self.buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
+					reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 					if "AREL" in self.experiment_type:
-						reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
-						reward_var_batch += (reward_var/self.reward_model_update_epochs)
+						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
-						reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
-						entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
-						entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
+						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+					for i in range(self.reward_model_update_epochs):
+						sample = self.buffer.sample_reward_model(num_episodes=self.reward_batch_size)
+						if "AREL" in self.experiment_type:
+							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
+							reward_var_batch += (reward_var/self.reward_model_update_epochs)
+						elif "ATRR" in self.experiment_type:
+							reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
+							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
+							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
 
-					reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
-					grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
+						reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
+						grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
+
+						if self.scheduler_need:
+							self.agents.scheduler_reward.step()
+
+					if self.comet_ml is not None:
+						self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
+						self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
+
+						if "AREL" in self.experiment_type:
+							self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
+						elif "ATRR" in self.experiment_type:
+							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
+							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
+
+
+				if self.batch_size <= self.buffer.length and episode != 0 and episode%self.update_episode_interval == 0:
+					Q_loss_batch = 0.0
+					grad_norm_batch = 0.0
+					for _ in range(self.num_updates):
+						sample = self.buffer.sample(
+							num_episodes=self.batch_size, 
+							Q_network=self.agents.Q_network, 
+							target_Q_network=self.agents.target_Q_network, 
+							target_QMix_network=self.agents.target_QMix_network,
+							reward_model=self.agents.reward_model,
+							)
+						Q_loss, grad_norm = self.agents.update(sample)
+						Q_loss_batch += Q_loss
+						grad_norm_batch += grad_norm
+					Q_loss_batch /= self.num_updates
+					grad_norm_batch /= self.num_updates
+
+					self.plotting_dict = {
+					"loss": Q_loss_batch,
+					"grad_norm": grad_norm_batch,
+					}
+
+					if self.comet_ml is not None:
+						self.plot(episode)
 
 					if self.scheduler_need:
-						self.agents.scheduler_reward.step()
-
-				if self.comet_ml is not None:
-					self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
-					self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
-
-					if "AREL" in self.experiment_type:
-						self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
-					elif "ATRR" in self.experiment_type:
-						self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
-						self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
-
-
-			if self.learn and self.batch_size <= self.buffer.length and episode != 0 and episode%self.update_episode_interval == 0:
-				Q_loss_batch, grad_norm_Q_batch = 0.0, 0.0
-				
-				for i in range(self.num_updates):
-					sample = self.buffer.sample(num_episodes=self.batch_size)
-					
-					Q_loss, grad_norm_Q = self.agents.update(sample)
-					
-					Q_loss_batch += (Q_loss/self.num_updates)
-					grad_norm_Q_batch += (grad_norm_Q/self.num_updates)
-
-				if self.scheduler_need:
-					self.agents.scheduler.step()
+						self.agents.scheduler.step()
 
 				if self.soft_update:
 					soft_update(self.agents.target_Q_network, self.agents.Q_network, self.tau)
@@ -317,10 +344,6 @@ class QMIX:
 					if episode % self.target_update_interval == 0:
 						hard_update(self.agents.target_Q_network, self.agents.Q_network)
 						hard_update(self.agents.target_QMix_network, self.agents.QMix_network)
-
-				if self.comet_ml is not None:
-					self.comet_ml.log_metric('Q_Loss', Q_loss_batch, episode)
-					self.comet_ml.log_metric('Q_Grad_Norm', grad_norm_Q_batch, episode)
 
 
 			if self.eval_policy:
@@ -360,15 +383,15 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_with_final_temporal_block_only_lr_1e-4"
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "teamporal_team"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
-				"model_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+extension+'/models/',
-				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+'_'+extension+'/',
-				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+extension+'/',
+				"model_dir": '../../tests/'+test_num+'/'+experiment_type+'/models/'+env_name+'_'+extension+'/models/',
+				"gif_dir": '../../tests/'+test_num+'/'+experiment_type+'/gifs/'+env_name+'_'+'_'+extension+'/',
+				"policy_eval_dir":'../../tests/'+test_num+'/'+experiment_type+'/policy_eval/'+env_name+'_'+extension+'/',
 				"test_num":test_num,
 				"extension":extension,
 				"experiment_type": experiment_type,
@@ -392,8 +415,8 @@ if __name__ == '__main__':
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
 				"batch_size": 32,
-				"update_episode_interval": 1,
-				"num_updates": 1,
+				"update_episode_interval": 10,
+				"num_updates": 10,
 				"epsilon_greedy": 0.8,
 				"epsilon_greedy_min": 0.05,
 				"epsilon_greedy_decay_episodes": 30000,
@@ -421,7 +444,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
+				"update_reward_model_freq": 10, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
@@ -435,6 +458,8 @@ if __name__ == '__main__':
 				"learning_rate": 1e-3, #1e-3
 				"enable_grad_clip": False,
 				"grad_clip": 0.5,
+				"data_chunk_length": 10,
+				"rnn_num_layers": 1,
 				"rnn_hidden_dim": 64,
 				"hidden_dim": 64,
 				"norm_returns": False,

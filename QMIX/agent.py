@@ -6,7 +6,7 @@ import torch.nn as nn
 from functools import reduce
 from torch.optim import Adam, AdamW, RMSprop
 import torch.nn.functional as F
-from model import QMIXNetwork, RNNQNetwork, AgentQNetwork
+from model import QMIXNetwork, RNNQNetwork
 from utils import hard_update
 import torch.optim as optim
 
@@ -58,6 +58,7 @@ class QMIXAgent:
 		self.enable_grad_clip = dictionary["enable_grad_clip"]
 		self.grad_clip = dictionary["grad_clip"]
 		self.tau = dictionary["tau"] # target network smoothing coefficient
+		self.rnn_num_layers = dictionary["rnn_num_layers"]
 		self.rnn_hidden_dim = dictionary["rnn_hidden_dim"]
 		self.hidden_dim = dictionary["hidden_dim"]
 
@@ -66,10 +67,9 @@ class QMIXAgent:
 
 
 		# Q Network
-		self.Q_network = RNNQNetwork(self.q_obs_input_dim, self.num_actions, self.rnn_hidden_dim).to(self.device)
-		self.target_Q_network = RNNQNetwork(self.q_obs_input_dim, self.num_actions, self.rnn_hidden_dim).to(self.device)
-		# self.Q_network = AgentQNetwork(self.obs_input_dim, self.num_actions).to(self.device)
-		# self.target_Q_network = AgentQNetwork(self.obs_input_dim, self.num_actions).to(self.device)
+		self.Q_network = RNNQNetwork(self.q_obs_input_dim+self.num_actions, self.num_actions, self.rnn_hidden_dim, self.rnn_num_layers).to(self.device)
+		self.target_Q_network = RNNQNetwork(self.q_obs_input_dim+self.num_actions, self.num_actions, self.rnn_hidden_dim, self.rnn_num_layers).to(self.device)
+		
 		self.QMix_network = QMIXNetwork(self.num_agents, self.hidden_dim, self.q_mix_obs_input_dim).to(self.device)
 		self.target_QMix_network = QMIXNetwork(self.num_agents, self.hidden_dim, self.q_mix_obs_input_dim).to(self.device)
 
@@ -166,24 +166,31 @@ class QMIXAgent:
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
 
-	def get_action(self, state, last_one_hot_action, epsilon_greedy, mask_actions):
+		else:
+
+			self.reward_model = None
+
+
+	def get_action(self, state, last_one_hot_action, rnn_hidden_state, epsilon_greedy, action_masks):
 		if np.random.uniform() < epsilon_greedy:
 			actions = []
 			for info in range(self.num_agents):
-				avail_indices = [i for i, x in enumerate(mask_actions[info]) if x]
+				avail_indices = [i for i, x in enumerate(action_masks[info]) if x]
 				actions.append(int(np.random.choice(avail_indices)))
 			# actions = [np.random.choice(self.num_actions) for _ in range(self.num_agents)]
 		else:
 			with torch.no_grad():
 				state = torch.FloatTensor(state)
 				last_one_hot_action = torch.FloatTensor(last_one_hot_action)
-				mask_actions = torch.FloatTensor(mask_actions)
-				final_state = torch.cat([state, last_one_hot_action], dim=-1)
-				Q_values = self.Q_network(final_state.to(self.device)) + (1-mask_actions.to(self.device))*(-1e9)
-				actions = Q_values.argmax(dim=-1).cpu().tolist()
+				rnn_hidden_state = torch.FloatTensor(rnn_hidden_state)
+				action_masks = torch.BoolTensor(action_masks)
+				final_state = torch.cat([state, last_one_hot_action], dim=-1).unsqueeze(0).unsqueeze(0)
+				Q_values, rnn_hidden_state = self.Q_network(final_state.to(self.device), rnn_hidden_state.to(self.device), action_masks.to(self.device)) #+ mask_actions
+				actions = Q_values.reshape(self.num_agents, self.num_actions).argmax(dim=-1).cpu().tolist()
+				rnn_hidden_state = rnn_hidden_state.cpu().numpy()
 				# actions = [Categorical(dist).sample().detach().cpu().item() for dist in Q_values]
 		
-		return actions
+		return actions, rnn_hidden_state
 
 
 	def calculate_returns(self, rewards):
@@ -264,8 +271,8 @@ class QMIXAgent:
 		
 
 	def update_reward_model(self, sample):
-		# # sample episodes from replay buffer
-		state_batch, _, _, _, _, _, next_last_one_hot_actions_batch, _, reward_batch, _, mask_batch, agent_masks_batch, episode_len_batch, _ = sample
+		# sample episodes from replay buffer
+		state_batch, full_state_batch, last_one_hot_actions_batch, next_state_batch, next_full_state_batch, next_last_one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch = sample
 		# # convert list to tensor
 		state_batch = torch.FloatTensor(state_batch)
 		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
@@ -275,11 +282,11 @@ class QMIXAgent:
 		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
 		episode_len_batch = torch.LongTensor(episode_len_batch)
 
-		if self.norm_rewards:
-			shape = episodic_reward_batch.shape
-			self.reward_normalizer.update(episodic_reward_batch.view(-1))
+		# if self.norm_rewards:
+		# 	shape = episodic_reward_batch.shape
+		# 	self.reward_normalizer.update(episodic_reward_batch.view(-1))
 			
-			episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
+		# 	episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
 
 		if "AREL" in self.experiment_type:
 			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
@@ -353,125 +360,140 @@ class QMIXAgent:
 
 	def update(self, sample):
 		# # sample episodes from replay buffer
-		state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, episode_len_batch, max_episode_len = sample
-		# # convert list to tensor
-		state_batch = torch.FloatTensor(state_batch)
-		global_state_batch = torch.FloatTensor(global_state_batch)
-		actions_batch = torch.FloatTensor(actions_batch)
-		last_one_hot_actions_batch = torch.FloatTensor(last_one_hot_actions_batch)
-		next_state_batch = torch.FloatTensor(next_state_batch)
-		next_global_state_batch = torch.FloatTensor(next_global_state_batch)
-		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
-		next_mask_actions_batch = torch.FloatTensor(next_mask_actions_batch)
-		reward_batch = torch.FloatTensor(reward_batch)
-		done_batch = torch.FloatTensor(done_batch)
-		mask_batch = torch.FloatTensor(mask_batch)
-		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
-		episode_len_batch = torch.LongTensor(episode_len_batch)
+		# state_batch, global_state_batch, actions_batch, last_one_hot_actions_batch, next_state_batch, next_global_state_batch, next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, mask_batch, agent_masks_batch, episode_len_batch, max_episode_len = sample
+		# # # convert list to tensor
+		# state_batch = torch.FloatTensor(state_batch)
+		# global_state_batch = torch.FloatTensor(global_state_batch)
+		# actions_batch = torch.FloatTensor(actions_batch)
+		# last_one_hot_actions_batch = torch.FloatTensor(last_one_hot_actions_batch)
+		# next_state_batch = torch.FloatTensor(next_state_batch)
+		# next_global_state_batch = torch.FloatTensor(next_global_state_batch)
+		# next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
+		# next_mask_actions_batch = torch.FloatTensor(next_mask_actions_batch)
+		# reward_batch = torch.FloatTensor(reward_batch)
+		# done_batch = torch.FloatTensor(done_batch)
+		# mask_batch = torch.FloatTensor(mask_batch)
+		# agent_masks_batch = torch.FloatTensor(agent_masks_batch)
+		# episode_len_batch = torch.LongTensor(episode_len_batch)
 
-		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
+		# if "AREL" in self.experiment_type:
+		# 	state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
 
-			with torch.no_grad():
-				reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = self.reward_model(
-					state_actions_batch.permute(0, 2, 1, 3).to(self.device),
-					team_masks=mask_batch.to(self.device),
-					agent_masks=agent_masks_batch.to(self.device)
-					)
+		# 	with torch.no_grad():
+		# 		reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = self.reward_model(
+		# 			state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+		# 			team_masks=mask_batch.to(self.device),
+		# 			agent_masks=agent_masks_batch.to(self.device)
+		# 			)
 
-			reward_batch = reward_time_wise.cpu()
+		# 	reward_batch = reward_time_wise.cpu()
 
-			if self.experiment_type == "AREL_agent":
-				reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
-
-
-		elif "ATRR" in self.experiment_type:
-			# agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
-
-			with torch.no_grad():
-				reward_episode_wise, temporal_weights, agent_weights, _, _, _, _ = self.reward_model(
-					state_batch.permute(0, 2, 1, 3).to(self.device), 
-					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
-					# team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
-					# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
-					team_masks=mask_batch.to(self.device),
-					agent_masks=agent_masks_batch.to(self.device),
-					episode_len=episode_len_batch.to(self.device),
-					)
-
-			if self.norm_rewards:
-				shape = reward_episode_wise.shape
-				reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
-
-			reward_batch = (reward_episode_wise * temporal_weights).cpu()
-
-			if self.experiment_type == "ATRR_agent":
-				reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
+		# 	if self.experiment_type == "AREL_agent":
+		# 		reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
 
 
+		# elif "ATRR" in self.experiment_type:
+		# 	# agent_masks = torch.cat([agent_masks_batch, torch.ones(agent_masks_batch.shape[0], 1, agent_masks_batch.shape[2])], dim=1)
 
-		self.Q_network.rnn_hidden_state = None
-		self.target_Q_network.rnn_hidden_state = None
+		# 	with torch.no_grad():
+		# 		reward_episode_wise, temporal_weights, agent_weights, _, _, _, _ = self.reward_model(
+		# 			state_batch.permute(0, 2, 1, 3).to(self.device), 
+		# 			next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+		# 			# team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
+		# 			# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
+		# 			team_masks=mask_batch.to(self.device),
+		# 			agent_masks=agent_masks_batch.to(self.device),
+		# 			episode_len=episode_len_batch.to(self.device),
+		# 			)
 
-		if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
-			Q_mix_values = []
-			target_Q_mix_values = []
-		else:
-			Q_vals_ = []
-			Q_targets_ = []
+		# 	if self.norm_rewards:
+		# 		shape = reward_episode_wise.shape
+		# 		reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
 
-		for t in range(max_episode_len):
-			# train in time order
-			states_slice = state_batch[:,t].reshape(-1, self.q_obs_input_dim)
-			global_states_slice = global_state_batch[:,t].reshape(-1, self.q_mix_obs_input_dim)
-			last_one_hot_actions_slice = last_one_hot_actions_batch[:,t].reshape(-1, self.num_actions)
-			actions_slice = actions_batch[:, t].reshape(-1)
-			next_states_slice = next_state_batch[:,t].reshape(-1, self.q_obs_input_dim)
-			next_global_states_slice = next_global_state_batch[:,t].reshape(-1, self.q_mix_obs_input_dim)
-			next_last_one_hot_actions_slice = next_last_one_hot_actions_batch[:,t].reshape(-1, self.num_actions)
-			next_mask_actions_slice = next_mask_actions_batch[:,t].reshape(-1, self.num_actions)
-			reward_slice = reward_batch[:, t].reshape(-1)
-			done_slice = done_batch[:, t].reshape(-1)
-			mask_slice = mask_batch[:, t].reshape(-1)
+		# 	reward_batch = (reward_episode_wise * temporal_weights).cpu()
 
-			final_state_slice = torch.cat([states_slice, last_one_hot_actions_slice], dim=-1)
-			Q_values = self.Q_network(final_state_slice.to(self.device))
-			Q_evals = torch.gather(Q_values, dim=-1, index=actions_slice.long().unsqueeze(-1).to(self.device)).squeeze(-1)
+		# 	if self.experiment_type == "ATRR_agent":
+		# 		reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
 
-			if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
-				Q_mix = self.QMix_network(Q_evals, global_states_slice.to(self.device)).squeeze(-1).squeeze(-1) * mask_slice.to(self.device)
 
-			with torch.no_grad():
-				next_final_state_slice = torch.cat([next_states_slice, next_last_one_hot_actions_slice], dim=-1)
-				Q_evals_next = self.Q_network(next_final_state_slice.to(self.device))
-				Q_targets = self.target_Q_network(next_final_state_slice.to(self.device))
-				a_argmax = torch.argmax(Q_evals_next+(1-next_mask_actions_slice.to(self.device)*(-1e9)), dim=-1, keepdim=True)
-				Q_targets = torch.gather(Q_targets, dim=-1, index=a_argmax.to(self.device)).squeeze(-1)
+
+		# self.Q_network.rnn_hidden_state = None
+		# self.target_Q_network.rnn_hidden_state = None
+
+		# if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
+		# 	Q_mix_values = []
+		# 	target_Q_mix_values = []
+		# else:
+		# 	Q_vals_ = []
+		# 	Q_targets_ = []
+
+		# for t in range(max_episode_len):
+		# 	# train in time order
+		# 	states_slice = state_batch[:,t].reshape(-1, self.q_obs_input_dim)
+		# 	global_states_slice = global_state_batch[:,t].reshape(-1, self.q_mix_obs_input_dim)
+		# 	last_one_hot_actions_slice = last_one_hot_actions_batch[:,t].reshape(-1, self.num_actions)
+		# 	actions_slice = actions_batch[:, t].reshape(-1)
+		# 	next_states_slice = next_state_batch[:,t].reshape(-1, self.q_obs_input_dim)
+		# 	next_global_states_slice = next_global_state_batch[:,t].reshape(-1, self.q_mix_obs_input_dim)
+		# 	next_last_one_hot_actions_slice = next_last_one_hot_actions_batch[:,t].reshape(-1, self.num_actions)
+		# 	next_mask_actions_slice = next_mask_actions_batch[:,t].reshape(-1, self.num_actions)
+		# 	reward_slice = reward_batch[:, t].reshape(-1)
+		# 	done_slice = done_batch[:, t].reshape(-1)
+		# 	mask_slice = mask_batch[:, t].reshape(-1)
+
+		# 	final_state_slice = torch.cat([states_slice, last_one_hot_actions_slice], dim=-1)
+		# 	Q_values = self.Q_network(final_state_slice.to(self.device))
+		# 	Q_evals = torch.gather(Q_values, dim=-1, index=actions_slice.long().unsqueeze(-1).to(self.device)).squeeze(-1)
+
+		# 	if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
+		# 		Q_mix = self.QMix_network(Q_evals, global_states_slice.to(self.device)).squeeze(-1).squeeze(-1) * mask_slice.to(self.device)
+
+		# 	with torch.no_grad():
+		# 		next_final_state_slice = torch.cat([next_states_slice, next_last_one_hot_actions_slice], dim=-1)
+		# 		Q_evals_next = self.Q_network(next_final_state_slice.to(self.device))
+		# 		Q_targets = self.target_Q_network(next_final_state_slice.to(self.device))
+		# 		a_argmax = torch.argmax(Q_evals_next+(1-next_mask_actions_slice.to(self.device)*(-1e9)), dim=-1, keepdim=True)
+		# 		Q_targets = torch.gather(Q_targets, dim=-1, index=a_argmax.to(self.device)).squeeze(-1)
 				
-				if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
-					Q_mix_target = self.target_QMix_network(Q_targets, next_global_states_slice.to(self.device)).squeeze(-1).squeeze(-1)
+		# 		if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
+		# 			Q_mix_target = self.target_QMix_network(Q_targets, next_global_states_slice.to(self.device)).squeeze(-1).squeeze(-1)
 				
-			if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
-				Q_mix_values.append(Q_mix)
-				target_Q_mix_values.append(Q_mix_target)
-			else:
-				Q_vals_.append(Q_evals.reshape(-1, self.num_agents))
-				Q_targets_.append(Q_targets.reshape(-1, self.num_agents))
+		# 	if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
+		# 		Q_mix_values.append(Q_mix)
+		# 		target_Q_mix_values.append(Q_mix_target)
+		# 	else:
+		# 		Q_vals_.append(Q_evals.reshape(-1, self.num_agents))
+		# 		Q_targets_.append(Q_targets.reshape(-1, self.num_agents))
 
-		if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
-			Q_mix_values = torch.stack(Q_mix_values, dim=1).to(self.device)
-			target_Q_mix_values = torch.stack(target_Q_mix_values, dim=1).to(self.device)
+		# if self.experiment_type != "ATRR_agent" and self.experiment_type != "AREL_agent":
+		# 	Q_mix_values = torch.stack(Q_mix_values, dim=1).to(self.device)
+		# 	target_Q_mix_values = torch.stack(target_Q_mix_values, dim=1).to(self.device)
 
-			target_Q_mix_values = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), mask_batch[:, :max_episode_len].to(self.device), target_Q_mix_values)
+		# 	target_Q_mix_values = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), mask_batch[:, :max_episode_len].to(self.device), target_Q_mix_values)
 
-			Q_loss = self.loss_fn(Q_mix_values, target_Q_mix_values.detach()) / mask_batch.to(self.device).sum()
-		else:
-			Q_vals_ = torch.stack(Q_vals_, dim=1).to(self.device)
-			Q_targets_ = torch.stack(Q_targets_, dim=1).to(self.device)
+		# 	Q_loss = self.loss_fn(Q_mix_values, target_Q_mix_values.detach()) / mask_batch.to(self.device).sum()
+		# else:
+		# 	Q_vals_ = torch.stack(Q_vals_, dim=1).to(self.device)
+		# 	Q_targets_ = torch.stack(Q_targets_, dim=1).to(self.device)
 
-			Q_targets_ = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), agent_masks_batch[:, :max_episode_len].to(self.device), Q_targets_)
+		# 	Q_targets_ = self.build_td_lambda_targets(reward_batch[:, :max_episode_len].to(self.device), agent_masks_batch[:, :max_episode_len].to(self.device), Q_targets_)
 		
-			Q_loss = self.loss_fn(Q_vals_, Q_targets_.detach()) / mask_batch.to(self.device).sum()
+		# 	Q_loss = self.loss_fn(Q_vals_, Q_targets_.detach()) / mask_batch.to(self.device).sum()
+
+
+		state_batch, rnn_hidden_state_batch, full_state_batch, actions_batch, last_one_hot_actions_batch, mask_actions_batch, next_state_batch, next_rnn_hidden_state_batch, next_full_state_batch, \
+		next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, indiv_dones_batch, next_indiv_dones_batch, team_mask_batch, max_episode_len, target_Q_mix_values = sample
+
+		final_state_batch = torch.cat([state_batch, last_one_hot_actions_batch], dim=-1)
+		Q_values, _ = self.Q_network(final_state_batch.to(self.device), rnn_hidden_state_batch.to(self.device), torch.ones_like(next_mask_actions_batch).bool().to(self.device))
+		Q_evals = (torch.gather(Q_values, dim=-1, index=actions_batch.to(self.device)) * (1-indiv_dones_batch).to(self.device)).squeeze(-1)
+		Q_mix = self.QMix_network(Q_evals, next_full_state_batch.to(self.device)).reshape(-1) #* team_mask_batch.reshape(-1).to(self.device)
+
+		Q_mix *= (1-done_batch).reshape(-1).to(self.device)
+
+		target_Q_mix_values *= (1-done_batch).squeeze(-1)
+
+		Q_loss = self.loss_fn(Q_mix, target_Q_mix_values.reshape(-1).to(self.device)) / team_mask_batch.to(self.device).sum()
  
 		self.optimizer.zero_grad()
 		Q_loss.backward()

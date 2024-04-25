@@ -3,54 +3,60 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Initialize weights
-def weights_init(m):
-	if isinstance(m, nn.Linear):
-		torch.nn.init.xavier_uniform_(m.weight, gain=1)
-		torch.nn.init.constant_(m.bias, 0)
+def init(module, weight_init, bias_init, gain=1):
+	weight_init(module.weight.data, gain=gain)
+	if module.bias is not None:
+		bias_init(module.bias.data)
+	return module
+
+def init_(m, gain=0.01, activate=False):
+	if activate:
+		gain = nn.init.calculate_gain('relu')
+	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
 class RNNQNetwork(nn.Module):
-	def __init__(self, num_inputs, num_actions, hidden_dim):
+	def __init__(self, input_dim, num_actions, rnn_hidden_dim, rnn_num_layers):
 		super(RNNQNetwork, self).__init__()
 
-		self.rnn_hidden_state = None
-		self.Layer1 = nn.Linear(num_inputs + num_actions, hidden_dim)
-		self.RNN = nn.GRUCell(hidden_dim, hidden_dim)
-		self.Layer2 = nn.Linear(hidden_dim, num_actions)
+		self.mask_value = torch.tensor(
+				torch.finfo(torch.float).min, dtype=torch.float
+			)
+		self.rnn_num_layers = rnn_num_layers
 
-		self.apply(weights_init)
-
-	def forward(self, states_actions):
-		x = F.gelu(self.Layer1(states_actions))
-		self.rnn_hidden_state = self.RNN(x, self.rnn_hidden_state)
-		Q_a_values = self.Layer2(self.rnn_hidden_state)
-		return Q_a_values
-
-
-class AgentQNetwork(nn.Module):
-	def __init__(self, num_inputs, num_actions):
-		super(AgentQNetwork, self).__init__()
-
-		self.QNet = nn.Sequential(
-			nn.Linear(num_inputs+num_actions, 128),
+		# self.rnn_hidden_state = None
+		# self.Layer1 = nn.Linear(input_dim + num_actions, hidden_dim)
+		self.Layer_1 = nn.Sequential(
+			init_(nn.Linear(input_dim, rnn_hidden_dim), activate=True),
 			nn.GELU(),
-			nn.Linear(128, 64),
-			nn.GELU(),
-			nn.Linear(64, num_actions)
+			nn.LayerNorm(rnn_hidden_dim),
+			)
+		# self.RNN = nn.GRUCell(hidden_dim, hidden_dim)
+		self.RNN = nn.GRU(input_size=rnn_hidden_dim, hidden_size=rnn_hidden_dim, num_layers=rnn_num_layers, batch_first=True)
+		# self.Layer2 = nn.Linear(hidden_dim, num_actions)
+		self.Layer_2 = nn.Sequential(
+			nn.LayerNorm(rnn_hidden_dim),
+			init_(nn.Linear(rnn_hidden_dim, num_actions), gain=0.01)
 			)
 
-		self.reset_parameters()
+		# self.apply(weights_init)
 
-	def reset_parameters(self):
-		"""Reinitialize learnable parameters."""
+	def forward(self, states_actions, hidden_state, action_masks):
+		batch, timesteps, num_agents, _ = states_actions.shape
+		# x = F.gelu(self.Layer1(states_actions))
+		# self.rnn_hidden_state = self.RNN(x, self.rnn_hidden_state)
 
-		# EMBEDDINGS
-		nn.init.xavier_uniform_(self.QNet[0].weight)
-		nn.init.xavier_uniform_(self.QNet[2].weight)
-		nn.init.xavier_uniform_(self.QNet[4].weight)
+		intermediate = self.Layer_1(states_actions)
+		intermediate = intermediate.permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1)
+		hidden_state = hidden_state.reshape(self.rnn_num_layers, batch*num_agents, -1)
+		output, h = self.RNN(intermediate, hidden_state)
+		output = output.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3)
+		Q_a_values = self.Layer_2(output)
 
-	def forward(self, states_actions):
-		return self.QNet(states_actions)
+		# Q_a_values = self.Layer2(self.rnn_hidden_state)
+		Q_a_values = torch.where(action_masks, Q_a_values, self.mask_value)
+		
+		return Q_a_values, h
 
 
 class QMIXNetwork(nn.Module):
