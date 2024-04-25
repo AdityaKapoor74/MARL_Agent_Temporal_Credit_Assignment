@@ -332,7 +332,8 @@ class QMIX:
 					}
 
 					if self.comet_ml is not None:
-						self.plot(episode)
+						self.comet_ml.log_metric('Loss', Q_loss_batch, episode)
+						self.comet_ml.log_metric('Grad_Norm', grad_norm_batch, episode)
 
 					if self.scheduler_need:
 						self.agents.scheduler.step()
