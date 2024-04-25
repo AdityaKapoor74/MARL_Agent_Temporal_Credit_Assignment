@@ -457,27 +457,27 @@ class Time_Agent_Transformer(nn.Module):
 
 		i, i_d = 0, 0
 
-		while i < len(self.tblocks):
-			# even numbers have temporal attention
-			x = self.tblocks[i](x, masks=agent_masks)
-			# temporal_weights.append(self.tblocks[i].attention.attn_weights)
-			# temporal_scores.append(self.tblocks[i].attention.attn_scores)
+		# while i < len(self.tblocks):
+		# 	# even numbers have temporal attention
+		# 	x = self.tblocks[i](x, masks=agent_masks)
+		# 	# temporal_weights.append(self.tblocks[i].attention.attn_weights)
+		# 	# temporal_scores.append(self.tblocks[i].attention.attn_scores)
 
-			i += 1
+		# 	i += 1
 			
-			if self.agent_attn:
-				# odd numbers have agent attention
-				x = self.tblocks[i](x, masks=agent_masks)
-				agent_weights.append(self.tblocks[i].attention.attn_weights)
-				agent_scores.append(self.tblocks[i].attention.attn_scores)
-				i += 1
+		# 	if self.agent_attn:
+		# 		# odd numbers have agent attention
+		# 		x = self.tblocks[i](x, masks=agent_masks)
+		# 		agent_weights.append(self.tblocks[i].attention.attn_weights)
+		# 		agent_scores.append(self.tblocks[i].attention.attn_scores)
+		# 		i += 1
 
-			state_latent_embeddings.append(x)
-			# dynamics_model_output.append(self.dynamics_model[i_d](x))
-			i_d += 1
+		# 	state_latent_embeddings.append(x)
+		# 	# dynamics_model_output.append(self.dynamics_model[i_d](x))
+		# 	i_d += 1
 
 
-		state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, :]
+		# state_latent_embeddings = torch.stack(state_latent_embeddings, dim=0).view(b, n_a, t, -1)[:, :, 1:, :]
 		# dynamics_model_output = torch.stack(dynamics_model_output, dim=0).view(b, n_a, t, -1)[:, :, :-1, :]
 
 		# state_latent_embeddings = x.detach().clone().view(b, n_a, t, -1)[:, :, 1:, -1]
@@ -487,7 +487,8 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = self.pre_final_temporal_block_norm(x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2))
+		x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
+		# x = self.pre_final_temporal_block_norm(x)
 
 		for i in range(len(self.final_temporal_block)):
 			x = self.final_temporal_block[i](x, masks=team_masks, temporal_only=True)
@@ -516,10 +517,14 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_weights = (temporal_weights * team_masks.reshape(1, b, 1, t).to(x.device))[-1, :, -1, :]
 
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
-		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
+		
+		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a).permute(1, 2, 0, 3, 4).mean(dim=-3).sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
 
-		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t, 1, 1, n_a).to(x.device)
-		agent_scores = agent_scores * agent_masks.reshape(1, b, t, 1, n_a, 1).to(x.device)
+		agent_weights = torch.ones(b, t, n_a).to(x.device)
+		agent_scores = torch.ones(self.depth, b, t, self.heads, n_a, n_a).to(x.device)
+
+		# agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t, 1, 1, n_a).to(x.device)
+		# agent_scores = agent_scores * agent_masks.reshape(1, b, t, 1, n_a, 1).to(x.device)
 		# print(agent_scores.shape)
 
 		return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output
