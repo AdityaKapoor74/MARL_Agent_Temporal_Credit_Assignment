@@ -424,7 +424,7 @@ if __name__ == '__main__':
 				"experiment_name": experiment_name,
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
