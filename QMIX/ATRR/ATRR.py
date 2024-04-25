@@ -487,7 +487,7 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = self.pre_final_temporal_block_norm((x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2))/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
+		x = self.pre_final_temporal_block_norm(x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2))
 
 		for i in range(len(self.final_temporal_block)):
 			x = self.final_temporal_block[i](x, masks=team_masks, temporal_only=True)
