@@ -516,7 +516,7 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_weights = torch.stack(temporal_weights, dim=0).reshape(self.depth, b, t, t) * team_masks.reshape(1, b, t, 1).to(x.device)
 		# temporal_weights = (temporal_weights * team_masks.reshape(1, b, 1, t).to(x.device)).mean(dim=0)[torch.arange(x.shape[0]), episode_len]
 		# ATTENTION ROLLOUT
-		temporal_weights = (temporal_weights[0][torch.arange(x.shape[0]), episode_len].unsqueeze(1) @ temporal_weights[1] @ temporal_weights[2]).unsqueeze(dim=-2)
+		temporal_weights = (temporal_weights[0][torch.arange(x.shape[0]), episode_len].unsqueeze(1) @ temporal_weights[1] @ temporal_weights[2]).squeeze(dim=-2)
 		
 		# agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a+1, n_a+1)[:, :, :, 0, 1:].permute(1, 2, 0, 3).mean(dim=-2) * agent_masks[: , :, 1:]
 		
