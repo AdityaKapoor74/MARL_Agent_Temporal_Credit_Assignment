@@ -149,7 +149,7 @@ class ReplayMemory:
 			# 	reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
 
 		# return reward_batch
-		return reward_agent_temporal.permute(0, 2, 1)
+		return reward_agent_temporal.cpu().permute(0, 2, 1)
 
 
 	def build_td_lambda_targets(self, rewards, terminated, target_qs):
