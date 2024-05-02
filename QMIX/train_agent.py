@@ -503,7 +503,7 @@ if __name__ == '__main__':
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
 				"epsilon_greedy_min": 0.05,
-				"epsilon_greedy_decay_episodes": 8000,
+				"epsilon_greedy_decay_episodes": 4000,
 				"lambda": 0.8,
 				"experiment_name": experiment_name,
 
@@ -539,7 +539,7 @@ if __name__ == '__main__':
 				"env": env_name,
 
 				# MODEL
-				"learning_rate": 5e-4, #1e-3
+				"learning_rate": 1e-4, #1e-3
 				"enable_grad_clip": False,
 				"grad_clip": 0.5,
 				"data_chunk_length": 10,
