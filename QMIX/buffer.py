@@ -124,7 +124,14 @@ class ReplayMemory:
 		elif "ATRR" in self.experiment_type:
 
 			with torch.no_grad():
-				reward_episode_wise, temporal_weights, agent_weights, _, _, _, _ = reward_model(
+				# reward_episode_wise, temporal_weights, agent_weights, _, _, _, _ = reward_model(
+				# 	state_batch.permute(0, 2, 1, 3).to(self.device), 
+				# 	next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+				# 	team_masks=mask_batch.to(self.device),
+				# 	agent_masks=agent_masks_batch.to(self.device),
+				# 	episode_len=episode_len_batch.to(self.device),
+				# 	)
+				reward_agent_temporal, temporal_weights, agent_weights, _, _, _, _ = reward_model(
 					state_batch.permute(0, 2, 1, 3).to(self.device), 
 					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 					team_masks=mask_batch.to(self.device),
@@ -136,12 +143,13 @@ class ReplayMemory:
 			# 	shape = reward_episode_wise.shape
 			# 	reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
 
-			reward_batch = (reward_episode_wise * temporal_weights).cpu()
+			# reward_batch = (reward_episode_wise * temporal_weights).cpu()
 
-			if self.experiment_type == "ATRR_agent":
-				reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
+			# if self.experiment_type == "ATRR_agent":
+			# 	reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
 
-		return reward_batch
+		# return reward_batch
+		return reward_agent_temporal.permute(0, 2, 1)
 
 
 	def build_td_lambda_targets(self, rewards, terminated, target_qs):
@@ -202,14 +210,21 @@ class ReplayMemory:
 				)
 			next_a_argmax = torch.argmax(next_Q_evals, dim=-1, keepdim=True)
 			next_Q_target = torch.gather(next_Q_target, dim=-1, index=next_a_argmax.to(self.device)).squeeze(-1)
-			next_Q_mix_target = target_QMix_network(
-			next_Q_target, 
-			next_full_state_batch.reshape(num_episodes*data_chunks, self.data_chunk_length, -1).to(self.device), 
-			).reshape(-1) #* team_mask_batch.reshape(-1).to(self.device)
+			
+			if self.experiment_type == "ATRR_agent" or self.experiment_type == "AREL_agent":
+				# Finally using TD-lambda equation to generate targets
+				target_Q_values = self.build_td_lambda_targets(reward_batch.permute(0, 2, 1).reshape(-1, self.max_episode_len), indiv_done_batch.permute(0, 2, 1).reshape(-1, self.max_episode_len), next_Q_target.reshape(-1, self.max_episode_len, self.num_agents).permute(0, 2, 1).reshape(-1, self.max_episode_len).cpu())
+			else:
+				next_Q_mix_target = target_QMix_network(
+				next_Q_target, 
+				next_full_state_batch.reshape(num_episodes*data_chunks, self.data_chunk_length, -1).to(self.device), 
+				).reshape(-1) #* team_mask_batch.reshape(-1).to(self.device)
+
+				# Finally using TD-lambda equation to generate targets
+				target_Q_values = self.build_td_lambda_targets(reward_batch.reshape(-1, self.max_episode_len), done_batch.reshape(-1, self.max_episode_len), next_Q_mix_target.reshape(-1, self.max_episode_len).cpu())
 
 		
-		# Finally using TD-lambda equation to generate targets
-		target_Q_mix_values = self.build_td_lambda_targets(reward_batch.reshape(-1, self.max_episode_len), done_batch.reshape(-1, self.max_episode_len), next_Q_mix_target.reshape(-1, self.max_episode_len).cpu())
+		
 		
 		state_batch = state_batch.reshape(num_episodes, data_chunks, self.data_chunk_length, self.num_agents, -1)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length, self.num_agents, -1)
 		rnn_hidden_state_batch = rnn_hidden_state_batch.reshape(num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers, self.num_agents, -1)[:, rand_time][:, :, 0].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers, num_episodes*data_chunks*self.num_agents, -1)
@@ -228,12 +243,15 @@ class ReplayMemory:
 		next_indiv_dones_batch = torch.from_numpy(np.take(self.buffer['next_indiv_dones'], batch_indices, axis=0)).reshape(num_episodes, data_chunks, self.data_chunk_length, self.num_agents, -1)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length, self.num_agents, -1)
 		team_mask_batch = torch.from_numpy(np.take(self.buffer['mask'], batch_indices, axis=0)).reshape(num_episodes, data_chunks, self.data_chunk_length, -1)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length, -1)
 
-		target_Q_mix_values = target_Q_mix_values.reshape(num_episodes, data_chunks, self.data_chunk_length)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length)
+		if self.experiment_type == "AREL_agent" or self.experiment_type == "ATRR_agent":
+			target_Q_values = target_Q_values.reshape(num_episodes, self.num_agents, data_chunks, self.data_chunk_length)[:, :, rand_time].reshape(num_episodes*self.num_agents*data_chunks, self.data_chunk_length)
+		else:
+			target_Q_values = target_Q_values.reshape(num_episodes, data_chunks, self.data_chunk_length)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length)
 
 		max_episode_len = int(np.max(self.episode_len[batch_indices]))
 
 		return state_batch, rnn_hidden_state_batch, full_state_batch, actions_batch, last_one_hot_actions_batch, mask_actions_batch, next_state_batch, next_rnn_hidden_state_batch, next_full_state_batch, \
-		next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, indiv_dones_batch, next_indiv_dones_batch, team_mask_batch, max_episode_len, target_Q_mix_values
+		next_last_one_hot_actions_batch, next_mask_actions_batch, reward_batch, done_batch, indiv_dones_batch, next_indiv_dones_batch, team_mask_batch, max_episode_len, target_Q_values
 
 	
 	def sample_reward_model(self, num_episodes):

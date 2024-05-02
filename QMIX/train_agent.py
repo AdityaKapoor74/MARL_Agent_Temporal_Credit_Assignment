@@ -181,8 +181,14 @@ class QMIX:
 			indiv_dones = np.array(indiv_dones)
 			dones = all(indiv_dones)
 
+
+			# for recording data with gif
 			images = []
 			action_list = []
+			enemy_action_list = []
+			num_allies_alive = []
+			num_enemies_alive = []
+			true_rewards = []
 
 			episodic_team_reward = 0
 
@@ -220,26 +226,31 @@ class QMIX:
 				next_mask_actions = np.array(info["avail_actions"]) # (np.array(info["avail_actions"]) - 1) * 1e5
 				next_indiv_dones = info["indiv_dones"]
 
-				if self.learn:
-					# can't give agent level rewards since the algorithm cannot make use of it
-					if self.experiment_type == "temporal_team":
-						rewards_to_send = rewards
-						# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
-					elif self.experiment_type == "episodic_team":
-						episodic_team_reward = episodic_team_reward+rewards
-						if all(next_indiv_dones) or step == self.max_time_steps:
-							rewards_to_send = episodic_team_reward
-						else:
-							rewards_to_send = 0
-					elif "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
-						episodic_team_reward = episodic_team_reward+rewards
-						if all(next_indiv_dones) or step == self.max_time_steps:
-							rewards_to_send = episodic_team_reward
-						else:
-							rewards_to_send = 0
+				# record data for gif
+				enemy_action_list.append(info["enemy_action_list"])
+				num_allies_alive.append(info["num_allies"])
+				num_enemies_alive.append(info["num_enemies"])
+				true_rewards.append(rewards)
 
+				# can't give agent level rewards since the algorithm cannot make use of it
+				if self.experiment_type == "temporal_team":
+					rewards_to_send = rewards
+					# rewards_to_send = [rewards if indiv_dones[i]==0 else 0 for i in range(self.num_agents)]
+				elif self.experiment_type == "episodic_team":
+					episodic_team_reward = episodic_team_reward+rewards
+					if all(next_indiv_dones) or step == self.max_time_steps:
+						rewards_to_send = episodic_team_reward
+					else:
+						rewards_to_send = 0
+				elif "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
+					episodic_team_reward = episodic_team_reward+rewards
+					if all(next_indiv_dones) or step == self.max_time_steps:
+						rewards_to_send = episodic_team_reward
+					else:
+						rewards_to_send = 0
 
-					self.buffer.push(states, rnn_hidden_state, full_state, actions, last_one_hot_action, mask_actions, next_states, next_rnn_hidden_state, next_full_state, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones, next_indiv_dones)
+				# need buffer to get reward model output while generating gif
+				self.buffer.push(states, rnn_hidden_state, full_state, actions, last_one_hot_action, mask_actions, next_states, next_rnn_hidden_state, next_full_state, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones, next_indiv_dones)
 
 				states, full_state, mask_actions, last_one_hot_action, rnn_hidden_state = next_states, next_full_state, next_mask_actions, next_last_one_hot_action, next_rnn_hidden_state
 				dones, indiv_dones = next_dones, next_indiv_dones
@@ -266,11 +277,83 @@ class QMIX:
 
 			if self.gif:
 				reward_model_output = self.agents.reward_model_output(self.buffer)
-				for i in range(self.max_time_steps):
-					print("TIMESTEP:", i)
-					if i <= final_timestep:
-						print("ACTIONS:", action_list[i])
+				ally_attack, enemy_attack = [], []
+				for i in range(final_timestep):
+					print("ALLY ACTIONS:", action_list[i], "ENEMY ACTIONS:", enemy_action_list[i])
 					print("REWARD AT TIMESTEP ", i, "is", reward_model_output[0, i].item())
+
+					aa, ea = 0, 0
+					for action in action_list[i]:
+						if action > 5:
+							aa += 1
+					for action in enemy_action_list[i]:
+						if action < 0: # negative numbers indicate attack on an ally
+							ea += 1
+
+					ally_attack.append(aa)
+					enemy_attack.append(ea)
+
+				import matplotlib.pyplot as plt
+
+				# PLOTTING JUST REWARDS
+				# # Create a figure and an axes.
+				# fig, ax = plt.subplots()
+
+				# # Plot data
+				# ax.plot(reward_model_output[0, :final_timestep+1].numpy())
+
+				# # Set a title and labels for the axes.
+				# ax.set_title('Reward Redistribution vs Timestep')
+				# ax.set_xlabel('Timesteps')
+				# ax.set_ylabel('Rewards')
+
+				# Create a figure and a set of subplots for plotting redistributed rewards, true rewards, ally attacks, enemy attacks, num allies alive, num enemies alive
+				# fig, axs = plt.subplots(3, 1, figsize=(8, 12))  # 3 Rows, 1 Column
+				fig, axs = plt.subplots(6, 1, figsize=(10, 18))  # 6 Rows, 1 Column
+
+				# Plot on the first subplot
+				axs[0].plot(reward_model_output[0, :final_timestep+1].numpy(), marker='o', color='red')
+				axs[0].set_title('Redistributed Rewards vs Timesteps')
+				axs[0].set_xlabel('Timesteps')
+				axs[0].set_ylabel('Redistributed Rewards')
+
+				# Plot on the second subplot
+				axs[1].plot(true_rewards, marker='o', color='blue')
+				axs[1].set_title('True Rewards vs Timesteps')
+				axs[1].set_xlabel('Timesteps')
+				axs[1].set_ylabel('True Rewards')
+
+				# Plot on the third subplot
+				axs[2].plot(ally_attack, marker='s', color='magenta')
+				axs[2].set_title('Ally Attacks vs Timesteps')
+				axs[2].set_xlabel('Timesteps')
+				axs[2].set_ylabel('Ally Attacks')
+
+				# Plot on the fourth subplot
+				axs[3].plot(enemy_attack, marker='s', color='purple')
+				axs[3].set_title('Enemy Attacks vs Timesteps')
+				axs[3].set_xlabel('Timesteps')
+				axs[3].set_ylabel('Enemy Attacks')
+
+				# Plot on the fifth subplot
+				axs[4].plot(num_allies_alive, marker='s', color='orange')
+				axs[4].set_title('Num Allies Alive vs Timesteps')
+				axs[4].set_xlabel('Timesteps')
+				axs[4].set_ylabel('Num Allies')
+
+				# Plot on the sixth subplot
+				axs[5].plot(num_enemies_alive, marker='s', color='yellow')
+				axs[5].set_title('Num Enemies Alive vs Timesteps')
+				axs[5].set_xlabel('Timesteps')
+				axs[5].set_ylabel('Num Enemies')
+
+				# Adjust layout to prevent overlapping
+				plt.tight_layout()
+
+				# Save the figure
+				plt.savefig('Redistributed_Rewards_Analysis.png', format='png', dpi=300)
+
+				plt.show()
 
 			self.epsilon_greedy = self.epsilon_greedy - self.epsilon_decay_rate if self.epsilon_greedy - self.epsilon_decay_rate > self.epsilon_greedy_min else self.epsilon_greedy_min
 			self.buffer.end_episode()
@@ -384,8 +467,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_temporal_1e-4"
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "ATRR_agent_with_AREL_arch_1e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -399,9 +482,9 @@ if __name__ == '__main__':
 				"gif": False,
 				"gif_checkpoint":1,
 				"load_models": False,
-				"model_path_q_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_Q_epsiode_30000.pt",
-				"model_path_qmix_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_QMix_epsiode_30000.pt",
-				"model_path_reward_net": "../../inspect_crash_in_reward_learning/tests/Learning_Reward_Func_for_Credit_Assignment/models/5m_vs_6m_QMix_1/models/model_ATRR_temporal_30000.pt",
+				"model_path_q_net": "../../../tests/AREL_temporal/models/5m_vs_6m_QMix_2/models/model_Q_epsiode_50000.pt",
+				"model_path_qmix_net": "../../../tests/AREL_temporal/models/5m_vs_6m_QMix_2/models/model_QMix_epsiode_50000.pt",
+				"model_path_reward_net": "../../../tests/AREL_temporal/models/5m_vs_6m_QMix_2/models/model_AREL_temporal_50000.pt",
 				# "model_path": "../../tests/PRD_2_MPE/models/crossing_team_greedy_prd_above_threshold_MAPPO_Q_run_2/critic_networks/critic_epsiode100000.pt",
 				"eval_policy": True,
 				"save_model": True,

@@ -487,7 +487,7 @@ class Time_Agent_Transformer(nn.Module):
 		# x = torch.cat([x.view(b, n_a+1, t, -1)[:, 0, :, :], (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([1]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		# x = torch.cat([x.view(b, n_a, t, -1).sum(dim=1), (self.pos_embedding(torch.LongTensor([t]).to(self.device))+self.summary_embedding(torch.LongTensor([0]).to(self.device)).to(self.device)).to(self.device).unsqueeze(0).repeat(b, 1, 1)], dim=1)
 		
-		x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
+		# x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 		# x = self.pre_final_temporal_block_norm(x)
 
 		# for i in range(len(self.final_temporal_block)):
@@ -501,7 +501,10 @@ class Time_Agent_Transformer(nn.Module):
 
 		# x = self.final_temporal_block(x, team_masks, temporal_only=True)
 
-		x_episode_wise = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
+		# x_episode_wise = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
+
+		x = x.reshape(b, n_a, t, -1)
+		x_agent_time_rewards = self.rblocks(x).view(b, n_a, t).contiguous() * agent_masks.permute(0, 2, 1).to(x.device)
 
 		# temporal_weights = self.final_temporal_block.attention.attn_weights[:, -1, :-1] * team_masks[: , :-1]
 		# temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t).mean(dim=0).sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[torch.arange(x.shape[0]), episode_len]
@@ -532,7 +535,9 @@ class Time_Agent_Transformer(nn.Module):
 		# agent_scores = agent_scores * agent_masks.reshape(1, b, t, 1, n_a, 1).to(x.device)
 		# print(agent_scores.shape)
 
-		return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output
+		# return x_episode_wise, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output
+
+		return x_agent_time_rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output
 
 
 
