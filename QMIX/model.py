@@ -27,7 +27,7 @@ class RNNQNetwork(nn.Module):
 		# self.rnn_hidden_state = None
 		# self.Layer1 = nn.Linear(input_dim + num_actions, hidden_dim)
 		self.Layer_1 = nn.Sequential(
-			init_(nn.Linear(input_dim, rnn_hidden_dim*2), activate=True),
+			init_(nn.Linear(input_dim, rnn_hidden_dim), activate=True),
 			nn.GELU(),
 			nn.LayerNorm(rnn_hidden_dim),
 			)
