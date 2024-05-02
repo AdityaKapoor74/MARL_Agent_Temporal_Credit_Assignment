@@ -520,7 +520,7 @@ if __name__ == '__main__':
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
 				"reward_batch_size": 128, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 1e-5,
 				"reward_weight_decay": 0.0,
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
