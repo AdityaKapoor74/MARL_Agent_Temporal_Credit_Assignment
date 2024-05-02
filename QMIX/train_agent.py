@@ -498,7 +498,7 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 32,
+				"batch_size": 64,
 				"update_episode_interval": 10,
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
@@ -519,7 +519,7 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				"reward_batch_size": 128, # 128
+				"reward_batch_size": 64, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 5e-4,
 				"temporal_score_efficient": 0.0,
@@ -528,7 +528,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
+				"update_reward_model_freq": 10, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
