@@ -29,9 +29,6 @@ class RNNQNetwork(nn.Module):
 		self.Layer_1 = nn.Sequential(
 			init_(nn.Linear(input_dim, rnn_hidden_dim*2), activate=True),
 			nn.GELU(),
-			nn.LayerNorm(rnn_hidden_dim*2),
-			init_(nn.Linear(rnn_hidden_dim*2, rnn_hidden_dim), activate=True),
-			nn.GELU(),
 			nn.LayerNorm(rnn_hidden_dim),
 			)
 		# self.RNN = nn.GRUCell(hidden_dim, hidden_dim)
