@@ -487,8 +487,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "IDQN_uniform_team_redistribution"
+		experiment_type = "AREL_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IDQN_AREL_temporal"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
