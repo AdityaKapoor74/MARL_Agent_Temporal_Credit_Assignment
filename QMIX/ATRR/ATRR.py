@@ -441,7 +441,7 @@ class Time_Agent_Transformer(nn.Module):
 			x = torch.cat([obs, one_hot_actions], dim=-1)
 			# positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
 			# x = self.compress_input(x).view(b*n_a, t, self.comp_emb) #+ positions
-			x = self.obs_compress_input(obs).view(b*n_a, t, self.comp_emb) + self.action_compress_input(one_hot_actions).view(b*n_a, t, self.comp_emb) + positions
+			x = self.obs_compress_input(obs).view(b*n_a, t, self.comp_emb) + self.action_compress_input(one_hot_actions).view(b*n_a, t, self.comp_emb)
 		elif self.comp == "hypernet_compression":
 			b, n_a, t, _ = obs.size()
 			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
