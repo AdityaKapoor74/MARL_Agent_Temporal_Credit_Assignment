@@ -487,8 +487,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "IDQN_ATRR_agent"
+		experiment_type = "AREL_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IDQN_AREL_temporal"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -518,7 +518,7 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 32,
+				"batch_size": 128,
 				"update_episode_interval": 10,
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
@@ -539,7 +539,7 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				"reward_batch_size": 64, # 128
+				"reward_batch_size": 128, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_efficient": 0.0,
