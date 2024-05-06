@@ -48,6 +48,7 @@ class QMIX:
 		self.target_update_interval = dictionary["target_update_interval"]
 		self.use_reward_model = dictionary["use_reward_model"]
 
+		self.algorithm_type = dictionary["algorithm_type"]
 		self.q_observation_shape = dictionary["q_observation_shape"]
 		self.q_mix_observation_shape = dictionary["q_mix_observation_shape"]
 		self.data_chunk_length = dictionary["data_chunk_length"]
@@ -55,7 +56,9 @@ class QMIX:
 		self.rnn_num_layers = dictionary["rnn_num_layers"]
 		self.replay_buffer_size = dictionary["replay_buffer_size"]
 		self.batch_size = dictionary["batch_size"] # number of datapoints to sample
+
 		self.buffer = ReplayMemory(
+			algorithm_type = self.algorithm_type,
 			experiment_type = self.experiment_type,
 			capacity = self.replay_buffer_size,
 			max_episode_len = self.max_time_steps,
@@ -506,12 +509,12 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 32,
+				"batch_size": 64,
 				"update_episode_interval": 10,
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
 				"epsilon_greedy_min": 0.05,
-				"epsilon_greedy_decay_episodes": 5000,
+				"epsilon_greedy_decay_episodes": 4000,
 				"lambda": 0.8,
 				"experiment_name": experiment_name,
 
@@ -527,7 +530,7 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				"reward_batch_size": 64, # 128
+				"reward_batch_size": 128, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_efficient": 0.0,
@@ -547,6 +550,7 @@ if __name__ == '__main__':
 				"env": env_name,
 
 				# MODEL
+				"algorithm_type": "IDQN", # IDQN, QMIX
 				"learning_rate": 1e-4, #1e-3
 				"enable_grad_clip": False,
 				"grad_clip": 0.5,

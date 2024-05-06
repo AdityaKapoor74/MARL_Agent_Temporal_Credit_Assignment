@@ -5,6 +5,7 @@ import torch
 class ReplayMemory:
 	def __init__(
 		self, 
+		algorithm_type,
 		experiment_type,
 		capacity, 
 		max_episode_len, 
@@ -21,6 +22,7 @@ class ReplayMemory:
 		device,
 		):
 
+		self.algorithm_type = algorithm_type
 		self.experiment_type = experiment_type
 		self.capacity = capacity
 		self.length = 0
