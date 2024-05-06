@@ -273,12 +273,13 @@ class Time_Agent_Transformer(nn.Module):
 
 			self.do = nn.Dropout(dropout)
 		elif comp == "linear_compression":
-			self.compress_input = nn.Sequential(
-					init_(nn.Linear(obs_shape+action_shape, self.comp_emb), activate=True),
-					nn.GELU(),
-					nn.LayerNorm(self.comp_emb),
-					)
-			self.compress_input = init_(nn.Linear(obs_shape+action_shape, self.comp_emb), activate=False)
+			# self.compress_input = nn.Sequential(
+			# 		init_(nn.Linear(obs_shape+action_shape, self.comp_emb), activate=True),
+			# 		nn.GELU(),
+			# 		nn.LayerNorm(self.comp_emb),
+			# 		)
+			self.obs_compress_input = init_(nn.Linear(obs_shape, self.comp_emb), activate=False)
+			self.action_compress_input = init_(nn.Linear(action_shape, self.comp_emb), activate=False)
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
@@ -439,11 +440,8 @@ class Time_Agent_Transformer(nn.Module):
 			b, n_a, t, _ = obs.size()
 			x = torch.cat([obs, one_hot_actions], dim=-1)
 			# positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
-			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) #+ positions
-			# b, n_a, t, e = x.size()
-			# concatenate temporal embedding for each agent
-			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
-			# x = torch.cat([x, self.temporal_summary_embedding(torch.arange(self.n_agents, device=(self.device if self.device is not None else d()))).reshape(1, self.n_agents, 1, e).expand(b, -1, -1, e)], dim=-2).view(b*n_a, t+1, e) + positions
+			# x = self.compress_input(x).view(b*n_a, t, self.comp_emb) #+ positions
+			x = self.obs_compress_input(obs).view(b*n_a, t, self.comp_emb) + self.action_compress_input(one_hot_actions).view(b*n_a, t, self.comp_emb) + positions
 		elif self.comp == "hypernet_compression":
 			b, n_a, t, _ = obs.size()
 			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
