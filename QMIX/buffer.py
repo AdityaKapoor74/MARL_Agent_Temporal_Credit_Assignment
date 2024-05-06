@@ -166,7 +166,7 @@ class ReplayMemory:
 		# ret[:, -1] = target_qs[:, -1] * (1 - (torch.sum(terminated, dim=1)>0).int())
 		# Backwards  recursive  update  of the "forward  view"
 		for t in range(ret.shape[1] - 2, -1,  -1):
-			ret[:, t] = self.lambda_ * self.gamma * ret[:, t + 1] + (1-terminated[:, t]) \
+			ret[:, t] = self.lambda_ * self.gamma * ret[:, t+1] + (1-terminated[:, t]) \
 						* (rewards[:, t] + (1 - self.lambda_) * self.gamma * target_qs[:, t] * (1 - terminated[:, t]))
 		# Returns lambda-return from t=0 to t=T-1, i.e. in B*T-1*A
 		# return ret[:, 0:-1]

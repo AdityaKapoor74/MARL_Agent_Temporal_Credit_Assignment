@@ -511,7 +511,7 @@ if __name__ == '__main__':
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
 				"epsilon_greedy_min": 0.05,
-				"epsilon_greedy_decay_episodes": 4000,
+				"epsilon_greedy_decay_episodes": 5000,
 				"lambda": 0.8,
 				"experiment_name": experiment_name,
 
