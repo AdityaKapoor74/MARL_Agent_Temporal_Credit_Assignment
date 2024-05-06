@@ -199,6 +199,9 @@ class ReplayMemory:
 
 		if reward_model is not None:
 			reward_batch = self.reward_model_output(reward_model, reward_model_obs_batch, last_one_hot_actions_batch, 1-done_batch, 1-indiv_done_batch, episode_len_batch).permute(0, 2, 1)
+		elif self.experiment_type == "uniform_team_redistribution":
+			reward_batch = torch.from_numpy(np.take(self.buffer['reward'], batch_indices, axis=0))
+			reward_batch = (reward_batch.sum(dim=1)/episode_len_batch).reshape(-1, 1, 1).repeat(1, self.max_episode_len, self.num_agents) * (1-indiv_done_batch)
 		else:
 			reward_batch = torch.from_numpy(np.take(self.buffer['reward'], batch_indices, axis=0)).unsqueeze(-1).repeat(1, 1, self.num_agents)
 		

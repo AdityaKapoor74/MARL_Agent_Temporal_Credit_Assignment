@@ -252,6 +252,12 @@ class QMIX:
 						rewards_to_send = episodic_team_reward
 					else:
 						rewards_to_send = 0
+				elif self.experiment_type == "uniform_team_redistribution":
+					episodic_team_reward = episodic_team_reward+rewards
+					if all(next_indiv_dones) or step == self.max_time_steps:
+						rewards_to_send = episodic_team_reward
+					else:
+						rewards_to_send = 0
 				elif "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
 					episodic_team_reward = episodic_team_reward+rewards
 					if all(next_indiv_dones) or step == self.max_time_steps:
@@ -481,8 +487,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_agent_AREL_arch_full_state"
+		experiment_type = "uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IDQN_uniform_team_redistribution"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -522,7 +528,7 @@ if __name__ == '__main__':
 				"experiment_name": experiment_name,
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
@@ -543,7 +549,7 @@ if __name__ == '__main__':
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
 				"update_reward_model_freq": 200, # 200
-				"reward_model_update_epochs": 100, # 400
+				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
