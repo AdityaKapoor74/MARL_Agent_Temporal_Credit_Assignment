@@ -126,6 +126,10 @@ class ReplayMemory:
 
 			if self.experiment_type == "AREL_agent":
 				reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
+			else:
+				reward_batch = reward_batch.unsqueeze(-1).repeat(1, 1, self.num_agents)
+
+			return reward_batch
 
 
 		elif "ATRR" in self.experiment_type:
