@@ -198,9 +198,9 @@ class ReplayMemory:
 		episode_len_batch = torch.from_numpy(np.take(self.episode_len, batch_indices, axis=0)).long()
 
 		if reward_model is not None:
-			reward_batch = self.reward_model_output(reward_model, reward_model_obs_batch, last_one_hot_actions_batch, 1-done_batch, 1-indiv_done_batch, episode_len_batch)
+			reward_batch = self.reward_model_output(reward_model, reward_model_obs_batch, last_one_hot_actions_batch, 1-done_batch, 1-indiv_done_batch, episode_len_batch).permute(0, 2, 1)
 		else:
-			reward_batch = torch.from_numpy(np.take(self.buffer['reward'], batch_indices, axis=0))
+			reward_batch = torch.from_numpy(np.take(self.buffer['reward'], batch_indices, axis=0)).unsqueeze(-1).repeat(1, 1, self.num_agents)
 		
 
 		with torch.no_grad():
@@ -219,9 +219,9 @@ class ReplayMemory:
 			next_a_argmax = torch.argmax(next_Q_evals, dim=-1, keepdim=True)
 			next_Q_target = torch.gather(next_Q_target, dim=-1, index=next_a_argmax.to(self.device)).squeeze(-1)
 			
-			if self.experiment_type == "ATRR_agent" or self.experiment_type == "AREL_agent":
+			if self.algorithm_type == "IDQN":
 				# Finally using TD-lambda equation to generate targets
-				target_Q_values = self.build_td_lambda_targets(reward_batch.permute(0, 2, 1).reshape(-1, self.max_episode_len), indiv_done_batch.permute(0, 2, 1).reshape(-1, self.max_episode_len), next_Q_target.reshape(-1, self.max_episode_len, self.num_agents).permute(0, 2, 1).reshape(-1, self.max_episode_len).cpu())
+				target_Q_values = self.build_td_lambda_targets(reward_batch.reshape(-1, self.max_episode_len), indiv_done_batch.permute(0, 2, 1).reshape(-1, self.max_episode_len), next_Q_target.reshape(-1, self.max_episode_len, self.num_agents).permute(0, 2, 1).reshape(-1, self.max_episode_len).cpu())
 			else:
 				next_Q_mix_target = target_QMix_network(
 				next_Q_target, 
@@ -251,7 +251,7 @@ class ReplayMemory:
 		next_indiv_dones_batch = torch.from_numpy(np.take(self.buffer['next_indiv_dones'], batch_indices, axis=0)).reshape(num_episodes, data_chunks, self.data_chunk_length, self.num_agents, -1)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length, self.num_agents, -1)
 		team_mask_batch = torch.from_numpy(np.take(self.buffer['mask'], batch_indices, axis=0)).reshape(num_episodes, data_chunks, self.data_chunk_length, -1)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length, -1)
 
-		if self.experiment_type == "AREL_agent" or self.experiment_type == "ATRR_agent":
+		if self.algorithm_type == "IDQN":
 			target_Q_values = target_Q_values.reshape(num_episodes, self.num_agents, data_chunks, self.data_chunk_length)[:, :, rand_time].reshape(num_episodes*self.num_agents*data_chunks, self.data_chunk_length)
 		else:
 			target_Q_values = target_Q_values.reshape(num_episodes, data_chunks, self.data_chunk_length)[:, rand_time].reshape(num_episodes*data_chunks, self.data_chunk_length)

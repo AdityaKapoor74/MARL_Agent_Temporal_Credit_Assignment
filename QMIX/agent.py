@@ -54,6 +54,7 @@ class QMIXAgent:
 		self.norm_rewards = dictionary["norm_rewards"]
 	
 		# Model Setup
+		self.algorithm_type = dictionary["algorithm_type"]
 		self.learning_rate = dictionary["learning_rate"]
 		self.enable_grad_clip = dictionary["enable_grad_clip"]
 		self.grad_clip = dictionary["grad_clip"]
@@ -499,7 +500,7 @@ class QMIXAgent:
 		Q_values, _ = self.Q_network(final_state_batch.to(self.device), rnn_hidden_state_batch.to(self.device), torch.ones_like(next_mask_actions_batch).bool().to(self.device))
 		Q_evals = (torch.gather(Q_values, dim=-1, index=actions_batch.to(self.device)) * (1-indiv_dones_batch).to(self.device)).squeeze(-1)
 		
-		if self.experiment_type == "ATRR_agent" or self.experiment_type == "AREL_agent":
+		if self.algorithm_type == "IDQN":
 			Q_loss = self.loss_fn(Q_evals.reshape(-1), target_Q_values.reshape(-1).to(self.device)) / (1-indiv_dones_batch).to(self.device).sum()
 		else:
 			Q_mix = self.QMix_network(Q_evals, next_full_state_batch.to(self.device)).reshape(-1) #* team_mask_batch.reshape(-1).to(self.device)

@@ -434,11 +434,13 @@ class QMIX:
 
 				if self.soft_update:
 					soft_update(self.agents.target_Q_network, self.agents.Q_network, self.tau)
-					soft_update(self.agents.target_QMix_network, self.agents.QMix_network, self.tau)
+					if self.algorithm_type != "IDQN":
+						soft_update(self.agents.target_QMix_network, self.agents.QMix_network, self.tau)
 				else:
 					if episode % self.target_update_interval == 0:
 						hard_update(self.agents.target_Q_network, self.agents.Q_network)
-						hard_update(self.agents.target_QMix_network, self.agents.QMix_network)
+						if self.algorithm_type != "IDQN":
+							hard_update(self.agents.target_QMix_network, self.agents.QMix_network)
 
 
 			if self.eval_policy:
@@ -451,7 +453,8 @@ class QMIX:
 
 			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
 				torch.save(self.agents.Q_network.state_dict(), self.model_path+'_Q_epsiode_'+str(episode)+'.pt')
-				torch.save(self.agents.QMix_network.state_dict(), self.model_path+'_QMix_epsiode_'+str(episode)+'.pt')
+				if self.algorithm_type != "IDQN":
+					torch.save(self.agents.QMix_network.state_dict(), self.model_path+'_QMix_epsiode_'+str(episode)+'.pt')
 
 				if self.use_reward_model:
 					torch.save(self.agents.reward_model.state_dict(), self.model_path+'_'+self.experiment_type+'_'+str(episode)+'.pt')
@@ -478,8 +481,8 @@ if __name__ == '__main__':
 		extension = "QMix_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_agent_with_AREL_arch_full_state_1e-4"
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IDQN_temporal_team"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -509,7 +512,7 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 64,
+				"batch_size": 32,
 				"update_episode_interval": 10,
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
@@ -519,7 +522,7 @@ if __name__ == '__main__':
 				"experiment_name": experiment_name,
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
@@ -530,7 +533,7 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				"reward_batch_size": 128, # 128
+				"reward_batch_size": 64, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_efficient": 0.0,
