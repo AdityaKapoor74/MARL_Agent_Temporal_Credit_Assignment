@@ -536,7 +536,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 10, # 200
+				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
