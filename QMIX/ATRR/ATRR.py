@@ -278,6 +278,7 @@ class Time_Agent_Transformer(nn.Module):
 					nn.GELU(),
 					nn.LayerNorm(self.comp_emb),
 					)
+			self.compress_input = init_(nn.Linear(obs_shape+action_shape, self.comp_emb), activate=False)
 
 			# one temporal embedding for each agent
 			# self.temporal_summary_embedding = nn.Embedding(embedding_dim=self.comp_emb+action_shape, num_embeddings=1).to(self.device)
