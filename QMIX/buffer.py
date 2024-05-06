@@ -13,6 +13,7 @@ class ReplayMemory:
 		q_mix_obs_shape, 
 		rnn_num_layers, 
 		rnn_hidden_state_shape, 
+		reward_model_obs_shape,
 		data_chunk_length, 
 		action_shape,
 		gamma,
@@ -31,6 +32,7 @@ class ReplayMemory:
 		self.q_mix_obs_shape = q_mix_obs_shape
 		self.rnn_num_layers = rnn_num_layers
 		self.rnn_hidden_state_shape = rnn_hidden_state_shape
+		self.reward_model_obs_shape = reward_model_obs_shape
 		self.data_chunk_length = data_chunk_length
 		self.action_shape = action_shape
 		self.gamma = gamma
@@ -38,30 +40,32 @@ class ReplayMemory:
 		self.device = device
 
 		self.buffer = dict()
-		self.buffer['state'] = np.zeros((capacity, self.max_episode_len, num_agents, q_obs_shape), dtype=np.float32)
-		self.buffer['rnn_hidden_state'] = np.zeros((capacity, self.max_episode_len, rnn_num_layers, num_agents, rnn_hidden_state_shape), dtype=np.float32)
-		self.buffer['mask_actions'] = np.zeros((capacity, self.max_episode_len, num_agents, action_shape), dtype=np.float32)
-		self.buffer['next_state'] = np.zeros((capacity, self.max_episode_len, num_agents, q_obs_shape), dtype=np.float32)
-		self.buffer['next_rnn_hidden_state'] = np.zeros((capacity, self.max_episode_len, rnn_num_layers, num_agents, rnn_hidden_state_shape), dtype=np.float32)
-		self.buffer['full_state'] = np.zeros((capacity, self.max_episode_len, 1, q_mix_obs_shape), dtype=np.float32)
-		self.buffer['next_full_state'] = np.zeros((capacity, self.max_episode_len, 1, q_mix_obs_shape), dtype=np.float32)
-		self.buffer['actions'] = np.zeros((capacity, self.max_episode_len, num_agents), dtype=np.float32)
-		self.buffer['last_one_hot_actions'] = np.zeros((capacity, self.max_episode_len, num_agents, action_shape), dtype=np.float32)
-		self.buffer['next_last_one_hot_actions'] = np.zeros((capacity, self.max_episode_len, num_agents, action_shape), dtype=np.float32)
-		self.buffer['next_mask_actions'] = np.zeros((capacity, self.max_episode_len, num_agents, action_shape), dtype=np.float32)
-		self.buffer['reward'] = np.zeros((capacity, self.max_episode_len), dtype=np.float32)
-		self.buffer['indiv_dones'] = np.ones((capacity, self.max_episode_len, num_agents), dtype=np.float32)
-		self.buffer['next_indiv_dones'] = np.ones((capacity, self.max_episode_len, num_agents), dtype=np.float32)
-		self.buffer['done'] = np.ones((capacity, self.max_episode_len), dtype=np.float32)
-		self.buffer['mask'] = np.zeros((capacity, self.max_episode_len), dtype=np.float32)
+		self.buffer['state'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.q_obs_shape), dtype=np.float32)
+		self.buffer['rnn_hidden_state'] = np.zeros((self.capacity, self.max_episode_len, self.rnn_num_layers, self.num_agents, self.rnn_hidden_state_shape), dtype=np.float32)
+		self.buffer['mask_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		self.buffer['next_state'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.q_obs_shape), dtype=np.float32)
+		self.buffer['next_rnn_hidden_state'] = np.zeros((self.capacity, self.max_episode_len, self.rnn_num_layers, self.num_agents, self.rnn_hidden_state_shape), dtype=np.float32)
+		self.buffer['full_state'] = np.zeros((self.capacity, self.max_episode_len, 1, self.q_mix_obs_shape), dtype=np.float32)
+		self.buffer['next_full_state'] = np.zeros((self.capacity, self.max_episode_len, 1, self.q_mix_obs_shape), dtype=np.float32)
+		self.buffer['reward_model_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
+		self.buffer['last_one_hot_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		self.buffer['next_last_one_hot_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		self.buffer['next_mask_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		self.buffer['reward'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
+		self.buffer['indiv_dones'] = np.ones((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
+		self.buffer['next_indiv_dones'] = np.ones((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
+		self.buffer['done'] = np.ones((self.capacity, self.max_episode_len), dtype=np.float32)
+		self.buffer['mask'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
 
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, state, rnn_hidden_state, full_state, actions, last_one_hot_actions, mask_actions, next_state, next_rnn_hidden_state, next_full_state, next_last_one_hot_actions, next_mask_actions, reward, done, indiv_dones, next_indiv_dones):
+	def push(self, state, rnn_hidden_state, full_state, reward_model_obs, actions, last_one_hot_actions, mask_actions, next_state, next_rnn_hidden_state, next_full_state, next_last_one_hot_actions, next_mask_actions, reward, done, indiv_dones, next_indiv_dones):
 		self.buffer['state'][self.episode][self.t] = state
 		self.buffer['rnn_hidden_state'][self.episode][self.t] = rnn_hidden_state
 		self.buffer['full_state'][self.episode][self.t] = full_state
+		self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
 		self.buffer['actions'][self.episode][self.t] = actions
 		self.buffer['last_one_hot_actions'][self.episode][self.t] = last_one_hot_actions
 		self.buffer['mask_actions'][self.episode][self.t] = mask_actions
@@ -93,6 +97,7 @@ class ReplayMemory:
 		self.buffer['next_state'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.q_obs_shape), dtype=np.float32)
 		self.buffer['next_rnn_hidden_state'][self.episode] = np.zeros((self.max_episode_len, self.rnn_num_layers, self.num_agents, self.rnn_hidden_state_shape), dtype=np.float32)
 		self.buffer['next_full_state'][self.episode] = np.zeros((self.max_episode_len, 1, self.q_mix_obs_shape), dtype=np.float32)
+		self.buffer['reward_model_obs'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
 		self.buffer['next_last_one_hot_actions'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
 		self.buffer['next_mask_actions'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
 		self.buffer['reward'][self.episode] = np.zeros((self.max_episode_len,), dtype=np.float32)
@@ -103,10 +108,10 @@ class ReplayMemory:
 
 
 
-	def reward_model_output(self, reward_model, state_batch, next_last_one_hot_actions_batch, mask_batch, agent_masks_batch, episode_len_batch):
+	def reward_model_output(self, reward_model, reward_model_obs_batch, next_last_one_hot_actions_batch, mask_batch, agent_masks_batch, episode_len_batch):
 		
 		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)
+			state_actions_batch = torch.cat([reward_model_obs_batch, next_last_one_hot_actions_batch], dim=-1)
 
 			with torch.no_grad():
 				reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = reward_model(
@@ -132,7 +137,7 @@ class ReplayMemory:
 				# 	episode_len=episode_len_batch.to(self.device),
 				# 	)
 				reward_agent_temporal, temporal_weights, agent_weights, _, _, _, _ = reward_model(
-					state_batch.permute(0, 2, 1, 3).to(self.device), 
+					reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 					team_masks=mask_batch.to(self.device),
 					agent_masks=agent_masks_batch.to(self.device),
@@ -180,6 +185,7 @@ class ReplayMemory:
 		rnn_hidden_state_batch = torch.from_numpy(np.take(self.buffer['rnn_hidden_state'], batch_indices, axis=0))
 		mask_actions_batch = torch.from_numpy(np.take(self.buffer['mask_actions'], batch_indices, axis=0)).bool()
 		full_state_batch = torch.from_numpy(np.take(self.buffer['full_state'], batch_indices, axis=0))
+		reward_model_obs_batch = torch.from_numpy(np.take(self.buffer['reward_model_obs'], batch_indices, axis=0))
 		next_state_batch = torch.from_numpy(np.take(self.buffer['next_state'], batch_indices, axis=0))
 		next_last_one_hot_actions_batch = torch.from_numpy(np.take(self.buffer['next_last_one_hot_actions'], batch_indices, axis=0))
 		next_rnn_hidden_state_batch = torch.from_numpy(np.take(self.buffer['next_rnn_hidden_state'], batch_indices, axis=0))
@@ -190,7 +196,7 @@ class ReplayMemory:
 		episode_len_batch = torch.from_numpy(np.take(self.episode_len, batch_indices, axis=0)).long()
 
 		if reward_model is not None:
-			reward_batch = self.reward_model_output(reward_model, state_batch, last_one_hot_actions_batch, 1-done_batch, 1-indiv_done_batch, episode_len_batch)
+			reward_batch = self.reward_model_output(reward_model, reward_model_obs_batch, last_one_hot_actions_batch, 1-done_batch, 1-indiv_done_batch, episode_len_batch)
 		else:
 			reward_batch = torch.from_numpy(np.take(self.buffer['reward'], batch_indices, axis=0))
 		
@@ -257,19 +263,14 @@ class ReplayMemory:
 	def sample_reward_model(self, num_episodes):
 		assert num_episodes <= self.length
 		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
-		state_batch = np.take(self.buffer['state'], batch_indices, axis=0)
-		full_state_batch = np.take(self.buffer['full_state'], batch_indices, axis=0)
-		last_one_hot_actions_batch = np.take(self.buffer['last_one_hot_actions'], batch_indices, axis=0)
-		next_state_batch = np.take(self.buffer['next_state'], batch_indices, axis=0)
-		next_full_state_batch = np.take(self.buffer['next_full_state'], batch_indices, axis=0)
+		reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
 		next_last_one_hot_actions_batch = np.take(self.buffer['next_last_one_hot_actions'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
-		done_batch = np.take(self.buffer['done'], batch_indices, axis=0)
-		mask_batch = 1 - done_batch
+		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		return state_batch, full_state_batch, last_one_hot_actions_batch, next_state_batch, next_full_state_batch, next_last_one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return reward_model_obs_batch, next_last_one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 

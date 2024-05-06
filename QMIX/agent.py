@@ -113,7 +113,7 @@ class QMIXAgent:
 			if "AREL" in self.experiment_type:
 				from AREL import AREL
 				self.reward_model = AREL.Time_Agent_Transformer(
-					emb=self.q_obs_input_dim+self.num_actions, 
+					emb=dictionary["reward_model_obs_shape"]+self.num_actions, #self.q_obs_input_dim+self.num_actions
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
@@ -130,7 +130,7 @@ class QMIXAgent:
 			elif "ATRR" in self.experiment_type:
 				from ATRR import ATRR
 				self.reward_model = ATRR.Time_Agent_Transformer(
-					obs_shape=self.q_obs_input_dim,
+					obs_shape=dictionary["reward_model_obs_shape"],
 					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
@@ -272,15 +272,15 @@ class QMIXAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		state_batch, full_state_batch, last_one_hot_actions_batch, next_state_batch, next_full_state_batch, next_last_one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch = sample
-		# # convert list to tensor
-		state_batch = torch.FloatTensor(state_batch)
-		next_last_one_hot_actions_batch = torch.FloatTensor(next_last_one_hot_actions_batch) # same as current one_hot_actions
-		reward_batch = torch.FloatTensor(reward_batch)
+		reward_model_obs_batch, next_last_one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch = sample
+		# convert numpy array to tensor
+		reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
+		next_last_one_hot_actions_batch = torch.from_numpy(next_last_one_hot_actions_batch).float() # same as current one_hot_actions
+		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
-		mask_batch = torch.FloatTensor(mask_batch)
-		agent_masks_batch = torch.FloatTensor(agent_masks_batch)
-		episode_len_batch = torch.LongTensor(episode_len_batch)
+		mask_batch = torch.from_numpy(mask_batch).float()
+		agent_masks_batch = torch.from_numpy(agent_masks_batch).float()
+		episode_len_batch = torch.from_numpy(episode_len_batch).long()
 
 		# if self.norm_rewards:
 		# 	shape = episodic_reward_batch.shape
@@ -289,7 +289,7 @@ class QMIXAgent:
 		# 	episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
 
 		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([state_batch, next_last_one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
+			state_actions_batch = torch.cat([reward_model_obs_batch, next_last_one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
 			reward_episode_wise, reward_time_wise, _, _, _, _ = self.reward_model(
 				state_actions_batch.permute(0, 2, 1, 3).to(self.device),
 				team_masks=mask_batch.to(self.device),
@@ -329,7 +329,7 @@ class QMIXAgent:
 			# 	)
 
 			reward_agent_time, temporal_weights, agent_weights, temporal_scores, agent_scores, state_latent_embeddings, dynamics_model_output = self.reward_model(
-				state_batch.permute(0, 2, 1, 3).to(self.device), 
+				reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 				# team_masks=torch.cat([mask_batch, torch.tensor([1]).unsqueeze(0).repeat(mask_batch.shape[0], 1)], dim=-1).to(self.device),
 				# agent_masks=torch.cat([masks, torch.ones(masks.shape[0], masks.shape[1], 1)], dim=-1).to(self.device)
@@ -344,7 +344,7 @@ class QMIXAgent:
 			# div = torch.mean(torch.distributions.kl.kl_divergence(dynamics_model_output, state_latent_embeddings.detach()))
 			# self.free_nats = 3
 			# div = torch.max(div, div.new_full(div.size(), self.free_nats))
-			reward_loss = F.huber_loss(reward_agent_time.reshape(state_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			reward_loss = F.huber_loss(reward_agent_time.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			# reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			# reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + div + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			# reward_loss = F.huber_loss(reward_episode_wise.reshape(-1), episodic_reward_batch.to(self.device)) + F.huber_loss(state_latent_embeddings.detach(), dynamics_model_output) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()

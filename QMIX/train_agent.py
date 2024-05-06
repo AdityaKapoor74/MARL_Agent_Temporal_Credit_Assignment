@@ -64,6 +64,7 @@ class QMIX:
 			q_mix_obs_shape = self.q_mix_observation_shape,
 			rnn_num_layers = self.rnn_num_layers,
 			rnn_hidden_state_shape = self.rnn_hidden_dim,
+			reward_model_obs_shape = dictionary["reward_model_obs_shape"],
 			data_chunk_length = self.data_chunk_length,
 			action_shape = self.num_actions,
 			gamma = dictionary["gamma"],
@@ -176,7 +177,10 @@ class QMIX:
 			states = np.concatenate((self.agent_ids, states), axis=-1)
 			states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
 			states_enemies = np.array(info["enemy_states"]).reshape(-1)
-			full_state = np.concatenate((states_allies, states_enemies), axis=-1).reshape(-1)
+			full_state = np.concatenate((states_allies, states_enemies), axis=-1)
+			ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
+			enemy_states = np.repeat(np.expand_dims(states_enemies, axis=0), repeats=self.num_agents, axis=0)
+			reward_model_obs = np.concatenate((ally_states, enemy_states), axis=-1)
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
 			dones = all(indiv_dones)
@@ -223,6 +227,9 @@ class QMIX:
 				next_states_allies = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1).reshape(-1)
 				next_states_enemies = np.array(info["enemy_states"]).reshape(-1)
 				next_full_state = np.concatenate((next_states_allies, next_states_enemies), axis=-1)
+				ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
+				enemy_states = np.repeat(np.expand_dims(states_enemies, axis=0), repeats=self.num_agents, axis=0)
+				next_reward_model_obs = np.concatenate((ally_states, enemy_states), axis=-1)
 				next_mask_actions = np.array(info["avail_actions"]) # (np.array(info["avail_actions"]) - 1) * 1e5
 				next_indiv_dones = info["indiv_dones"]
 
@@ -250,9 +257,9 @@ class QMIX:
 						rewards_to_send = 0
 
 				# need buffer to get reward model output while generating gif
-				self.buffer.push(states, rnn_hidden_state, full_state, actions, last_one_hot_action, mask_actions, next_states, next_rnn_hidden_state, next_full_state, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones, next_indiv_dones)
+				self.buffer.push(states, rnn_hidden_state, full_state, reward_model_obs, actions, last_one_hot_action, mask_actions, next_states, next_rnn_hidden_state, next_full_state, next_last_one_hot_action, next_mask_actions, rewards_to_send, dones, indiv_dones, next_indiv_dones)
 
-				states, full_state, mask_actions, last_one_hot_action, rnn_hidden_state = next_states, next_full_state, next_mask_actions, next_last_one_hot_action, next_rnn_hidden_state
+				states, full_state, reward_model_obs, mask_actions, last_one_hot_action, rnn_hidden_state = next_states, next_full_state, next_reward_model_obs, next_mask_actions, next_last_one_hot_action, next_rnn_hidden_state
 				dones, indiv_dones = next_dones, next_indiv_dones
 
 				episode_reward += np.sum(rewards)
@@ -365,6 +372,7 @@ class QMIX:
 						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
 						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+					
 					for i in range(self.reward_model_update_epochs):
 						sample = self.buffer.sample_reward_model(num_episodes=self.reward_batch_size)
 						if "AREL" in self.experiment_type:
@@ -468,7 +476,7 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "ATRR_agent_with_AREL_arch_1e-5"
+		experiment_name = "ATRR_agent_with_AREL_arch_full_state_1e-4"
 		dictionary = {
 				# TRAINING
 				"iteration": i,
@@ -498,7 +506,7 @@ if __name__ == '__main__':
 				"max_time_steps": 50,
 				"gamma": 0.99,
 				"replay_buffer_size": 5000,
-				"batch_size": 64,
+				"batch_size": 32,
 				"update_episode_interval": 10,
 				"num_updates": 10,
 				"epsilon_greedy": 0.8,
@@ -519,8 +527,8 @@ if __name__ == '__main__':
 				"reward_hypernet_hidden_dim": 64,
 				"reward_hypernet_final_dim": 64,
 				# "num_episodes_capacity": 2000, # 40000
-				"reward_batch_size": 128, # 128
-				"reward_lr": 1e-5,
+				"reward_batch_size": 64, # 128
+				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_efficient": 0.0,
 				"agent_score_efficient": 0.0,
@@ -528,7 +536,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
 				# "reward_warmup": 5000, # 1000
-				"update_reward_model_freq": 200, # 200
+				"update_reward_model_freq": 10, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
 				"clamp_rewards": False,
@@ -559,5 +567,6 @@ if __name__ == '__main__':
 		dictionary["num_agents"] = env.n_agents
 		dictionary["q_observation_shape"] = env.n_agents+obs[0].shape[0]
 		dictionary["q_mix_observation_shape"] = env.n_agents*(env.n_agents+info["ally_states"].shape[1])+env.n_enemies*info["enemy_states"].shape[1]
+		dictionary["reward_model_obs_shape"] = env.n_agents+info["ally_states"].shape[1]+env.n_enemies*info["enemy_states"].shape[1]
 		ma_controller = QMIX(env, dictionary)
 		ma_controller.run()
