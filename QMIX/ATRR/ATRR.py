@@ -438,8 +438,8 @@ class Time_Agent_Transformer(nn.Module):
 		elif self.comp == "linear_compression":
 			b, n_a, t, _ = obs.size()
 			x = torch.cat([obs, one_hot_actions], dim=-1)
-			positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
-			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) + positions
+			# positions = self.pos_embedding(torch.arange(t, device=(self.device if self.device is not None else d())))[None, :, :].expand(b*n_a, t, self.comp_emb)
+			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) #+ positions
 			# b, n_a, t, e = x.size()
 			# concatenate temporal embedding for each agent
 			# x = torch.cat([x, self.temporal_summary_embedding(torch.tensor([0]).to(self.device)).unsqueeze(0).unsqueeze(-2).expand(b, n_a, 1, e)], dim=-2).view(b*n_a, t+1, e) + positions
