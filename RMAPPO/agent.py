@@ -458,15 +458,10 @@ class PPOAgent:
 
 	def plot(self, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
-		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
 		self.comet_ml.log_metric('Grad_Norm_Q_Value',self.plotting_dict["grad_norm_value_q"],episode)
 		self.comet_ml.log_metric('Policy_Loss',self.plotting_dict["policy_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_Policy',self.plotting_dict["grad_norm_policy"],episode)
 		self.comet_ml.log_metric('Entropy',self.plotting_dict["entropy"],episode)
-
-		# self.comet_ml.log_metric('Q_Value_LR',self.plotting_dict["q_value_lr"],episode)
-		# self.comet_ml.log_metric('V_Value_LR',self.plotting_dict["v_value_lr"],episode)
-		# self.comet_ml.log_metric('Policy_LR',self.plotting_dict["policy_lr"],episode)
 		
 
 	def update_parameters(self):
