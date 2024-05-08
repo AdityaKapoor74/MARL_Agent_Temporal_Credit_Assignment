@@ -201,9 +201,10 @@ class MAPPO:
 					reward_model_obs, rewards_to_send, indiv_dones, dones,
 					)
 
-				self.agents.reward_model_buffer.push(
-					reward_model_obs, one_hot_actions, rewards_to_send, dones, indiv_dones
-					)
+				if self.use_reward_model:
+					self.agents.reward_model_buffer.push(
+						reward_model_obs, one_hot_actions, rewards_to_send, dones, indiv_dones
+						)
 
 				episode_reward += np.sum(rewards)
 				episode_indiv_rewards = [r+info["indiv_rewards"][i] for i, r in enumerate(episode_indiv_rewards)]
@@ -243,8 +244,8 @@ class MAPPO:
 
 					break
 
-
-			self.agents.reward_model_buffer.end_episode()
+			if self.use_reward_model:
+				self.agents.reward_model_buffer.end_episode()
 
 
 			if self.agents.scheduler_need:
@@ -326,8 +327,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "IPPO_temporal_team"
+		experiment_type = "episodic_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IPPO_episodic_team"
 
 		dictionary = {
 				# TRAINING
