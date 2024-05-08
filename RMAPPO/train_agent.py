@@ -71,6 +71,7 @@ class MAPPO:
 		self.comet_ml = None
 		if self.save_comet_ml_plot:
 			self.comet_ml = Experiment("im5zK8gFkz6j07uflhc3hXk8I",project_name=dictionary["test_num"])
+			self.comet_ml.set_name(dictionary["experiment_name"])
 			self.comet_ml.log_parameters(dictionary)
 
 
