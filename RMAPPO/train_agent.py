@@ -285,7 +285,7 @@ class MAPPO:
 					if "AREL" in self.experiment_type:
 						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
-						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+						entropy_temporal_weights_batch, entropy_agent_weights_batch, entropy_final_temporal_block_batch = 0.0, 0.0, 0.0
 					
 					for i in range(self.reward_model_update_epochs):
 						sample = self.agents.reward_model_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
@@ -293,10 +293,12 @@ class MAPPO:
 							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							reward_var_batch += (reward_var/self.reward_model_update_epochs)
 						elif "ATRR" in self.experiment_type:
-							reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
+							reward_loss, entropy_temporal_weights, entropy_agent_weights, entropy_final_temporal_block, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
-
+							if entropy_final_temporal_block is not None:
+								entropy_final_temporal_block_batch += (entropy_final_temporal_block/self.reward_model_update_epochs)
+						
 						reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
 						grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
 
@@ -312,6 +314,8 @@ class MAPPO:
 						elif "ATRR" in self.experiment_type:
 							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
+							if entropy_agent_weights is not None:
+								self.comet_ml.log_metric('Entropy_Final_Temporal_Weights', entropy_final_temporal_block_batch, episode)
 
 
 			if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
@@ -330,8 +334,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, SeqModel, RUDDER, AREL_agent
-		experiment_name = "IPPO_ATRR_agent"
+		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, ATRR_agent_attn_weights, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IPPO_ATRR_temporal_attn_weights"
 
 		dictionary = {
 				# TRAINING
@@ -366,7 +370,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 2000,
+				"warm_up_period": 0,
 
 
 				# ENVIRONMENT
@@ -380,10 +384,8 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"reward_comp": "linear_compression", # no_compression, linear_compression, hypernet_compression
+				"version": "temporal_attn_weights", # temporal, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
-				"reward_hypernet_hidden_dim": 64,
-				"reward_hypernet_final_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
