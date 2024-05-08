@@ -458,7 +458,6 @@ class PPOAgent:
 
 	def plot(self, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
-		self.comet_ml.log_metric('V_Value_Loss',self.plotting_dict["v_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
 		self.comet_ml.log_metric('Grad_Norm_Q_Value',self.plotting_dict["grad_norm_value_q"],episode)
 		self.comet_ml.log_metric('Policy_Loss',self.plotting_dict["policy_loss"],episode)
@@ -478,16 +477,10 @@ class PPOAgent:
 	def update(self, episode):
 		
 		q_value_loss_batch = 0
-		v_value_loss_batch = 0
 		policy_loss_batch = 0
 		entropy_batch = 0
-		weight_prd_batch = None
-		weight_v_batch = None
-		grad_norm_value_v_batch = 0
 		grad_norm_value_q_batch = 0
 		grad_norm_policy_batch = 0
-		agent_groups_over_episode_batch = 0
-		avg_agent_group_over_episode_batch = 0
 
 		self.buffer.calculate_targets()
 
@@ -598,9 +591,6 @@ class PPOAgent:
 			self.target_critic_network_q.load_state_dict(self.critic_network_q.state_dict())
 	
 		
-		# self.scheduler.step()
-		# print("learning rate of policy", self.scheduler.get_lr())
-
 		# clear buffer
 		self.buffer.clear()
 		
