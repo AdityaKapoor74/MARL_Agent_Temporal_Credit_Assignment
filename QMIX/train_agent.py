@@ -132,38 +132,6 @@ class QMIX:
 				print("Policy Eval Directory can not be created")
 
 
-	def make_gif(self,images,fname,fps=10, scale=1.0):
-		from moviepy.editor import ImageSequenceClip
-		"""Creates a gif given a stack of images using moviepy
-		Notes
-		-----
-		works with current Github version of moviepy (not the pip version)
-		https://github.com/Zulko/moviepy/commit/d4c9c37bc88261d8ed8b5d9b7c317d13b2cdf62e
-		Usage
-		-----
-		>>> X = randn(100, 64, 64)
-		>>> gif('test.gif', X)
-		Parameters
-		----------
-		filename : string
-			The filename of the gif to write to
-		array : array_like
-			A numpy array that contains a sequence of images
-		fps : int
-			frames per second (default: 10)
-		scale : float
-			how much to rescale each image by (default: 1.0)
-		"""
-
-		# copy into the color dimension if the images are black and white
-		if images.ndim == 3:
-			images = images[..., np.newaxis] * np.ones(3)
-
-		# make the moviepy clip
-		clip = ImageSequenceClip(list(images), fps=fps).resize(scale)
-		clip.write_gif(fname, fps=fps)
-
-
 	def run(self):  
 		if self.eval_policy:
 			self.rewards = []

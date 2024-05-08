@@ -123,16 +123,20 @@ class Time_Agent_Transformer(nn.Module):
 	"""
 
 	def __init__(self, emb, heads, depth, seq_length, n_agents, agent=True, 
-										dropout=0.0, wide=True, comp=True, norm_rewards=False, device=None):
+										dropout=0.0, wide=True, comp=True, norm_rewards=False, linear_compression_dim=128, device=None):
 		super().__init__()
 
 		self.comp = comp
 		self.n_agents = n_agents
 		self.device = device
-		if emb>100:
-			self.comp_emb = 100
-		else:
-			self.comp_emb = emb
+		self.comp_emb = linear_compression_dim
+		self.agent_attn = agent
+		self.depth = depth
+		self.heads = heads
+		# if emb>100:
+		# 	self.comp_emb = 100
+		# else:
+		# 	self.comp_emb = emb
 		print(self.comp_emb, '-'*50)
 
 		if not comp:
@@ -203,16 +207,23 @@ class Time_Agent_Transformer(nn.Module):
 			x = self.compress_input(x).view(b*n_a, t, self.comp_emb) + positions
 
 		# x = self.do(x)
+		temporal_weights, agent_weights, state_latent_embeddings, dynamics_model_output, temporal_scores, agent_scores = [], [], [], [], [], []
+		
+		i = 0
+		while i < len(self.tblocks):
+			x = self.tblocks[i](x, masks=agent_masks)
+			temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			temporal_scores.append(self.tblocks[i].attention.attn_scores)
+			i+=1
 
-		if agent_masks is not None:
-			i = 0
-			while i < len(self.tblocks):
+			if self.agent_attn:
 				x = self.tblocks[i](x, masks=agent_masks)
-				i+=1
+				agent_weights.append(self.tblocks[i].attention.attn_weights)
+				agent_scores.append(self.tblocks[i].attention.attn_scores)
+				i += 1
 
-		else:
-			x = self.tblocks(x)
-				
+			state_latent_embeddings.append(x)
+
 		x = self.rblocks(x).view(b, n_a, t, 50).contiguous().transpose(1,2).contiguous().sum(2) ###shape (b, t, 50)
 				
 		x_time_wise = self.toreward(x).view(b, t).contiguous()
@@ -222,7 +233,17 @@ class Time_Agent_Transformer(nn.Module):
 
 		x_episode_wise = x_time_wise.sum(1)
 
-		return x_episode_wise, x_time_wise
+		temporal_weights = (torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t)[-1, :, :, :, :].sum(dim=1)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))[:, -1, :] * team_masks
+
+		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, n_a, self.heads, t, t) * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, 1, t).to(x.device)
+		temporal_scores = temporal_scores * agent_masks.permute(0,2,1).reshape(1, b, n_a, 1, t, 1).to(x.device)
+
+		# taking the last agent-transformer block's weights
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a)[-1, :, :, :, :].sum(dim=-2)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5) * agent_masks
+
+		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, t, self.heads, n_a, n_a) * agent_masks.reshape(1, b, t, 1, 1, n_a).to(x.device)
+		agent_scores = agent_scores * agent_masks.reshape(1, b, t, 1, n_a, 1).to(x.device)
+		return x_episode_wise, x_time_wise, temporal_weights, temporal_scores, agent_weights, agent_scores
 
 
 class Time_Transformer(nn.Module):

@@ -22,7 +22,8 @@ def init(module, weight_init, bias_init, gain=1):
 def init_(m, gain=0.01, activate=False):
 	if activate:
 		gain = nn.init.calculate_gain('relu')
-	return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	# return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 class SelfAttentionWide(nn.Module):
 	def __init__(self, emb, heads=8, mask=False):
@@ -48,12 +49,16 @@ class SelfAttentionWide(nn.Module):
 
 		self.unifyheads = init_(nn.Linear(heads * emb, emb))
 
+		self.mask_value = torch.tensor(
+				torch.finfo(torch.float).min, dtype=torch.float
+			)
+
 		self.attn_weights = None
 		self.attn_scores = None
 
 	def forward(self, x, masks=None, agent=False, temporal_only=False):
 
-		b, t, e = x.size()
+		b, t, e = x.size() # b, n_a, e
 		h = self.heads
 		assert e == self.emb, f'Input embedding dim ({e}) should match layer embedding dim ({self.emb})'
 
@@ -83,15 +88,15 @@ class SelfAttentionWide(nn.Module):
 			n_agents = masks.shape[-1]
 			if agent:
 				t_ = masks.shape[1]
-				dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), -1e9)).reshape(*shape)
-				dot = (torch.where(masks.reshape(-1, t_, 1, n_agents, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), -1e9)).reshape(*shape)
+				dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), self.mask_value)).reshape(*shape)
+				dot = (torch.where(masks.reshape(-1, t_, 1, n_agents, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), self.mask_value)).reshape(*shape)
 			elif temporal_only:
 				t_ = masks.shape[-1]
-				dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), -1e9)).reshape(*shape)
-				dot = (torch.where(masks.reshape(-1, 1, t_, 1).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), -1e9)).reshape(*shape)
+				dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), self.mask_value)).reshape(*shape)
+				dot = (torch.where(masks.reshape(-1, 1, t_, 1).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), self.mask_value)).reshape(*shape)
 			else:
-				dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), -1e9)).reshape(*shape)
-				dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), -1e9)).reshape(*shape)
+				dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), self.mask_value)).reshape(*shape)
+				dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), self.mask_value)).reshape(*shape)
 
 		assert dot.size() == (b*h, t, t)
 
@@ -100,9 +105,25 @@ class SelfAttentionWide(nn.Module):
 
 		# dot = F.softmax(dot, dim=2)
 		dot = self.softmax(dot) # bxh, t, t
+		
+		# if an agent is dead, the row corresponding to it will all have -1e9 thus softmax would give uniform attention weight to each which should ideally by 0.0
+		shape = dot.shape
+		n_agents = masks.shape[-1]
+		if agent:
+			t_ = masks.shape[1]
+			dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.reshape(-1, t_, 1, n_agents, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), 0.0)).reshape(*shape)
+		elif temporal_only:
+			t_ = masks.shape[-1]
+			dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.reshape(-1, 1, t_, 1).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), 0.0)).reshape(*shape)
+		else:
+			dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), 0.0)).reshape(*shape)
+		
 		self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
-		# - dot now has row-wise self-attention probabilities
 
+		# - dot now has row-wise self-attention probabilities
 		# apply the self attention to the values
 		out = torch.bmm(dot, values).view(b, h, t, e)
 
@@ -198,6 +219,21 @@ class SelfAttentionNarrow(nn.Module):
 			mask_(dot, maskval=float('-inf'), mask_diagonal=False)
 
 		dot = self.softmax(dot)
+		# if an agent is dead, the row corresponding to it will all have -1e9 thus softmax would give uniform attention weight to each which should ideally by 0.0
+		shape = dot.shape
+		n_agents = masks.shape[-1]
+		if agent:
+			t_ = masks.shape[1]
+			dot = (torch.where(masks.reshape(-1, t_, 1, 1, n_agents).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.reshape(-1, t_, 1, n_agents, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, t_, h, n_agents, n_agents), 0.0)).reshape(*shape)
+		elif temporal_only:
+			t_ = masks.shape[-1]
+			dot = (torch.where(masks.reshape(-1, 1, 1, t_).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.reshape(-1, 1, t_, 1).repeat(1, h, 1, 1).bool(), dot.reshape(-1, h, t_, t_), 0.0)).reshape(*shape)
+		else:
+			dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, 1, t).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), 0.0)).reshape(*shape)
+			dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), 0.0)).reshape(*shape)
+
 		self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
 		# - dot now has row-wise self-attention probabilities
 
@@ -213,6 +249,8 @@ class TransformerBlock(nn.Module):
 
 	def __init__(self, emb, heads, mask, seq_length, ff_hidden_mult=4, dropout=0.0, wide=True):
 		super().__init__()
+
+		self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length)
 
 		self.attention = SelfAttentionWide(emb, heads=heads, mask=mask) if wide \
 					else SelfAttentionNarrow(emb, heads=heads, mask=mask)
@@ -230,6 +268,8 @@ class TransformerBlock(nn.Module):
 		self.do = nn.Dropout(dropout)
 
 	def forward(self, x, masks=None, temporal_only=False):
+		b, t, e = x.shape
+		x = x + self.pos_embedding(torch.arange(t, device=x.device))[None, :, :].expand(b, t, e)
 
 		attended = self.attention(x, masks, temporal_only=temporal_only)
 
@@ -246,12 +286,15 @@ class TransformerBlock(nn.Module):
 		return x
 
 
+
 class TransformerBlock_Agent(nn.Module):
 
 	def __init__(self, emb, heads, mask, seq_length, n_agents, ff_hidden_mult=4, dropout=0.0, wide=True):
 		super().__init__()
 
 		self.n_a = n_agents
+
+		self.agent_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=self.n_a)
 
 		self.attention = SelfAttentionWide(emb, heads=heads, mask=mask) if wide \
 					else SelfAttentionNarrow(emb, heads=heads, mask=mask)
@@ -263,7 +306,7 @@ class TransformerBlock_Agent(nn.Module):
 		self.ff = nn.Sequential(
 			init_(nn.Linear(emb, ff_hidden_mult * emb), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(ff_hidden_mult * emb, emb), True)
+			init_(nn.Linear(ff_hidden_mult * emb, emb), activate=True)
 		)
 
 		self.do = nn.Dropout(dropout)
@@ -273,6 +316,7 @@ class TransformerBlock_Agent(nn.Module):
 		_, t, e = x.size()
 
 		x = x.view(-1, self.n_a, t, e).transpose(1, 2).contiguous().view(-1, self.n_a, e)
+		x = x + self.agent_embedding(torch.arange(self.n_a, device=x.device))[None, :, :].expand(x.shape[0], self.n_a, e)
 
 		attended = self.attention(x, masks, agent=True)
 
