@@ -343,6 +343,8 @@ if __name__ == '__main__':
 				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
 				"extension": extension,
+				"experiment_type": experiment_type,
+				"experiment_name": experiment_name,
 				"gamma": 0.99,
 				"gif": False,
 				"gif_checkpoint":1,
