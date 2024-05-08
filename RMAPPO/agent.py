@@ -456,7 +456,7 @@ class PPOAgent:
 
 
 
-	def plot(self, masks, episode):
+	def plot(self, episode):
 		self.comet_ml.log_metric('Q_Value_Loss',self.plotting_dict["q_value_loss"],episode)
 		self.comet_ml.log_metric('V_Value_Loss',self.plotting_dict["v_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
@@ -623,7 +623,7 @@ class PPOAgent:
 
 		
 		if self.comet_ml is not None:
-			self.plot(masks, episode)
+			self.plot(episode)
 
 		del q_value_loss_batch, policy_loss_batch, entropy_batch, grad_norm_value_q_batch, grad_norm_policy_batch
 		torch.cuda.empty_cache()
