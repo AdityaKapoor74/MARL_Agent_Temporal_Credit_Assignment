@@ -315,7 +315,7 @@ class Time_Agent_Transformer(nn.Module):
 			if self.version == "temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)
 			elif self.version == "agent_temporal_attn_weights":
-				rewards = rewards * temporal_weights * agent_weights.mean(dim=0)[torch.arange(x.shape[0]), :, episode_len, :]
+				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights.mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
 
 		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block
 
