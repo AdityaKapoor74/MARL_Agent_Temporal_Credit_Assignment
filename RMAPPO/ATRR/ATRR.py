@@ -307,14 +307,16 @@ class Time_Agent_Transformer(nn.Module):
 
 			rewards = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
 
-			temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
-			temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
+			# temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
+			# temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
 			# ATTENTION ROLLOUT
 			# temporal_weights_final_temporal_block = (temporal_weights_final_temporal_block[0][torch.arange(x.shape[0]), episode_len].unsqueeze(1) @ temporal_weights_final_temporal_block[1] @ temporal_weights_final_temporal_block[2]).squeeze(dim=-2)
-			temporal_weights_final_temporal_block = temporal_weights_final_temporal_block[-1][torch.arange(x.shape[0]), episode_len]
+			# temporal_weights_final_temporal_block = temporal_weights_final_temporal_block[-1][torch.arange(x.shape[0]), episode_len]
 
 			if self.version == "temporal_attn_weights":
-				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)
+				# rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)
+				temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len, :]/(agent_masks.permute(0, 2, 1).sum(dim=1)+1e-5)
+				rewards = (rewards * temporal_weights_final).unsqueeze(-1).repeat(1, 1, n_a)
 			elif self.version == "agent_temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights.mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
 				# rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights[-1].sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
