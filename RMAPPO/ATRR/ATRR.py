@@ -315,7 +315,12 @@ class Time_Agent_Transformer(nn.Module):
 
 			if self.version == "temporal_attn_weights":
 				# rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)
-				temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len, :]/(agent_masks.permute(0, 2, 1).sum(dim=1)+1e-5)
+				# dropping final temporal attention block
+				# use last attn block
+				# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len, :]/(agent_masks.permute(0, 2, 1).sum(dim=1)+1e-5)
+				# use attention rollout
+				temporal_weights_final = temporal_weights.sum(dim=2)/(agent_masks.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
+				temporal_weights_final = (temporal_weights_final[0, torch.arange(x.shape[0]), episode_len, :].unsqueeze(1) @ temporal_weights_final[1] @ temporal_weights_final[2]).squeeze(-2)
 				rewards = (rewards * temporal_weights_final).unsqueeze(-1).repeat(1, 1, n_a)
 			elif self.version == "agent_temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights.mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
