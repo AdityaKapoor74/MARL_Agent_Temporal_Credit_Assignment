@@ -310,7 +310,8 @@ class Time_Agent_Transformer(nn.Module):
 			temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 			temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
 			# ATTENTION ROLLOUT
-			temporal_weights_final_temporal_block = (temporal_weights_final_temporal_block[0][torch.arange(x.shape[0]), episode_len].unsqueeze(1) @ temporal_weights_final_temporal_block[1] @ temporal_weights_final_temporal_block[2]).squeeze(dim=-2)
+			# temporal_weights_final_temporal_block = (temporal_weights_final_temporal_block[0][torch.arange(x.shape[0]), episode_len].unsqueeze(1) @ temporal_weights_final_temporal_block[1] @ temporal_weights_final_temporal_block[2]).squeeze(dim=-2)
+			temporal_weights_final_temporal_block = temporal_weights_final_temporal_block[-1][torch.arange(x.shape[0]), episode_len]
 
 			if self.version == "temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)

@@ -397,10 +397,10 @@ class PPOAgent:
 				episode_len=episode_len_batch.to(self.device),
 				)
 
-			temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)
+			temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 			agent_weights = agent_weights.cpu().mean(dim=0)
 			entropy_temporal_weights = (-torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/team_mask_batch.shape[0]).item()
-			entropy_agent_weights = (-torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/team_mask_batch.sum()).item() 
+			entropy_agent_weights = (-torch.sum(agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)))/agent_masks_batch.sum()).item() 
 			
 			if temporal_weights_final_temporal_block is not None:
 				entropy_final_temporal_block = (-torch.sum(temporal_weights_final_temporal_block * torch.log(torch.clamp(temporal_weights_final_temporal_block, 1e-10, 1.0)))/team_mask_batch.shape[0]).item()
