@@ -334,8 +334,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, ATRR_temporal, ATRR_agent, ATRR_agent_attn_weights, SeqModel, RUDDER, AREL_agent
-		experiment_name = "IPPO_uniform_team_redistribution"
+		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_agent, ATRR_agent_attn_weights, SeqModel, RUDDER, AREL_agent
+		experiment_name = "IPPO_ATRR_temporal"
 
 		dictionary = {
 				# TRAINING
@@ -378,13 +378,13 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "temporal_attn_weights", # temporal, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "temporal", # temporal, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
