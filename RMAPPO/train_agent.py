@@ -267,16 +267,16 @@ class MAPPO:
 				torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'_Q_epsiode'+str(episode)+'.pt')
 				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
 
-			if self.learn and self.use_reward_model and episode > self.warm_up_period and not(episode%self.update_ppo_agent) and episode != 0:
+			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
 				if self.experiment_type == "uniform_team_redistribution":
 					b, t, n_a = self.agents.buffer.rewards.shape
 					episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
 					self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
 					self.agents.buffer.rewards *= (1-self.agents.buffer.agent_dones[:, :-1, :])
-				elif "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
+					self.agents.update(episode)
+				elif self.use_reward_model and episode > self.warm_up_period:
 					self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
-
-				self.agents.update(episode)
+					self.agents.update(episode)
 
 			if self.learn:
 				if self.use_reward_model and self.reward_batch_size <= self.agents.reward_model_buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
@@ -334,8 +334,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "IPPO_ATRR_temporal_attn_weights"
+		experiment_type = "ATRR_uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "IPPO_uniform_team_redistribution"
 
 		dictionary = {
 				# TRAINING
@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
