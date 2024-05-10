@@ -250,6 +250,10 @@ class Time_Agent_Transformer(nn.Module):
 					   
 		self.do = nn.Dropout(dropout)
 
+		self.mask_value = torch.tensor(
+				torch.finfo(torch.float).min, dtype=torch.float
+			)
+
 			
 	def forward(self, obs, one_hot_actions, team_masks=None, agent_masks=None, episode_len=None):
 
@@ -329,6 +333,7 @@ class Time_Agent_Transformer(nn.Module):
 				# use attention rollout
 				temporal_weights_final = temporal_weights.sum(dim=2)/(agent_masks.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
 				temporal_weights_final = (temporal_weights_final[0] @ temporal_weights_final[1] @ temporal_weights_final[2, torch.arange(x.shape[0]), episode_len, :].unsqueeze(2)).squeeze(-1)
+				temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
 				rewards = (rewards * temporal_weights_final).unsqueeze(-1).repeat(1, 1, n_a)
 			elif self.version == "agent_temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights.mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
