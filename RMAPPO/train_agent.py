@@ -245,6 +245,9 @@ class MAPPO:
 
 						self.agents.buffer.end_episode(final_timestep, q_value, indiv_dones, dones)
 
+					if self.use_reward_model and episode < self.warm_up_period:
+						self.agents.buffer.clear()
+
 					break
 
 			if self.use_reward_model:
