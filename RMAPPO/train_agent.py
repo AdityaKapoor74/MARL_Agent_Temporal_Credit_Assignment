@@ -197,7 +197,7 @@ class MAPPO:
 					else:
 						rewards_to_send = 0
 
-				if self.learn and self.use_reward_model and episode > self.warm_up_period:
+				if self.learn:
 					self.agents.buffer.push(
 						states_critic, q_value, rnn_hidden_state_q, \
 						states_actor, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
@@ -233,7 +233,7 @@ class MAPPO:
 						self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
 
 
-					if self.learn and self.use_reward_model and episode > self.warm_up_period:
+					if self.learn:
 						# add final time to buffer
 						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, mask_actions, rnn_hidden_state_actor)
 					
@@ -280,7 +280,6 @@ class MAPPO:
 
 			if self.learn:
 				if self.use_reward_model and self.reward_batch_size <= self.agents.reward_model_buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
-					print("UPDATING REWARD")
 					reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 					if "AREL" in self.experiment_type:
 						reward_var_batch = 0.0
@@ -334,7 +333,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_type = "uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
 		experiment_name = "IPPO_uniform_team_redistribution"
 
 		dictionary = {

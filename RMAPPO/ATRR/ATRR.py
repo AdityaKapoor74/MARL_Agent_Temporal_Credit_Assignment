@@ -267,6 +267,7 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
 
+		x_intermediate_temporal_agent = []
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
@@ -283,6 +284,13 @@ class Time_Agent_Transformer(nn.Module):
 
 				i += 1
 
+			if i == len(self.tblocks):
+				break
+
+			x_intermediate_temporal_agent.append(x)
+
+		x_intermediate_temporal_agent = torch.stack(x_intermediate_temporal_agent, dim=0).sum(dim=0)
+
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
 		temporal_weights = torch.stack(temporal_weights, dim=0).reshape(self.depth, b, n_a, t, t) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(-1) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(-2)
@@ -297,7 +305,7 @@ class Time_Agent_Transformer(nn.Module):
 			x = x.reshape(b, n_a, t, -1)
 			rewards = self.rblocks(x).view(b, n_a, t).contiguous() * agent_masks.permute(0, 2, 1).to(x.device)
 		else:
-			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
+			x = (x+x_intermediate_temporal_agent).reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			x = self.pre_final_temporal_block_norm(x)
 			# temporal_weights_final_temporal_block, temporal_scores_final_temporal_block = [], []
 			# for i in range(len(self.final_temporal_block)):
@@ -317,10 +325,10 @@ class Time_Agent_Transformer(nn.Module):
 				# rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1).repeat(1, 1, n_a)
 				# dropping final temporal attention block
 				# use last attn block
-				# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len, :]/(agent_masks.permute(0, 2, 1).sum(dim=1)+1e-5)
+				temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len, :]/(agent_masks.permute(0, 2, 1).sum(dim=1)+1e-5)
 				# use attention rollout
-				temporal_weights_final = temporal_weights.sum(dim=2)/(agent_masks.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
-				temporal_weights_final = (temporal_weights_final[0, torch.arange(x.shape[0]), episode_len, :].unsqueeze(1) @ temporal_weights_final[1] @ temporal_weights_final[2]).squeeze(-2)
+				# temporal_weights_final = temporal_weights.sum(dim=2)/(agent_masks.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
+				# temporal_weights_final = (temporal_weights_final[0, torch.arange(x.shape[0]), episode_len, :].unsqueeze(1) @ temporal_weights_final[1] @ temporal_weights_final[2]).squeeze(-2)
 				rewards = (rewards * temporal_weights_final).unsqueeze(-1).repeat(1, 1, n_a)
 			elif self.version == "agent_temporal_attn_weights":
 				rewards = (rewards * temporal_weights_final_temporal_block).unsqueeze(-1) * (agent_weights.mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))

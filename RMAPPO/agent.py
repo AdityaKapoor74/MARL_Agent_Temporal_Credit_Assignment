@@ -399,7 +399,7 @@ class PPOAgent:
 
 			temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 			agent_weights = agent_weights.cpu().mean(dim=0)
-			entropy_temporal_weights = (-torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/team_mask_batch.sum()).item()
+			entropy_temporal_weights = (-torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/(team_mask_batch.sum()+1e-5)).item()
 			entropy_agent_weights = (-torch.sum(agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)))/agent_masks_batch.sum()).item() 
 			
 			if temporal_weights_final_temporal_block is not None:
@@ -500,8 +500,8 @@ class PPOAgent:
 			logprobs = probs.log_prob(actions.to(self.device))
 			
 			
-			critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
-			critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
+			critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+			critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
 			critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
 			# critic_q_loss = F.huber_loss(q_values*agent_masks.to(self.device), target_q_values.to(self.device)*agent_masks.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum() #(self.num_agents*agent_masks.sum())
 
@@ -514,8 +514,8 @@ class PPOAgent:
 			surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.to(self.device) * agent_masks.to(self.device)
 
 			# final loss of clipped objective PPO
-			entropy = -torch.sum(torch.sum(dists*agent_masks.unsqueeze(-1).to(self.device) * torch.log(torch.clamp(dists*agent_masks.unsqueeze(-1).to(self.device), 1e-10,1.0)), dim=-1))/ agent_masks.sum()
-			policy_loss_ = (-torch.min(surr1, surr2).sum())/agent_masks.sum()
+			entropy = -torch.sum(torch.sum(dists*agent_masks.unsqueeze(-1).to(self.device) * torch.log(torch.clamp(dists*agent_masks.unsqueeze(-1).to(self.device), 1e-10,1.0)), dim=-1))/ (agent_masks.sum()+1e-5)
+			policy_loss_ = (-torch.min(surr1, surr2).sum())/(agent_masks.sum()+1e-5)
 			policy_loss = policy_loss_ - self.entropy_pen*entropy
 
 			print("Policy Loss", policy_loss_.item(), "Entropy", (-self.entropy_pen*entropy.item()))
