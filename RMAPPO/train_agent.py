@@ -336,7 +336,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_attn_weights, ATRR_temporal_attn_weights_v2, ATRR_agent, ATRR_agent_temporal_attn_weights
 		experiment_name = "IPPO_ATRR_temporal_attn_weights"
 
 		dictionary = {
@@ -432,10 +432,10 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
-				"policy_lr": 1e-3, #prd 1e-4
+				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 5e-4,
-				"entropy_pen": 8e-3, #8e-3
-				"entropy_pen_final": 8e-3,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
