@@ -336,7 +336,9 @@ class PPOAgent:
 						episode_len=episode_len_batch.to(self.device),
 						)
 					if self.experiment_type == "ATRR_temporal_v2":
-						temporal_weightage = F.softmax(rewards, dim=-2) # batch, timesteps, num_agents
+						mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
+						# void weightage to timesteps after multi-agent system death
+						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards, mask_value), dim=-2) # batch, timesteps, num_agents
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage.cpu()
 
 				if self.norm_rewards:
