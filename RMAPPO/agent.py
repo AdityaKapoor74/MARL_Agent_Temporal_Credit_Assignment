@@ -337,7 +337,7 @@ class PPOAgent:
 						)
 					if self.experiment_type == "ATRR_temporal_v2":
 						temporal_weightage = F.softmax(rewards, dim=-2) # batch, timesteps, num_agents
-						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
+						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage.cpu()
 
 				if self.norm_rewards:
 					shape = reward_episode_wise.shape
