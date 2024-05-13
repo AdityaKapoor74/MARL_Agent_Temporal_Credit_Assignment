@@ -503,7 +503,6 @@ class PPOAgent:
 			critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
 			critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
 			critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
-			# critic_q_loss = F.huber_loss(q_values*agent_masks.to(self.device), target_q_values.to(self.device)*agent_masks.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum() #(self.num_agents*agent_masks.sum())
 
 
 			# Finding the ratio (pi_theta / pi_theta__old)
@@ -544,9 +543,6 @@ class PPOAgent:
 					total_norm += param_norm.item() ** 2
 				grad_norm_policy = torch.tensor([total_norm ** 0.5])
 			self.policy_optimizer.step()
-
-			# print("grads")
-			# print(grad_norm_value_q.item(), grad_norm_value_v.item(), grad_norm_policy.item())
 
 			q_value_loss_batch += critic_q_loss.item()
 			policy_loss_batch += policy_loss.item()
