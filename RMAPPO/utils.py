@@ -102,59 +102,6 @@ class RewardReplayMemory:
 		self.buffer['done'][self.episode] = np.ones((self.max_episode_len,), dtype=np.float32)
 		self.buffer['indiv_dones'][self.episode] = np.ones((self.max_episode_len, self.num_agents), dtype=np.float32)
 
-
-	def reward_model_output(self, reward_model, reward_model_obs_batch, next_last_one_hot_actions_batch, mask_batch, agent_masks_batch, episode_len_batch):
-		
-		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([reward_model_obs_batch, next_last_one_hot_actions_batch], dim=-1)
-
-			with torch.no_grad():
-				reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = reward_model(
-					state_actions_batch.permute(0, 2, 1, 3).to(self.device),
-					team_masks=mask_batch.to(self.device),
-					agent_masks=agent_masks_batch.to(self.device)
-					)
-
-			reward_batch = reward_time_wise.cpu()
-
-			if self.experiment_type == "AREL_agent":
-				reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
-			else:
-				reward_batch = reward_batch.unsqueeze(-1).repeat(1, 1, self.num_agents)
-
-			return reward_batch
-
-
-		elif "ATRR" in self.experiment_type:
-
-			with torch.no_grad():
-				# reward_episode_wise, temporal_weights, agent_weights, _, _, _, _ = reward_model(
-				# 	state_batch.permute(0, 2, 1, 3).to(self.device), 
-				# 	next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
-				# 	team_masks=mask_batch.to(self.device),
-				# 	agent_masks=agent_masks_batch.to(self.device),
-				# 	episode_len=episode_len_batch.to(self.device),
-				# 	)
-				reward_agent_temporal, temporal_weights, agent_weights, _, _, _, _ = reward_model(
-					reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-					next_last_one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
-					team_masks=mask_batch.to(self.device),
-					agent_masks=agent_masks_batch.to(self.device),
-					episode_len=episode_len_batch.to(self.device),
-					)
-
-			# if self.norm_rewards:
-			# 	shape = reward_episode_wise.shape
-			# 	reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
-
-			# reward_batch = (reward_episode_wise * temporal_weights).cpu()
-
-			# if self.experiment_type == "ATRR_agent":
-			# 	reward_batch = reward_batch.unsqueeze(-1) * agent_weights[:, :-1, :].cpu()
-
-		# return reward_batch
-		return reward_agent_temporal.cpu().permute(0, 2, 1)
-
 	
 	def sample_reward_model(self, num_episodes):
 		assert num_episodes <= self.length

@@ -302,7 +302,7 @@ class Time_Agent_Transformer(nn.Module):
 		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, self.heads, n_a, t, t) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-1) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 
 		temporal_weights_final_temporal_block, temporal_scores_final_temporal_block = None, None
-		if self.version == "temporal":
+		if self.version == "temporal" or self.version == "temporal_v2":
 			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			rewards = (self.rblocks(x).view(b, t).contiguous() * team_masks.to(x.device)).unsqueeze(-1).repeat(1, 1, n_a)
 		elif self.version == "agent_temporal":

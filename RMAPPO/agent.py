@@ -294,12 +294,14 @@ class PPOAgent:
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.agent_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
 		else:
 			state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
 			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions).float()
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1, :]).float()
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long()
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1)
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
@@ -325,13 +327,17 @@ class PPOAgent:
 			elif "ATRR" in self.experiment_type:
 
 				with torch.no_grad():
-					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
+					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
+					temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
 						state_batch.permute(0, 2, 1, 3).to(self.device), 
 						one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 						team_masks=team_mask_batch.to(self.device),
 						agent_masks=agent_masks_batch.to(self.device),
 						episode_len=episode_len_batch.to(self.device),
 						)
+					if self.experiment_type == "ATRR_temporal_v2":
+						temporal_weightage = F.softmax(rewards, dim=-2) # batch, timesteps, num_agents
+						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
 				if self.norm_rewards:
 					shape = reward_episode_wise.shape
