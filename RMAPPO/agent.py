@@ -331,6 +331,27 @@ class PPOAgent:
 						agent_masks=agent_masks_batch.to(self.device),
 						episode_len=episode_len_batch.to(self.device),
 						)
+
+					if self.experiment_type == "ATRR_temporal_attn_weights":
+						b, t, n_a, _ = state_batch.shape
+						# use last attn block
+						# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len_batch, :]/(agent_masks_batch.permute(0, 2, 1).sum(dim=1)+1e-5)
+						# use attention rollout
+						temporal_weights_final = temporal_weights.detach().cpu().sum(dim=2)/(agent_masks_batch.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
+						temporal_weights_final = (temporal_weights_final[0] @ temporal_weights_final[1] @ temporal_weights_final[2, torch.arange(b), episode_len_batch, :].unsqueeze(2)).squeeze(-1)
+						temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
+						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final).unsqueeze(-1).repeat(1, 1, n_a)
+					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
+						b, t, n_a, _ = state_batch.shape
+						# use last attn block
+						# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len_batch, :]/(agent_masks_batch.permute(0, 2, 1).sum(dim=1)+1e-5)
+						# use attention rollout
+						temporal_weights_final = temporal_weights.detach().cpu().sum(dim=2)/(agent_masks_batch.permute(0, 2, 1).sum(dim=1).reshape(1, b, t, 1)+1e-5)
+						temporal_weights_final = (temporal_weights_final[0] @ temporal_weights_final[1] @ temporal_weights_final[2, torch.arange(b), episode_len_batch, :].unsqueeze(2)).squeeze(-1)
+						temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
+						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final).unsqueeze(-1) * (agent_weights.detach().cpu().mean(dim=0).sum(dim=-2)/(agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
+					
+
 					if self.experiment_type == "ATRR_temporal_v2":
 						mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
 						# void weightage to timesteps after multi-agent system death
