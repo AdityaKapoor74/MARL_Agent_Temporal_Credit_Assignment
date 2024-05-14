@@ -399,7 +399,7 @@ if __name__ == '__main__':
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
-				"norm_rewards": False,
+				"norm_rewards": True,
 
 
 				"algorithm_type": "IPPO", # IPPO, MAPPO
