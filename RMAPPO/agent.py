@@ -358,9 +358,9 @@ class PPOAgent:
 						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
-				if self.norm_rewards:
-					shape = rewards.shape
-					rewards = self.reward_normalizer.denormalize(rewards.cpu().view(-1)).view(shape) * agent_masks_batch
+				# if self.norm_rewards:
+				# 	shape = rewards.shape
+				# 	rewards = self.reward_normalizer.denormalize(rewards.cpu().view(-1)).view(shape) * agent_masks_batch
 
 				print("true episodic reward")
 				print(episodic_reward_batch[0])
