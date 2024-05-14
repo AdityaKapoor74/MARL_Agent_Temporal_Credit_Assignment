@@ -341,6 +341,10 @@ class PPOAgent:
 					shape = rewards.shape
 					rewards = self.reward_normalizer.denormalize(rewards.cpu().view(-1)).view(shape) * agent_masks_batch
 
+				print("true episodic reward")
+				print(episodic_reward_batch[0])
+				print("rewards post distribution")
+				print(rewards[0])
 		
 			return rewards.cpu()
 

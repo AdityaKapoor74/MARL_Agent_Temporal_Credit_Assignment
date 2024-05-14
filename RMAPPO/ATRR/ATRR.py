@@ -318,7 +318,6 @@ class Time_Agent_Transformer(nn.Module):
 			# 	temporal_scores_final_temporal_block.append(self.final_temporal_block[i].attention.attn_scores)
 
 			rewards = self.rblocks(x[torch.arange(x.shape[0]), episode_len]).view(b, 1).contiguous()
-
 			# temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 			# temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
 			# ATTENTION ROLLOUT
@@ -348,7 +347,7 @@ class Time_Agent_Transformer(nn.Module):
 				temporal_weights_final = (temporal_weights_final[0] @ temporal_weights_final[1] @ temporal_weights_final[2, torch.arange(x.shape[0]), episode_len, :].unsqueeze(2)).squeeze(-1)
 				temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
 				rewards = (rewards * temporal_weights_final.detach()).unsqueeze(-1) * (agent_weights.detach().mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
-
+				
 		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block
 
 
