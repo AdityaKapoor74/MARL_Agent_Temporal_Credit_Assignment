@@ -151,10 +151,6 @@ class PPOAgent:
 			num_actions=self.num_actions,
 			data_chunk_length=self.data_chunk_length,
 			norm_returns_q=self.norm_returns_q,
-			clamp_rewards=self.clamp_rewards,
-			clamp_rewards_value_min=self.clamp_rewards_value_min,
-			clamp_rewards_value_max=self.clamp_rewards_value_max,
-			norm_rewards=self.norm_rewards,
 			target_calc_style=self.target_calc_style,
 			td_lambda=self.td_lambda,
 			gae_lambda=self.gae_lambda,
@@ -342,8 +338,8 @@ class PPOAgent:
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
 				if self.norm_rewards:
-					shape = reward_episode_wise.shape
-					reward_episode_wise = self.reward_normalizer.denormalize(reward_episode_wise.view(-1)).view(shape)
+					shape = rewards.shape
+					rewards = self.reward_normalizer.denormalize(rewards.cpu().view(-1)).view(shape) * agent_masks_batch
 
 		
 			return rewards.cpu()
@@ -361,6 +357,10 @@ class PPOAgent:
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
 		agent_masks_batch = torch.from_numpy(agent_masks_batch).float()
 		episode_len_batch = torch.from_numpy(episode_len_batch).long()
+
+		if self.norm_rewards:
+			shape = episodic_reward_batch.shape
+			episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
 
 		# if self.norm_rewards:
 		# 	shape = episodic_reward_batch.shape

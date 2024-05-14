@@ -336,8 +336,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "IPPO_ATRR_temporal_v2"
+		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "IPPO_ATRR_temporal_attn_weights"
 
 		dictionary = {
 				# TRAINING
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "temporal_v2", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
@@ -399,10 +399,7 @@ if __name__ == '__main__':
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
-				"norm_rewards": False,
-				"clamp_rewards": False,
-				"clamp_rewards_value_min": 0.0,
-				"clamp_rewards_value_max": 2.0,
+				"norm_rewards": True,
 
 
 				"algorithm_type": "IPPO", # IPPO, MAPPO
