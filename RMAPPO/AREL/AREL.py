@@ -122,8 +122,22 @@ class Time_Agent_Transformer(nn.Module):
 	Transformer along time steps.
 	"""
 
-	def __init__(self, emb, heads, depth, seq_length, n_agents, agent=True, 
-										dropout=0.0, wide=True, comp=True, norm_rewards=False, linear_compression_dim=128, device=None):
+	def __init__(
+		self, 
+		emb, 
+		heads, 
+		depth, 
+		seq_length, 
+		n_agents, 
+		agent=True, 
+		dropout=0.0, 
+		wide=True, 
+		version="temporal", # temporal, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+		comp=True, 
+		norm_rewards=False, 
+		linear_compression_dim=128, 
+		device=None
+		):
 		super().__init__()
 
 		self.comp = comp
