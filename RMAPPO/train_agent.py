@@ -280,6 +280,8 @@ class MAPPO:
 				elif self.use_reward_model and episode > self.warm_up_period:
 					self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
 					self.agents.update(episode)
+				else:
+					self.agents.update(episode)
 
 			if self.learn:
 				if self.use_reward_model and self.reward_batch_size <= self.agents.reward_model_buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
@@ -336,8 +338,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_ATRR_agent"
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_temporal_team"
 		algorithm_type = "MAPPO" # IPPO, MAPPO
 
 		dictionary = {
@@ -381,7 +383,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
