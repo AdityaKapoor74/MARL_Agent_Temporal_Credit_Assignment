@@ -351,6 +351,8 @@ class PPOAgent:
 						temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
 						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final).unsqueeze(-1) * (agent_weights.detach().cpu().mean(dim=0).sum(dim=-2)/(agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
 					
+					if self.experiment_type == "ATRR_temporal":
+						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
 
 					if self.experiment_type == "ATRR_temporal_v2":
 						mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
