@@ -338,8 +338,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_ATRR_temporal"
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_ATRR_agent"
 		algorithm_type = "MAPPO" # IPPO, MAPPO
 
 		dictionary = {
@@ -389,7 +389,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "agent_temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
