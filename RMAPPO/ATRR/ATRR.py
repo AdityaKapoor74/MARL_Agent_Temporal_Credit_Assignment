@@ -307,7 +307,7 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = (self.rblocks(x).view(b, t).contiguous() * team_masks.to(x.device)).unsqueeze(-1).repeat(1, 1, n_a)
 		elif self.version == "agent_temporal":
 			x = x.reshape(b, n_a, t, -1)
-			rewards = self.rblocks(x).view(b, n_a, t).contiguous() * agent_masks.permute(0, 2, 1).to(x.device)
+			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 		else:
 			x = (x+x_intermediate_temporal_agent).reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			x = self.pre_final_temporal_block_norm(x)

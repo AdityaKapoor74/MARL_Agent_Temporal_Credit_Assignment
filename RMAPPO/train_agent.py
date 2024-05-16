@@ -171,12 +171,12 @@ class MAPPO:
 				if self.algorithm_type == "IPPO":
 					states_critic = np.concatenate((self.agent_ids, local_state, one_hot_actions), axis=-1)
 				else:
-					ally_state = np.concatenate((self.agent_ids, info["ally_states"], one_hot_actions), axis=-1)
+					ally_state = np.array([np.roll(np.concatenate((self.agent_ids, info["ally_states"], one_hot_actions), axis=-1), shift=-i, axis=0).reshape(-1) for i in range(self.num_agents)])
 					enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
 					states_critic = np.concatenate((ally_state, enemy_states), axis=-1)
 
 				q_value, next_rnn_hidden_state_q = self.agents.get_q_values(states_critic, rnn_hidden_state_q, indiv_dones)
-				
+
 				next_local_states, rewards, next_dones, info = self.env.step(actions)
 				next_states_actor = np.array(next_local_states)
 				last_one_hot_actions = one_hot_actions
@@ -336,14 +336,15 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "IPPO_ATRR_agent_temporal_attn_weights"
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_ATRR_agent"
+		algorithm_type = "MAPPO" # IPPO, MAPPO
 
 		dictionary = {
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
-				"critic_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
+				"critic_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+algorithm_type+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
 				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
@@ -364,7 +365,7 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 50000,
+				"max_episodes": 20000,
 				"max_time_steps": 50,
 				"experiment_type": experiment_type,
 				"scheduler_need": False,
@@ -386,7 +387,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "agent_temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
@@ -399,10 +400,10 @@ if __name__ == '__main__':
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
-				"norm_rewards": True,
+				"norm_rewards": False,
 
 
-				"algorithm_type": "IPPO", # IPPO, MAPPO
+				"algorithm_type": algorithm_type,
 
 				# CRITIC
 				"rnn_num_layers_q": 1,
@@ -431,8 +432,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 5e-4,
-				"entropy_pen": 0.0, #8e-3
-				"entropy_pen_final": 0.0,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
