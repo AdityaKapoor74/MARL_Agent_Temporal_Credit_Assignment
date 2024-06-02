@@ -59,7 +59,7 @@ class PPOAgent:
 		self.temperature_q = dictionary["temperature_q"]
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
 		self.rnn_hidden_q = dictionary["rnn_hidden_q"]
-		if self.algorithm_type == "IPPO":
+		if self.algorithm_type in ["IPPO", "IAC"]:
 			self.critic_observation_shape = dictionary["local_observation"]
 		else:
 			self.critic_observation_shape = dictionary["global_observation"]
@@ -535,21 +535,27 @@ class PPOAgent:
 			logprobs = probs.log_prob(actions.to(self.device))
 			
 			
-			critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
-			critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
-			critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
+			if self.algorithm_type == "IAC" or self.algorithm_type == "MAAC":
+				critic_q_loss = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				policy_loss_ = (logprobs * advantage.to(self.device) * agent_masks.to(self.device)).sum()/(agent_masks.sum()+1e-5)
+			else:
+				critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
 
+				# Finding the ratio (pi_theta / pi_theta__old)
+				ratios = torch.exp((logprobs - logprobs_old.to(self.device)))
+				
+				# Finding Surrogate Loss
+				surr1 = ratios * advantage.to(self.device) * agent_masks.to(self.device)
+				surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.to(self.device) * agent_masks.to(self.device)
 
-			# Finding the ratio (pi_theta / pi_theta__old)
-			ratios = torch.exp((logprobs - logprobs_old.to(self.device)))
-			
-			# Finding Surrogate Loss
-			surr1 = ratios * advantage.to(self.device) * agent_masks.to(self.device)
-			surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.to(self.device) * agent_masks.to(self.device)
+				# final loss of clipped objective PPO
+				policy_loss_ = (-torch.min(surr1, surr2).sum())/(agent_masks.sum()+1e-5)
 
-			# final loss of clipped objective PPO
+			# calculate entropy
 			entropy = -torch.sum(torch.sum(dists*agent_masks.unsqueeze(-1).to(self.device) * torch.log(torch.clamp(dists*agent_masks.unsqueeze(-1).to(self.device), 1e-10,1.0)), dim=-1))/ (agent_masks.sum()+1e-5)
-			policy_loss_ = (-torch.min(surr1, surr2).sum())/(agent_masks.sum()+1e-5)
+			# add entropy
 			policy_loss = policy_loss_ - self.entropy_pen*entropy
 
 			print("Policy Loss", policy_loss_.item(), "Entropy", (-self.entropy_pen*entropy.item()))

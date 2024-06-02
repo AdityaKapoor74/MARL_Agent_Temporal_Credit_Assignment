@@ -168,7 +168,7 @@ class MAPPO:
 					one_hot_actions[i][act] = 1
 
 				
-				if self.algorithm_type == "IPPO":
+				if self.algorithm_type in ["IPPO", "IAC"]:
 					states_critic = np.concatenate((self.agent_ids, local_state, one_hot_actions), axis=-1)
 				else:
 					ally_state = np.array([np.roll(np.concatenate((self.agent_ids, info["ally_states"], one_hot_actions), axis=-1), shift=-i, axis=0).reshape(-1) for i in range(self.num_agents)])
@@ -338,18 +338,18 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "ATRR_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_ATRR_temporal"
-		algorithm_type = "MAPPO" # IPPO, MAPPO
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "IAC_ATRR_agent"
+		algorithm_type = "IAC" # IPPO, MAPPO, IAC, MAAC
 
 		dictionary = {
 				# TRAINING
 				"iteration": i,
 				"device": "gpu",
 				"critic_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+algorithm_type+'_'+experiment_type+'_'+extension+'/critic_networks/',
-				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"actor_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+algorithm_type+'_'+experiment_type+'_'+extension+'/actor_networks/',
+				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+algorithm_type+'_'+experiment_type+'_'+extension+'/',
+				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+algorithm_type+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 5,
 				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes
 				"test_num": test_num,
@@ -375,7 +375,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 2000,
+				"warm_up_period": 0, # 2000
 
 
 				# ENVIRONMENT
@@ -389,7 +389,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "agent_temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 32, # 128
 				"reward_lr": 1e-4,
