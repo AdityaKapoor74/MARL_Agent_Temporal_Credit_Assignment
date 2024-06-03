@@ -251,6 +251,10 @@ class PPOAgent:
 		if dictionary["save_comet_ml_plot"]:
 			self.comet_ml = comet_ml
 
+		self.mask_value = torch.tensor(
+				torch.finfo(torch.float).min, dtype=torch.float
+			)
+
 	
 	def get_q_values(self, state_critic, rnn_hidden_state_q, indiv_dones):
 		with torch.no_grad():
@@ -332,9 +336,20 @@ class PPOAgent:
 						episode_len=episode_len_batch.to(self.device),
 						)
 
-					temporal_contribution = F.softmax(rewards.detach().sum(dim=-1), dim=-1).unsqueeze(-1)
-					agent_contribution = F.softmax(rewards.detach(), dim=-1)
+
+					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach(), self.mask_value)
+					temporal_contribution = F.softmax(rewards_copy.sum(dim=-1), dim=-1).unsqueeze(-1)
+					agent_contribution = F.softmax(rewards_copy, dim=-1)
 					rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_contribution * agent_contribution
+
+					# if self.norm_rewards:
+					# shape = rewards.shape
+					# rewards_copy = copy.deepcopy(rewards)
+					# rewards_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
+					# rewards_mean = torch.nanmean(rewards_copy)
+					# rewards_std = torch.from_numpy(np.array(np.nanstd(rewards_copy.cpu().numpy()))).float()
+
+					# rewards = ((rewards - rewards_mean) / (rewards_std + 1e-5))*agent_masks_batch.view(*shape)
 
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape

@@ -178,10 +178,11 @@ class Policy(nn.Module):
 		super(Policy, self).__init__()
 
 		self.rnn_num_layers = rnn_num_layers
-
+		
 		self.mask_value = torch.tensor(
 				torch.finfo(torch.float).min, dtype=torch.float
 			)
+
 		self.num_agents = num_agents
 		self.num_actions = num_actions
 		self.device = device
