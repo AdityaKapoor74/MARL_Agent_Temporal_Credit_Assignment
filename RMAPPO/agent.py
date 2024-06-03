@@ -337,8 +337,9 @@ class PPOAgent:
 						)
 
 
+					rewards_copy = torch.where(team_mask_batch.bool(), rewards_copy.sum(dim=-1).detach().cpu(), self.mask_value)
+					temporal_contribution = F.softmax(rewards_copy, dim=-1).unsqueeze(-1)
 					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), self.mask_value)
-					temporal_contribution = F.softmax(rewards_copy.sum(dim=-1), dim=-1).unsqueeze(-1)
 					agent_contribution = F.softmax(rewards_copy, dim=-1)
 					agent_temporal_contribution = temporal_contribution * agent_contribution
 
