@@ -344,13 +344,13 @@ class PPOAgent:
 					agent_temporal_contribution = temporal_contribution * agent_contribution
 
 					# Normalize contributions
-					# shape = agent_temporal_contribution.shape
-					# agent_temporal_contribution_copy = copy.deepcopy(agent_temporal_contribution)
-					# agent_temporal_contribution_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
-					# agent_temporal_contribution_mean = torch.nanmean(agent_temporal_contribution_copy)
-					# agent_temporal_contribution_std = torch.from_numpy(np.array(np.nanstd(agent_temporal_contribution_copy.cpu().numpy()))).float()
+					shape = agent_temporal_contribution.shape
+					agent_temporal_contribution_copy = copy.deepcopy(agent_temporal_contribution)
+					agent_temporal_contribution_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
+					agent_temporal_contribution_mean = torch.nanmean(agent_temporal_contribution_copy)
+					agent_temporal_contribution_std = torch.from_numpy(np.array(np.nanstd(agent_temporal_contribution_copy.cpu().numpy()))).float()
 
-					# agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
+					agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
 					
 					rewards = episodic_reward_batch.reshape(-1, 1, 1) * agent_temporal_contribution
 
