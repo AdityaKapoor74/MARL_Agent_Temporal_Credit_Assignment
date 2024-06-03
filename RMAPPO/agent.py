@@ -337,20 +337,20 @@ class PPOAgent:
 						)
 
 
-					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach(), self.mask_value)
+					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), self.mask_value)
 					temporal_contribution = F.softmax(rewards_copy.sum(dim=-1), dim=-1).unsqueeze(-1)
 					agent_contribution = F.softmax(rewards_copy, dim=-1)
 					rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_contribution * agent_contribution
 
 					# NORMALIZE REWARDS
 					# if self.norm_rewards:
-					shape = rewards.shape
-					rewards_copy = copy.deepcopy(rewards)
-					rewards_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
-					rewards_mean = torch.nanmean(rewards_copy)
-					rewards_std = torch.from_numpy(np.array(np.nanstd(rewards_copy.cpu().numpy()))).float()
+					# shape = rewards.shape
+					# rewards_copy = copy.deepcopy(rewards)
+					# rewards_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
+					# rewards_mean = torch.nanmean(rewards_copy)
+					# rewards_std = torch.from_numpy(np.array(np.nanstd(rewards_copy.cpu().numpy()))).float()
 
-					rewards = ((rewards - rewards_mean) / (rewards_std + 1e-5))*agent_masks_batch.view(*shape)
+					# rewards = ((rewards - rewards_mean) / (rewards_std + 1e-5))*agent_masks_batch.view(*shape)
 
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape
