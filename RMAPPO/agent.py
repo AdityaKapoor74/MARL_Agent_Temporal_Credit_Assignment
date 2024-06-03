@@ -340,17 +340,28 @@ class PPOAgent:
 					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), self.mask_value)
 					temporal_contribution = F.softmax(rewards_copy.sum(dim=-1), dim=-1).unsqueeze(-1)
 					agent_contribution = F.softmax(rewards_copy, dim=-1)
-					rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_contribution * agent_contribution
+					agent_temporal_contribution = temporal_contribution * agent_contribution
+
+					# Normalize contributions
+					shape = agent_temporal_contribution.shape
+					agent_temporal_contribution_copy = copy.deepcopy(agent_temporal_contribution)
+					agent_temporal_contribution_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
+					agent_temporal_contribution_mean = torch.nanmean(agent_temporal_contribution_copy)
+					agent_temporal_contribution_std = torch.from_numpy(np.array(np.nanstd(agent_temporal_contribution_copy.cpu().numpy()))).float()
+
+					agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
+					
+					rewards = episodic_reward_batch.reshape(-1, 1, 1) * agent_temporal_contribution
 
 					# NORMALIZE REWARDS
 					# if self.norm_rewards:
-					shape = rewards.shape
-					rewards_copy = copy.deepcopy(rewards)
-					rewards_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
-					rewards_mean = torch.nanmean(rewards_copy)
-					rewards_std = torch.from_numpy(np.array(np.nanstd(rewards_copy.cpu().numpy()))).float()
+					# shape = rewards.shape
+					# rewards_copy = copy.deepcopy(rewards)
+					# rewards_copy[agent_masks_batch.view(*shape) == 0.0] = float('nan')
+					# rewards_mean = torch.nanmean(rewards_copy)
+					# rewards_std = torch.from_numpy(np.array(np.nanstd(rewards_copy.cpu().numpy()))).float()
 
-					rewards = ((rewards - rewards_mean) / (rewards_std + 1e-5))*agent_masks_batch.view(*shape)
+					# rewards = ((rewards - rewards_mean) / (rewards_std + 1e-5))*agent_masks_batch.view(*shape)
 
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape
