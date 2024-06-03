@@ -332,6 +332,10 @@ class PPOAgent:
 						episode_len=episode_len_batch.to(self.device),
 						)
 
+					temporal_contribution = F.softmax(rewards.detach().sum(dim=-1), dim=-1).unsqueeze(-1)
+					agent_contribution = F.softmax(rewards.detach(), dim=-1)
+					rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_contribution * agent_contribution
+
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape
 						# use last attn block
