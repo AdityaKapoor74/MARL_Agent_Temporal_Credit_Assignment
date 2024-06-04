@@ -336,6 +336,9 @@ class PPOAgent:
 						episode_len=episode_len_batch.to(self.device),
 						)
 
+					print("pre rewards")
+					print(rewards[0])
+
 
 					rewards_copy = torch.where(team_mask_batch.bool(), (rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), self.mask_value)
 					# Calculate the dynamic temperature as the difference between max and min logits
@@ -365,6 +368,9 @@ class PPOAgent:
 					# agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
 					
 					rewards = (episodic_reward_batch+1).reshape(-1, 1, 1) * agent_temporal_contribution
+
+					print("post rewards")
+					print(rewards[0])
 
 					# NORMALIZE REWARDS
 					# if self.norm_rewards:
