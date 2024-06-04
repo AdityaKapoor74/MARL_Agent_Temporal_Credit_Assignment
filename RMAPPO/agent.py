@@ -367,7 +367,7 @@ class PPOAgent:
 
 					# agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
 					
-					rewards = (episodic_reward_batch+1).reshape(-1, 1, 1) * agent_temporal_contribution
+					rewards = episodic_reward_batch.reshape(-1, 1, 1) * agent_temporal_contribution
 
 					print("post rewards")
 					print(rewards[0])
