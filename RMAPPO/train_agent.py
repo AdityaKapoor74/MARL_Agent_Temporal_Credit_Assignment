@@ -413,7 +413,7 @@ if __name__ == '__main__':
 				"q_value_lr": 5e-4, #1e-3
 				"temperature_q": 1.0,
 				"q_weight_decay": 5e-4,
-				"enable_grad_clip_critic_q": True,
+				"enable_grad_clip_critic_q": False,
 				"grad_clip_critic_q": 0.5,
 				"value_clip": 0.2,
 				"target_calc_style": "GAE", # GAE, TD_Lambda, N_steps
@@ -429,7 +429,7 @@ if __name__ == '__main__':
 				"data_chunk_length": 10,
 				"rnn_num_layers_actor": 1,
 				"rnn_hidden_actor": 64,
-				"enable_grad_clip_actor": True,
+				"enable_grad_clip_actor": False,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
