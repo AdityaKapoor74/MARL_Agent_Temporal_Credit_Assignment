@@ -265,7 +265,7 @@ class Time_Agent_Transformer(nn.Module):
 		
 		
 		b, n_a, t, _ = obs.size()
-		x = torch.cat([obs, one_hot_actions], dim=-1)
+		# x = torch.cat([obs, one_hot_actions], dim=-1)
 		x = self.obs_compress_input(obs).view(b*n_a, t, self.comp_emb) + self.action_compress_input(one_hot_actions).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []

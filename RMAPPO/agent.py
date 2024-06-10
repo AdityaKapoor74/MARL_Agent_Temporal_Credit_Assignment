@@ -336,16 +336,16 @@ class PPOAgent:
 						episode_len=episode_len_batch.to(self.device),
 						)
 
-					print("pre rewards")
-					print(rewards[0])
+					# print("pre rewards")
+					# print(rewards[0])
 
 					# temporal contribution of the multi-agent system
-					rewards_copy = torch.where(team_mask_batch.bool(), (rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), self.mask_value)
-					# # Calculate the dynamic temperature as the difference between max and min logits
-					max_logits, _ = torch.max((rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), dim=-1, keepdim=True)
-					min_logits, _ = torch.min((rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), dim=-1, keepdim=True)
-					dynamic_temperature_scaling = (max_logits - min_logits + 1e-8)
-					temporal_contribution = F.softmax(rewards_copy/dynamic_temperature_scaling, dim=-1).unsqueeze(-1)
+					# rewards_copy = torch.where(team_mask_batch.bool(), (rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), self.mask_value)
+					# # # Calculate the dynamic temperature as the difference between max and min logits
+					# max_logits, _ = torch.max((rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), dim=-1, keepdim=True)
+					# min_logits, _ = torch.min((rewards.detach().cpu()*agent_masks_batch).sum(dim=-1), dim=-1, keepdim=True)
+					# dynamic_temperature_scaling = (max_logits - min_logits + 1e-8)
+					# temporal_contribution = F.softmax(rewards_copy/dynamic_temperature_scaling, dim=-1).unsqueeze(-1)
 
 					# temporal contribution of every single agent
 					# rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), self.mask_value)
@@ -360,12 +360,12 @@ class PPOAgent:
 					The mask application and scaling do not produce divisions by very small numbers.
     				Handle cases where max_logits and min_logits might result in zero differences.
 					'''
-					rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), 1e-9) #
-					max_logits, _ = torch.max(rewards.detach().cpu()*agent_masks_batch, dim=-1, keepdim=True)
-					min_logits, _ = torch.min(rewards.detach().cpu()*agent_masks_batch, dim=-1, keepdim=True)
-					dynamic_temperature_scaling = (torch.clamp(max_logits - min_logits, min=1e-2) + 1e-8) # because there are 0s in the agent dimension so the scaling value becomes 1e-8 forcing softmax to give out nan
-					agent_contribution = F.softmax(rewards_copy/dynamic_temperature_scaling, dim=-1) * agent_masks_batch
-					agent_temporal_contribution = temporal_contribution * agent_contribution
+					# rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), 1e-9) #
+					# max_logits, _ = torch.max(rewards.detach().cpu()*agent_masks_batch, dim=-1, keepdim=True)
+					# min_logits, _ = torch.min(rewards.detach().cpu()*agent_masks_batch, dim=-1, keepdim=True)
+					# dynamic_temperature_scaling = (torch.clamp(max_logits - min_logits, min=1e-2) + 1e-8) # because there are 0s in the agent dimension so the scaling value becomes 1e-8 forcing softmax to give out nan
+					# agent_contribution = F.softmax(rewards_copy/dynamic_temperature_scaling, dim=-1) * agent_masks_batch
+					# agent_temporal_contribution = temporal_contribution * agent_contribution
 
 					# Normalize contributions --> Not working in our favor
 					# shape = agent_temporal_contribution.shape
@@ -376,10 +376,10 @@ class PPOAgent:
 
 					# agent_temporal_contribution = ((agent_temporal_contribution - agent_temporal_contribution_mean) / (agent_temporal_contribution_std + 1e-5))*agent_masks_batch.view(*shape)
 					
-					rewards = episodic_reward_batch.reshape(-1, 1, 1) * agent_temporal_contribution
+					# rewards = episodic_reward_batch.reshape(-1, 1, 1) * agent_temporal_contribution
 
-					print("post rewards")
-					print(rewards[0])
+					# print("post rewards")
+					# print(rewards[0])
 
 					# NORMALIZE REWARDS
 					# if self.norm_rewards:
