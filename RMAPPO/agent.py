@@ -417,7 +417,7 @@ class PPOAgent:
 
 						temporal_weights_final = F.softmax(torch.where(team_mask_batch.bool(), (temporal_scores[-1].mean(dim=1).sum(dim=1)/(agent_masks_batch.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
 						agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].mean(dim=1)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
-						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
+						rewards = (rewards * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
 					
 					if self.experiment_type == "ATRR_temporal":
 						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
