@@ -311,8 +311,8 @@ class Time_Agent_Transformer(nn.Module):
 		else:
 			# x = (x+x_intermediate_temporal_agent).reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			# x = self.pre_final_temporal_block_norm(x[torch.arange(x.shape[0]), episode_len])
-			
-			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)[torch.arange(x.shape[0]), episode_len]
+
+			x = (x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2))[torch.arange(x.shape[0]), episode_len]
 			
 			# temporal_weights_final_temporal_block, temporal_scores_final_temporal_block = [], []
 			# for i in range(len(self.final_temporal_block)):
