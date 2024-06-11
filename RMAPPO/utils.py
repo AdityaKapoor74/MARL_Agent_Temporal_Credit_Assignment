@@ -110,14 +110,14 @@ class RewardReplayMemory:
 		assert num_episodes <= self.length
 		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
 		reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
-		actions = np.take(self.buffer['actions'], batch_indices, axis=0)
-		one_hot_actions = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
+		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
+		one_hot_actions_batch = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		return reward_model_obs_batch, actions, one_hot_actions, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return reward_model_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):

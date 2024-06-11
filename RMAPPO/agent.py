@@ -447,7 +447,7 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		reward_model_obs_batch, one_hot_actions, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		reward_model_obs_batch, actions_batch, one_hot_actions, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
 		reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
 		one_hot_actions = torch.from_numpy(one_hot_actions).float() # same as current one_hot_actions
