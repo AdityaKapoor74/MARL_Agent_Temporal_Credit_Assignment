@@ -436,7 +436,7 @@ class PPOAgent:
 							temporal_reward_redistribution.append(reward_contri)
 
 						temporal_reward_redistribution = torch.stack(temporal_reward_redistribution, dim=0).transpose(-1, -2)
-						agent_weights_final = agent_weights[-1].sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						agent_weights_final = agent_weights[-1].cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
