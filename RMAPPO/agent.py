@@ -425,18 +425,18 @@ class PPOAgent:
 						# agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].cpu().mean(dim=1)).sum(dim=-2), self.mask_value), dim=-1)
 						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
 
-						temporal_weights_final = temporal_weights[-1].cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						temporal_weights_final = temporal_weights[-1].detach().cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
 						temporal_reward_redistribution = []
-						left_return = rewards.cpu().squeeze(-1)
+						left_return = episodic_reward_batch.cpu().squeeze(-1)
 						for t in reversed(range(self.max_time_steps)):
 							reward_contri = temporal_weights_final[:, t, t] * left_return
 							left_return = left_return - reward_contri
 							temporal_reward_redistribution.append(reward_contri)
 
 						temporal_reward_redistribution = torch.stack(temporal_reward_redistribution, dim=0).transpose(-1, -2)
-						agent_weights_final = agent_weights[-1].cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						agent_weights_final = agent_weights[-1].detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
