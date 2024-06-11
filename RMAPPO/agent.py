@@ -429,7 +429,7 @@ class PPOAgent:
 						# renormalizing
 						temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
 						temporal_reward_redistribution = []
-						left_return = episodic_reward_batch
+						left_return = rewards.cpu()
 						for t in reversed(range(self.max_time_steps)):
 							reward_contri = temporal_weights_final[:, t, t] * left_return
 							left_return = left_return - reward_contri
