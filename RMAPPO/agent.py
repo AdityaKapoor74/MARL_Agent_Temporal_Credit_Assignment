@@ -499,7 +499,7 @@ class PPOAgent:
 			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
 				reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				# one_hot_actions.permute(0, 2, 1, 3).to(self.device), 
-				actions.permute(0, 2, 1).to(self.device), 
+				actions_batch.permute(0, 2, 1).to(self.device), 
 				team_masks=team_mask_batch.to(self.device),
 				agent_masks=agent_masks_batch.to(self.device),
 				episode_len=episode_len_batch.to(self.device),

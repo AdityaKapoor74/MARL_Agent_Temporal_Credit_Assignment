@@ -360,7 +360,8 @@ class Time_Agent_Transformer(nn.Module):
 				# rewards = (rewards * temporal_weights_final.detach()).unsqueeze(-1) * (agent_weights.detach().mean(dim=0).sum(dim=-2)/(agent_masks.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
 
 				temporal_weights_final = F.softmax(torch.where(team_masks.bool(), (temporal_scores[-1].mean(dim=1).sum(dim=1)/(agent_masks.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
-				agent_weights_final = F.softmax(torch.where(agent_masks.bool(), (agent_scores[-1].mean(dim=1)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
+				# agent_weights_final = F.softmax(torch.where(agent_masks.bool(), (agent_scores[-1].mean(dim=1)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
+				agent_weights_final = F.softmax(torch.where(agent_masks.bool(), (agent_scores[-1].mean(dim=1)).sum(dim=-2), self.mask_value), dim=-1)
 				rewards = (rewards * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
 
 
