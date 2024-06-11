@@ -216,6 +216,7 @@ class PPOAgent:
 					depth=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
+					n_actions=self.num_actions,
 					agent=dictionary["reward_agent_attn"], 
 					dropout=dictionary["reward_dropout"], 
 					wide=dictionary["reward_attn_net_wide"], 
@@ -290,6 +291,7 @@ class PPOAgent:
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
 			state_batch = torch.from_numpy(self.buffer.reward_model_obs[latest_sample_index]).float().unsqueeze(0)
+			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
 			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions[latest_sample_index]).float().unsqueeze(0)
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.agent_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
@@ -297,6 +299,7 @@ class PPOAgent:
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
 		else:
 			state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
+			actions_batch = torch.from_numpy(self.buffer.actions).float()
 			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions).float()
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1, :]).float()
@@ -330,7 +333,8 @@ class PPOAgent:
 					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
 					temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
 						state_batch.permute(0, 2, 1, 3).to(self.device), 
-						one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+						# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+						actions_batch.permute(0, 2, 1).to(self.device), 
 						team_masks=team_mask_batch.to(self.device),
 						agent_masks=agent_masks_batch.to(self.device),
 						episode_len=episode_len_batch.to(self.device),
@@ -494,7 +498,8 @@ class PPOAgent:
 			
 			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
 				reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				one_hot_actions.permute(0, 2, 1, 3).to(self.device), 
+				# one_hot_actions.permute(0, 2, 1, 3).to(self.device), 
+				actions.permute(0, 2, 1).to(self.device), 
 				team_masks=team_mask_batch.to(self.device),
 				agent_masks=agent_masks_batch.to(self.device),
 				episode_len=episode_len_batch.to(self.device),

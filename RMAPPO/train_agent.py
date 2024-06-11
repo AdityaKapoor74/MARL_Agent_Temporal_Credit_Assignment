@@ -206,7 +206,7 @@ class MAPPO:
 
 				if self.use_reward_model:
 					self.agents.reward_model_buffer.push(
-						reward_model_obs, one_hot_actions, rewards_to_send, dones, indiv_dones
+						reward_model_obs, actions, one_hot_actions, rewards_to_send, dones, indiv_dones
 						)
 
 				episode_reward += np.sum(rewards)

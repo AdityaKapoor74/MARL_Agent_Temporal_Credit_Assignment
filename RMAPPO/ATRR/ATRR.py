@@ -185,6 +185,7 @@ class Time_Agent_Transformer(nn.Module):
 		depth, 
 		seq_length, 
 		n_agents, 
+		n_actions,
 		agent=True, 
 		dropout=0.0, 
 		wide=True,  
@@ -208,7 +209,11 @@ class Time_Agent_Transformer(nn.Module):
 		self.agent_attn = agent
 
 		self.obs_compress_input = init_(nn.Linear(obs_shape, self.comp_emb), activate=False)
-		self.action_compress_input = init_(nn.Linear(action_shape, self.comp_emb), activate=False)
+		# self.action_compress_input = init_(nn.Linear(action_shape, self.comp_emb), activate=False)
+
+		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
+
+		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 
 
 		tblocks = []
@@ -223,12 +228,12 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.tblocks = nn.Sequential(*tblocks)
 		
-		self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
+		# self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
 
-		self.final_temporal_block = []
-		for i in range(depth):
-			self.final_temporal_block.append(TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
-		self.final_temporal_block = nn.Sequential(*self.final_temporal_block)
+		# self.final_temporal_block = []
+		# for i in range(depth):
+		# 	self.final_temporal_block.append(TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+		# self.final_temporal_block = nn.Sequential(*self.final_temporal_block)
 
 
 		if norm_rewards:
@@ -255,7 +260,7 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, obs, one_hot_actions, team_masks=None, agent_masks=None, episode_len=None):
+	def forward(self, obs, actions, team_masks=None, agent_masks=None, episode_len=None):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
@@ -265,8 +270,8 @@ class Time_Agent_Transformer(nn.Module):
 		
 		
 		b, n_a, t, _ = obs.size()
-		# x = torch.cat([obs, one_hot_actions], dim=-1)
-		x = self.obs_compress_input(obs).view(b*n_a, t, self.comp_emb) + self.action_compress_input(one_hot_actions).view(b*n_a, t, self.comp_emb)
+		# x = torch.cat([obs, one_hot_actions], dim=-1) 
+		x = (self.obs_compress_input(obs) + self.action_embedding(actions.long()) + self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0

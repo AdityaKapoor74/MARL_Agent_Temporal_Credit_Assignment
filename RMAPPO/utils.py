@@ -73,6 +73,7 @@ class RewardReplayMemory:
 
 		self.buffer = dict()
 		self.buffer['reward_model_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['one_hot_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
 		self.buffer['reward'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
 		self.buffer['done'] = np.ones((self.capacity, self.max_episode_len), dtype=np.float32)
@@ -81,8 +82,9 @@ class RewardReplayMemory:
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, reward_model_obs, one_hot_actions, reward, done, indiv_dones):
+	def push(self, reward_model_obs, actions, one_hot_actions, reward, done, indiv_dones):
 		self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
+		self.buffer['actions'][self.episode][self.t] = actions
 		self.buffer['one_hot_actions'][self.episode][self.t] = one_hot_actions
 		self.buffer['reward'][self.episode][self.t] = reward
 		self.buffer['done'][self.episode][self.t] = done
@@ -97,6 +99,7 @@ class RewardReplayMemory:
 		self.t = 0
 		# clear previous data
 		self.buffer['reward_model_obs'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['one_hot_actions'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
 		self.buffer['reward'][self.episode] = np.zeros((self.max_episode_len,), dtype=np.float32)
 		self.buffer['done'][self.episode] = np.ones((self.max_episode_len,), dtype=np.float32)
@@ -107,13 +110,14 @@ class RewardReplayMemory:
 		assert num_episodes <= self.length
 		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
 		reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
+		actions = np.take(self.buffer['actions'], batch_indices, axis=0)
 		one_hot_actions = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		return reward_model_obs_batch, one_hot_actions, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return reward_model_obs_batch, actions, one_hot_actions, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):
