@@ -367,7 +367,7 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 20000,
+				"max_episodes": 50000,
 				"max_time_steps": 50,
 				"experiment_type": experiment_type,
 				"scheduler_need": False,
@@ -375,7 +375,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 0, # 2000
+				"warm_up_period": 2000, # 2000
 
 
 				# ENVIRONMENT
