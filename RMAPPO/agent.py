@@ -448,10 +448,11 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		reward_model_obs_batch, actions_batch, one_hot_actions, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		reward_model_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
 		reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
-		one_hot_actions = torch.from_numpy(one_hot_actions).float() # same as current one_hot_actions
+		actions_batch = torch.from_numpy(actions_batch)
+		one_hot_actions_batch = torch.from_numpy(one_hot_actions).float() # same as current one_hot_actions
 		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
@@ -469,7 +470,7 @@ class PPOAgent:
 		# 	episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
 
 		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([reward_model_obs_batch, one_hot_actions], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
+			state_actions_batch = torch.cat([reward_model_obs_batch, one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
 			reward_episode_wise, reward_time_wise, _, _, _, _ = self.reward_model(
 				state_actions_batch.permute(0, 2, 1, 3).to(self.device),
 				team_masks=team_mask_batch.to(self.device),
@@ -499,7 +500,7 @@ class PPOAgent:
 			
 			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
 				reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				# one_hot_actions.permute(0, 2, 1, 3).to(self.device), 
+				# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.permute(0, 2, 1).to(self.device), 
 				team_masks=team_mask_batch.to(self.device),
 				agent_masks=agent_masks_batch.to(self.device),
