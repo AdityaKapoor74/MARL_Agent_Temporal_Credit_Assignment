@@ -452,7 +452,7 @@ class PPOAgent:
 		# convert numpy array to tensor
 		reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
-		one_hot_actions_batch = torch.from_numpy(one_hot_actions).float() # same as current one_hot_actions
+		one_hot_actions_batch = torch.from_numpy(one_hot_actions_batch).float() # same as current one_hot_actions
 		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
