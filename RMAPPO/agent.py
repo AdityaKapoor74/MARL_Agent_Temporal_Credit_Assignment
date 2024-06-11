@@ -46,6 +46,7 @@ class PPOAgent:
 
 		# Reward Model Setup
 		self.use_reward_model = dictionary["use_reward_model"]
+		self.version = dictionary["version"]
 		self.reward_lr = dictionary["reward_lr"]
 		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
@@ -419,10 +420,29 @@ class PPOAgent:
 						# temporal_weights_final = F.normalize(temporal_weights_final, dim=-1, p=1.0)
 						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final).unsqueeze(-1) * (agent_weights.detach().cpu().mean(dim=0).sum(dim=-2)/(agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5))
 
-						temporal_weights_final = F.softmax(torch.where(team_mask_batch.bool(), (temporal_scores[-1].cpu().mean(dim=1).sum(dim=1)/(agent_masks_batch.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
+						# temporal_weights_final = F.softmax(torch.where(team_mask_batch.bool(), (temporal_scores[-1].cpu().mean(dim=1).sum(dim=1)/(agent_masks_batch.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
 						# agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].cpu().mean(dim=1)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
-						agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].cpu().mean(dim=1)).sum(dim=-2), self.mask_value), dim=-1)
-						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
+						# agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].cpu().mean(dim=1)).sum(dim=-2), self.mask_value), dim=-1)
+						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
+
+						temporal_weights_final = temporal_weights[-1].cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						# renormalizing
+						temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
+						temporal_reward_redistribution = []
+						left_return = episodic_reward_batch
+						for t in range(self.max_time_steps):
+							reward_contri = temporal_weights_final[:, t, t] * left_return
+							left_return = left_return - reward_contri
+							temporal_reward_redistribution.append(reward_contri)
+
+						temporal_reward_redistribution = torch.stack(temporal_reward_redistribution, dim=0).transpose(-1, -2)
+						agent_weights_final = agent_weights[-1].sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						# renormalizing
+						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+						agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
+						rewards = agent_temporal_reward_redistribution
+
+
 					
 					if self.experiment_type == "ATRR_temporal":
 						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
@@ -517,7 +537,10 @@ class PPOAgent:
 			else:
 				entropy_final_temporal_block = None
 
-			reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			if self.version == "agent_temporal_attn_weights":
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			else:
+				reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			
 			if temporal_scores_final_temporal_block is not None:
 				reward_loss += self.temporal_score_coefficient * (temporal_scores_final_temporal_block**2).sum()
