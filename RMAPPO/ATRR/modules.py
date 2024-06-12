@@ -22,8 +22,8 @@ def init(module, weight_init, bias_init, gain=1):
 def init_(m, gain=0.01, activate=False):
 	if activate:
 		gain = nn.init.calculate_gain('relu')
-	# return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
-	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	return init(m, nn.init.xavier_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	# return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 class SelfAttentionWide(nn.Module):
 	def __init__(self, emb, heads=8, mask=False):

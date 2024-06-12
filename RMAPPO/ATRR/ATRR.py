@@ -10,22 +10,22 @@ from .modules import TransformerBlock, TransformerBlock_Agent
 from .util import d
 
 def init(module, weight_init, bias_init, gain=1):
-	# if isinstance(module, nn.LayerNorm):
-	# 	init.ones_(module.weight)
-	# 	if module.bias is not None:
-	# 		init.zeros_(module.bias)
-	# elif isinstance(module, nn.Linear):
-	# 	# weight_init(module.weight.data, gain=gain)
-	# 	weight_init(module.weight.data)
-	# 	if module.bias is not None:
-	# 		bias_init(module.bias.data)
-	return module
+	if isinstance(module, nn.LayerNorm):
+		init.ones_(module.weight)
+		if module.bias is not None:
+			init.zeros_(module.bias)
+	elif isinstance(module, nn.Linear):
+		# weight_init(module.weight.data, gain=gain)
+		weight_init(module.weight.data)
+		if module.bias is not None:
+			bias_init(module.bias.data)
+	# return module
 
 def init_(m, gain=0.01, activate=False):
 	if activate:
 		gain = nn.init.calculate_gain('relu')
-	# return init(m, nn.init.kaiming_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
-	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	return init(m, nn.init.xavier_uniform_, lambda x: nn.init.constant_(x, 0), gain=gain)
+	# return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
 class PopArt(torch.nn.Module):
