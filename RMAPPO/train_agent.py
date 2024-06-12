@@ -134,7 +134,7 @@ class MAPPO:
 			states_actor = np.concatenate((self.agent_ids, local_state, last_one_hot_actions), axis=-1)
 			ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
 			enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
-			reward_model_obs = np.concatenate((ally_states, enemy_states), axis=-1)	
+			reward_model_obs = np.concatenate((self.agent_ids, np.array(local_state)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
 			dones = int(all(indiv_dones))
@@ -183,7 +183,7 @@ class MAPPO:
 				next_states_actor = np.concatenate((self.agent_ids, next_states_actor, last_one_hot_actions), axis=-1)
 				ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
 				enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
-				next_reward_model_obs = np.concatenate((ally_states, enemy_states), axis=-1)	
+				next_reward_model_obs = np.concatenate((self.agent_ids, np.array(next_local_states)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
 				next_mask_actions = np.array(info["avail_actions"], dtype=int)
 				next_indiv_dones = info["indiv_dones"]
 
@@ -450,6 +450,6 @@ if __name__ == '__main__':
 		obs, info = env.reset(return_info=True)
 		dictionary["global_observation"] = (info["ally_states"][0].shape[0]+env.n_agents+env.action_space[0].n)*env.n_agents + (info["enemy_states"][0].shape[0]+env.n_enemies)*env.n_enemies
 		dictionary["local_observation"] = obs[0].shape[0]+env.n_agents+env.action_space[0].n
-		dictionary["reward_model_obs_shape"] = env.n_agents+info["ally_states"].shape[1]+env.n_enemies*(info["enemy_states"].shape[1]+env.n_enemies)
+		dictionary["reward_model_obs_shape"] = obs[0].shape[0]+env.n_agents # env.n_agents+info["ally_states"].shape[1]+env.n_enemies*(info["enemy_states"].shape[1]+env.n_enemies)
 		ma_controller = MAPPO(env,dictionary)
 		ma_controller.run()
