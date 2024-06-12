@@ -98,12 +98,12 @@ class RewardReplayMemory:
 		self.episode = (self.episode + 1) % self.capacity
 		self.t = 0
 		# clear previous data
-		self.buffer['reward_model_obs'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
-		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
-		self.buffer['one_hot_actions'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
-		self.buffer['reward'][self.episode] = np.zeros((self.max_episode_len,), dtype=np.float32)
-		self.buffer['done'][self.episode] = np.ones((self.max_episode_len,), dtype=np.float32)
-		self.buffer['indiv_dones'][self.episode] = np.ones((self.max_episode_len, self.num_agents), dtype=np.float32)
+		# self.buffer['reward_model_obs'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		# self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
+		# self.buffer['one_hot_actions'][self.episode] = np.zeros((self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		# self.buffer['reward'][self.episode] = np.zeros((self.max_episode_len,), dtype=np.float32)
+		# self.buffer['done'][self.episode] = np.ones((self.max_episode_len,), dtype=np.float32)
+		# self.buffer['indiv_dones'][self.episode] = np.ones((self.max_episode_len, self.num_agents), dtype=np.float32)
 
 	
 	def sample_reward_model(self, num_episodes):

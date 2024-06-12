@@ -332,13 +332,13 @@ class Time_Agent_Transformer(nn.Module):
 
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb).long() # subtracting 1 for indexing purposes
 			
-			print("Shape of x:", x.shape)
-			print("Shape of x after reshaping:", x.reshape(b, n_a, t, -1).shape)
-			print("Shape of indiv_agent_episode_len:", indiv_agent_episode_len.shape)
+			# print("Shape of x:", x.shape)
+			# print("Shape of x after reshaping:", x.reshape(b, n_a, t, -1).shape)
+			# print("Shape of indiv_agent_episode_len:", indiv_agent_episode_len.shape)
 
-			print("Min index:", indiv_agent_episode_len.min().item())
-			print("Max index:", indiv_agent_episode_len.max().item())
-			assert indiv_agent_episode_len.min() >= 0 and indiv_agent_episode_len.max() < t
+			# print("Min index:", indiv_agent_episode_len.min().item())
+			# print("Max index:", indiv_agent_episode_len.max().item())
+			# assert indiv_agent_episode_len.min() >= 0 and indiv_agent_episode_len.max() < t
 
 			# print(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).shape, torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1).shape)
 
