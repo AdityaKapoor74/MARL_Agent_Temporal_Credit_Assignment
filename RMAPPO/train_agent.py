@@ -402,7 +402,7 @@ if __name__ == '__main__':
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 10.0,
-				"replay_buffer_size": 15000,
+				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 200, # 200
 				"reward_model_update_epochs": 400, # 400
 				"norm_rewards": False,
