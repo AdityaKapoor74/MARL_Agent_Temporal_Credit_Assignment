@@ -334,6 +334,9 @@ if __name__ == '__main__':
 	RENDER = False
 	USE_CPP_RVO2 = False
 
+	import os
+	os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
