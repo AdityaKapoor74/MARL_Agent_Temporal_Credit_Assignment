@@ -442,7 +442,6 @@ class PPOAgent:
 						agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
 						rewards = agent_temporal_reward_redistribution
 
-
 					
 					if self.experiment_type == "ATRR_temporal":
 						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
