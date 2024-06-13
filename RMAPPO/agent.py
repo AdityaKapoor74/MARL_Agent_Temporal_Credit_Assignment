@@ -55,6 +55,8 @@ class PPOAgent:
 		self.norm_rewards = dictionary["norm_rewards"]
 		self.temporal_score_coefficient = dictionary["temporal_score_coefficient"]
 		self.agent_score_coefficient = dictionary["agent_score_coefficient"]
+		self.reward_n_heads = dictionary["reward_n_heads"]
+		self.reward_depth = dictionary["reward_depth"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -241,6 +243,11 @@ class PPOAgent:
 
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			
+			# for name, param in self.reward_model.named_parameters():
+			# 	if param.requires_grad:
+			# 		print(name)
+
+
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
 
@@ -528,10 +535,10 @@ class PPOAgent:
 				episode_len=episode_len_batch.to(self.device),
 				)
 
-			temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
-			agent_weights = agent_weights.cpu().mean(dim=0)
-			entropy_temporal_weights = (-torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/(team_mask_batch.sum()+1e-5)).item()
-			entropy_agent_weights = (-torch.sum(agent_weights.reshape(-1, self.num_agents) * torch.log(torch.clamp(agent_weights.reshape(-1, self.num_agents), 1e-10, 1.0)))/agent_masks_batch.sum()).item() 
+			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
+			# agent_weights = agent_weights.cpu().mean(dim=0)
+			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
+			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			
 			if temporal_weights_final_temporal_block is not None:
 				entropy_final_temporal_block = (-torch.sum(temporal_weights_final_temporal_block * torch.log(torch.clamp(temporal_weights_final_temporal_block, 1e-10, 1.0)))/team_mask_batch.shape[0]).item()
@@ -539,7 +546,7 @@ class PPOAgent:
 				entropy_final_temporal_block = None
 
 			if self.version == "agent_temporal_attn_weights":
-				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + 1e-2 * entropy_temporal_weights + 1e-2 * entropy_agent_weights
 			else:
 				reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			
@@ -563,7 +570,7 @@ class PPOAgent:
 		if "AREL" in self.experiment_type:
 			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
 		elif "ATRR" in self.experiment_type:
-			return reward_loss.item(), entropy_temporal_weights, entropy_agent_weights, entropy_final_temporal_block, grad_norm_value_reward.item()
+			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), entropy_final_temporal_block, grad_norm_value_reward.item()
 
 
 
