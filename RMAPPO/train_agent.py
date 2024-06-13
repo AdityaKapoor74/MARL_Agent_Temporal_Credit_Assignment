@@ -145,6 +145,7 @@ class MAPPO:
 			episodic_team_reward = 0
 
 			episode_reward = 0
+			action_frequency = np.array([0.0]*self.num_actions)
 			episode_indiv_rewards = [0 for i in range(self.num_agents)]
 			final_timestep = self.max_time_steps
 
@@ -211,6 +212,7 @@ class MAPPO:
 
 				episode_reward += np.sum(rewards)
 				episode_indiv_rewards = [r+info["indiv_rewards"][i] for i, r in enumerate(episode_indiv_rewards)]
+				action_frequency += np.sum(one_hot_actions, axis=0)
 
 				states_actor, reward_model_obs, mask_actions, indiv_dones, dones = next_states_actor, next_reward_model_obs, next_mask_actions, next_indiv_dones, next_dones
 				rnn_hidden_state_q, rnn_hidden_state_actor = next_rnn_hidden_state_q, next_rnn_hidden_state_actor
@@ -220,6 +222,7 @@ class MAPPO:
 					print("*"*100)
 					print("EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | Num Allies Alive: {} | Num Enemies Alive: {} \n".format(episode, np.round(episode_reward,decimals=4), step, self.max_time_steps, info["num_allies"], info["num_enemies"]))
 					print("INDIV REWARD STREAMS", episode_indiv_rewards, "AGENTS DEAD", info["indiv_dones"])
+					print("ACTION FREQUENCY", action_frequency)
 					print("*"*100)
 
 					final_timestep = step
