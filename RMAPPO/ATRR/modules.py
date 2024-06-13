@@ -81,6 +81,15 @@ class SelfAttentionWide(nn.Module):
 		# - get dot product of queries and keys, and scale
 		dot = torch.bmm(queries, keys.transpose(1, 2))
 
+		print("keys")
+		print(keys)
+
+		print("queries")
+		print(queries)
+
+		print("dot")
+		print(dot)
+
 		self.attn_scores = dot
 
 		if masks is not None:
@@ -122,6 +131,9 @@ class SelfAttentionWide(nn.Module):
 			dot = (torch.where(masks.permute(0, 2, 1).reshape(-1, n_agents, 1, t, 1).repeat(1, 1, h, 1, 1).bool(), dot.reshape(-1, n_agents, h, t, t), 0.0)).reshape(*shape)
 		
 		self.attn_weights = dot.reshape(-1, h, t, t).mean(dim=1).detach()
+
+		print("attn weights")
+		print(dot)
 
 		# - dot now has row-wise self-attention probabilities
 		# apply the self attention to the values

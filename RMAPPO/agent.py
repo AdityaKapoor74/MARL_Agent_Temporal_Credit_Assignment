@@ -428,19 +428,21 @@ class PPOAgent:
 						temporal_weights_final = temporal_weights[-1].detach().cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
-						temporal_reward_redistribution = []
-						left_return = episodic_reward_batch.detach().cpu().squeeze(-1)
-						for t in reversed(range(self.max_time_steps)):
-							reward_contri = temporal_weights_final[:, t, t] * left_return
-							left_return = left_return - reward_contri
-							temporal_reward_redistribution.append(reward_contri)
+						# temporal_reward_redistribution = []
+						# left_return = episodic_reward_batch.detach().cpu().squeeze(-1)
+						# for t in reversed(range(self.max_time_steps)):
+						# 	reward_contri = temporal_weights_final[:, t, t] * left_return
+						# 	left_return = left_return - reward_contri
+						# 	temporal_reward_redistribution.append(reward_contri)
 
-						temporal_reward_redistribution = torch.stack(temporal_reward_redistribution, dim=0).transpose(-1, -2)
+						# temporal_reward_redistribution = torch.stack(temporal_reward_redistribution, dim=0).transpose(-1, -2)
 						agent_weights_final = agent_weights[-1].detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
-						agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
-						rewards = agent_temporal_reward_redistribution
+						# agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
+						# rewards = agent_temporal_reward_redistribution
+
+						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final[torch.arange(b), episode_len_batch, :].detach().cpu()).unsqueeze(-1) * agent_weights_final.detach().cpu()
 
 					
 					if self.experiment_type == "ATRR_temporal":
