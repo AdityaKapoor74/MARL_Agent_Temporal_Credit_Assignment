@@ -243,11 +243,6 @@ class PPOAgent:
 
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			
-			# for name, param in self.reward_model.named_parameters():
-			# 	if param.requires_grad:
-			# 		print(name)
-
-
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
 
@@ -405,6 +400,7 @@ class PPOAgent:
 
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape
+						
 						# use last attn block
 						# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len_batch, :]/(agent_masks_batch.permute(0, 2, 1).sum(dim=1)+1e-5)
 						# use attention rollout
@@ -461,14 +457,6 @@ class PPOAgent:
 						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
-				# if self.norm_rewards:
-				# 	shape = rewards.shape
-				# 	rewards = self.reward_normalizer.denormalize(rewards.cpu().view(-1)).view(shape) * agent_masks_batch
-
-				# print("true episodic reward")
-				# print(episodic_reward_batch[0])
-				# print("rewards post distribution")
-				# print(rewards[0])
 		
 			return rewards.cpu()
 
@@ -546,7 +534,7 @@ class PPOAgent:
 				entropy_final_temporal_block = None
 
 			if self.version == "agent_temporal_attn_weights":
-				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + 5e-3 * entropy_temporal_weights + 5e-3 * entropy_agent_weights
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) #+ 5e-3 * entropy_temporal_weights + 5e-3 * entropy_agent_weights
 			else:
 				reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			
@@ -598,16 +586,11 @@ class PPOAgent:
 		self.buffer.calculate_targets()
 
 		
-		# torch.autograd.set_detect_anomaly(True)
-		# Optimize policy for n epochs
 		for _ in range(self.n_epochs):
 
 			# SAMPLE DATA FROM BUFFER
 			states_critic, hidden_state_q, states_actor, hidden_state_actor, logprobs_old, \
 			actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
-
-			# print("pre advantage normalization")
-			# print(advantage[:, 0])
 
 			if self.norm_adv:
 				shape = advantage.shape

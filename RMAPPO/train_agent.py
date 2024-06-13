@@ -7,7 +7,7 @@ import torch
 import datetime
 
 import gym
-import smaclite  # noqa
+import smaclite
 
 torch.autograd.set_detect_anomaly(True)
 

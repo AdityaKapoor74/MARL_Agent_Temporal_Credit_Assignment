@@ -202,6 +202,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.obs_shape = obs_shape
 		self.action_shape = action_shape
+		self.seq_length = seq_length
 		self.comp_emb = linear_compression_dim
 
 		self.heads = heads
@@ -212,7 +213,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.action_compress_input = init_(nn.Linear(action_shape, self.comp_emb), activate=False)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
-
+		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 
 
@@ -271,8 +272,10 @@ class Time_Agent_Transformer(nn.Module):
 		
 		
 		b, n_a, t, _ = obs.size()
-		# x = torch.cat([obs, one_hot_actions], dim=-1) 
-		x = (self.obs_compress_input(obs) + self.action_embedding(actions.long()) + self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)).view(b*n_a, t, self.comp_emb)
+
+		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, :, None, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		x = (self.obs_compress_input(obs) + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
