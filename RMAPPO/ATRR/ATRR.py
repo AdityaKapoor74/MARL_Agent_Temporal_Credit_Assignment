@@ -274,7 +274,8 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, _ = obs.size()
 
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
-		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, :, None, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, :, None, :].expand(b, n_a, t, self.comp_emb)
+		
 		x = (self.obs_compress_input(obs) + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
