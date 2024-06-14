@@ -534,7 +534,7 @@ class PPOAgent:
 				entropy_final_temporal_block = None
 
 			if self.version == "agent_temporal_attn_weights":
-				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + 5e-4 * entropy_temporal_weights + 5e-4 * entropy_agent_weights
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + 1e-3 * entropy_temporal_weights + 5e-4 * entropy_agent_weights
 			else:
 				reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			
