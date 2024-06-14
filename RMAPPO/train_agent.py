@@ -402,7 +402,7 @@ if __name__ == '__main__':
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 128, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
@@ -420,7 +420,7 @@ if __name__ == '__main__':
 				# CRITIC
 				"rnn_num_layers_q": 1,
 				"rnn_hidden_q": 64,
-				"q_value_lr": 5e-4, #1e-3
+				"q_value_lr": 1e-4, #1e-3
 				"temperature_q": 1.0,
 				"q_weight_decay": 5e-4,
 				"enable_grad_clip_critic_q": True,
@@ -442,7 +442,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 10.0,
 				"policy_clip": 0.2,
-				"policy_lr": 5e-4, #prd 1e-4
+				"policy_lr": 1e-4, #prd 1e-4
 				"policy_weight_decay": 5e-4,
 				"entropy_pen": 1e-2, #8e-3
 				"entropy_pen_final": 1e-2,
