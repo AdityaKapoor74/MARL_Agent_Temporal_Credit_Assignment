@@ -281,6 +281,10 @@ class MAPPO:
 					self.agents.buffer.rewards *= (1-self.agents.buffer.agent_dones[:, :-1, :])
 					self.agents.update(episode)
 				elif self.use_reward_model and episode > self.warm_up_period:
+					# finetune
+					sample = self.agents.buffer.reward_model_obs, self.agents.buffer.actions, self.agents.buffer.one_hot_actions, self.agents.buffer.rewards[:, :, 0], 1-self.agents.buffer.team_dones[:, :-1], 1-self.agents.buffer.agent_dones[:, :-1, :], self.agents.buffer.episode_length
+					self.agents.update_reward_model(sample)
+					
 					self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
 					self.agents.update(episode)
 				elif not self.use_reward_model:
