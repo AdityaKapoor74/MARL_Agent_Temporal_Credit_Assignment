@@ -435,7 +435,7 @@ class PPOAgent:
 						
 						# producing temporal redistribution for every agent individually
 						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						temporal_weights_final = torch.gather(temporal_weights[-1].reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+						temporal_weights_final = torch.gather(temporal_weights[-1].detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
 						# temporal_reward_redistribution = []
 						# left_return = episodic_reward_batch.detach().cpu().squeeze(-1)
@@ -454,11 +454,11 @@ class PPOAgent:
 
 						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final[torch.arange(b), episode_len_batch, :].detach().cpu()).unsqueeze(-1) * agent_weights_final.detach().cpu()
 
-						multi_agent_temporal_weights = (temporal_weights_final.detach().cpu()*agent_weights_final.detach().cpu()).sum(dim=-1)
+						multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
 						# renormalizing
 						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
 						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
-						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final.detach().cpu()
+						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
 
 						rewards = agent_temporal_rewards
 					
