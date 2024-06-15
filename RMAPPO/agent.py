@@ -365,7 +365,7 @@ class PPOAgent:
 					'''
 					The NaN values in agent_contribution likely arise from division by zero or undefined behavior when using torch.where with a mask that results in all negative infinity values in some positions.
 					The mask application and scaling do not produce divisions by very small numbers.
-    				Handle cases where max_logits and min_logits might result in zero differences.
+					Handle cases where max_logits and min_logits might result in zero differences.
 					'''
 					# rewards_copy = torch.where(agent_masks_batch.bool(), rewards.detach().cpu(), 1e-9) #
 					# max_logits, _ = torch.max(rewards.detach().cpu()*agent_masks_batch, dim=-1, keepdim=True)
@@ -428,9 +428,15 @@ class PPOAgent:
 						# agent_weights_final = F.softmax(torch.where(agent_masks_batch.bool(), (agent_scores[-1].cpu().mean(dim=1)).sum(dim=-2), self.mask_value), dim=-1)
 						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1) * agent_weights_final.detach()
 
-						temporal_weights_final = temporal_weights[-1].detach().cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						# producing temporal redistribution for the "multi-agent" system by collapsing the temporal weights across number of agents
+						# temporal_weights_final = temporal_weights[-1].detach().cpu().sum(dim=1)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
-						temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
+						# temporal_weights_final = temporal_weights_final / (temporal_weights_final.sum(dim=-1, keepdim=True) + 1e-5)
+						
+						# producing temporal redistribution for every agent individually
+						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+						temporal_weights_final = torch.gather(temporal_weights[-1].reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+
 						# temporal_reward_redistribution = []
 						# left_return = episodic_reward_batch.detach().cpu().squeeze(-1)
 						# for t in reversed(range(self.max_time_steps)):
@@ -442,11 +448,19 @@ class PPOAgent:
 						agent_weights_final = agent_weights[-1].detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+						
 						# agent_temporal_reward_redistribution = temporal_reward_redistribution.unsqueeze(-1) * agent_weights_final
 						# rewards = agent_temporal_reward_redistribution
 
-						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final[torch.arange(b), episode_len_batch, :].detach().cpu()).unsqueeze(-1) * agent_weights_final.detach().cpu()
+						# rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final[torch.arange(b), episode_len_batch, :].detach().cpu()).unsqueeze(-1) * agent_weights_final.detach().cpu()
 
+						multi_agent_temporal_weights = (temporal_weights_final.detach().cpu()*agent_weights_final.detach().cpu()).sum(dim=-1)
+						# renormalizing
+						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
+						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final.detach().cpu()
+
+						rewards = agent_temporal_rewards
 					
 					if self.experiment_type == "ATRR_temporal":
 						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
