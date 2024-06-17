@@ -25,10 +25,8 @@ class PPOAgent:
 		self.num_agents = self.env.n_agents
 		self.num_enemies = self.env.n_enemies
 		self.num_actions = self.env.action_space[0].n
-		self.reward_model_obs_shape = dictionary["reward_model_obs_shape"]
 
 		# Training setup
-		self.use_reward_model = dictionary["use_reward_model"]
 		self.max_episodes = dictionary["max_episodes"]
 		self.test_num = dictionary["test_num"]
 		self.gif = dictionary["gif"]
@@ -57,6 +55,9 @@ class PPOAgent:
 		self.agent_score_coefficient = dictionary["agent_score_coefficient"]
 		self.reward_n_heads = dictionary["reward_n_heads"]
 		self.reward_depth = dictionary["reward_depth"]
+		# self.reward_model_obs_shape = dictionary["reward_model_obs_shape"]
+		self.ally_obs_shape = dictionary["ally_obs_shape"]
+		self.enemy_obs_shape = dictionary["enemy_obs_shape"]
 
 		# Critic Setup
 		self.temperature_q = dictionary["temperature_q"]
@@ -150,7 +151,9 @@ class PPOAgent:
 			actor_hidden_state=self.rnn_hidden_actor,
 			rnn_num_layers_q=self.rnn_num_layers_q,
 			q_hidden_state=self.rnn_hidden_q,
-			obs_shape_reward_model=self.reward_model_obs_shape,
+			# obs_shape_reward_model=self.reward_model_obs_shape,
+			ally_obs_shape=self.ally_obs_shape,
+			enemy_obs_shape=self.enemy_obs_shape,
 			num_actions=self.num_actions,
 			data_chunk_length=self.data_chunk_length,
 			norm_returns_q=self.norm_returns_q,
@@ -188,7 +191,10 @@ class PPOAgent:
 				capacity = dictionary["replay_buffer_size"],
 				max_episode_len = self.max_time_steps,
 				num_agents = self.num_agents,
-				reward_model_obs_shape = dictionary["reward_model_obs_shape"],
+				num_enemies=self.num_enemies,
+				# reward_model_obs_shape = dictionary["reward_model_obs_shape"],
+				ally_obs_shape=self.ally_obs_shape,
+				enemy_obs_shape=self.enemy_obs_shape,
 				action_shape = self.num_actions,
 				device = self.device,
 				)
@@ -213,12 +219,15 @@ class PPOAgent:
 			elif "ATRR" in self.experiment_type:
 				from ATRR import ATRR
 				self.reward_model = ATRR.Time_Agent_Transformer(
-					obs_shape=dictionary["reward_model_obs_shape"],
+					# obs_shape=dictionary["reward_model_obs_shape"],
+					ally_obs_shape=dictionary["ally_obs_shape"],
+					enemy_obs_shape=dictionary["enemy_obs_shape"],
 					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
+					n_enemies=self.num_enemies,
 					n_actions=self.num_actions,
 					agent=dictionary["reward_agent_attn"], 
 					dropout=dictionary["reward_dropout"], 
@@ -293,7 +302,9 @@ class PPOAgent:
 	def reward_model_output(self, eval_reward_model=False):
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
-			state_batch = torch.from_numpy(self.buffer.reward_model_obs[latest_sample_index]).float().unsqueeze(0)
+			# state_batch = torch.from_numpy(self.buffer.reward_model_obs[latest_sample_index]).float().unsqueeze(0)
+			ally_state_batch = torch.from_numpy(self.buffer.ally_obs[latest_sample_index]).float().unsqueeze(0)
+			enemy_state_batch = torch.from_numpy(self.buffer.enemy_obs[latest_sample_index]).float().unsqueeze(0)
 			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
 			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions[latest_sample_index]).float().unsqueeze(0)
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
@@ -301,7 +312,9 @@ class PPOAgent:
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
 		else:
-			state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
+			# state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
+			ally_state_batch = torch.from_numpy(self.buffer.ally_obs).float()
+			enemy_state_batch = torch.from_numpy(self.buffer.enemy_obs).float()
 			actions_batch = torch.from_numpy(self.buffer.actions).float()
 			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions).float()
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
@@ -335,7 +348,9 @@ class PPOAgent:
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
 					temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
-						state_batch.permute(0, 2, 1, 3).to(self.device), 
+						# state_batch.permute(0, 2, 1, 3).to(self.device), 
+						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 						actions_batch.permute(0, 2, 1).to(self.device), 
 						team_masks=team_mask_batch.to(self.device),
@@ -414,7 +429,7 @@ class PPOAgent:
 					
 
 					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
-						b, t, n_a, _ = state_batch.shape
+						b, t, n_a, _ = ally_state_batch.shape
 						# use last attn block
 						# temporal_weights_final = temporal_weights[-1].sum(dim=1)[torch.arange(x.shape[0]), episode_len_batch, :]/(agent_masks_batch.permute(0, 2, 1).sum(dim=1)+1e-5)
 						# use attention rollout
@@ -478,9 +493,11 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		reward_model_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
-		reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
+		# reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
+		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
+		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
 		one_hot_actions_batch = torch.from_numpy(one_hot_actions_batch).float() # same as current one_hot_actions
 		reward_batch = torch.from_numpy(reward_batch).float()
@@ -529,7 +546,9 @@ class PPOAgent:
 		elif "ATRR" in self.experiment_type:
 			
 			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
-				reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.permute(0, 2, 1).to(self.device), 
 				team_masks=team_mask_batch.to(self.device),

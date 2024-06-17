@@ -55,7 +55,10 @@ class RewardReplayMemory:
 		capacity, 
 		max_episode_len, 
 		num_agents, 
-		reward_model_obs_shape,
+		num_enemies,
+		# reward_model_obs_shape,
+		ally_obs_shape,
+		enemy_obs_shape,
 		action_shape,
 		device,
 		):
@@ -67,12 +70,17 @@ class RewardReplayMemory:
 		self.t = 0
 		self.max_episode_len = max_episode_len
 		self.num_agents = num_agents
-		self.reward_model_obs_shape = reward_model_obs_shape
+		self.num_enemies = num_enemies
+		# self.reward_model_obs_shape = reward_model_obs_shape
+		self.ally_obs_shape = ally_obs_shape
+		self.enemy_obs_shape = enemy_obs_shape
 		self.action_shape = action_shape
 		self.device = device
 
 		self.buffer = dict()
-		self.buffer['reward_model_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		# self.buffer['reward_model_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.reward_model_obs_shape), dtype=np.float32)
+		self.buffer['ally_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.ally_obs_shape), dtype=np.float32)
+		self.buffer['enemy_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_enemies, self.enemy_obs_shape), dtype=np.float32)
 		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['one_hot_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
 		self.buffer['reward'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
@@ -82,8 +90,10 @@ class RewardReplayMemory:
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, reward_model_obs, actions, one_hot_actions, reward, done, indiv_dones):
-		self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
+	def push(self, ally_obs, enemy_obs, actions, one_hot_actions, reward, done, indiv_dones):
+		# self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
+		self.buffer['ally_obs'][self.episode][self.t] = ally_obs
+		self.buffer['enemy_obs'][self.episode][self.t] = enemy_obs
 		self.buffer['actions'][self.episode][self.t] = actions
 		self.buffer['one_hot_actions'][self.episode][self.t] = one_hot_actions
 		self.buffer['reward'][self.episode][self.t] = reward
@@ -101,7 +111,9 @@ class RewardReplayMemory:
 	def sample_reward_model(self, num_episodes):
 		assert num_episodes <= self.length
 		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
-		reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
+		# reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
+		ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
+		enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
 		one_hot_actions_batch = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
@@ -109,7 +121,7 @@ class RewardReplayMemory:
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		return reward_model_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):
@@ -130,7 +142,9 @@ class RolloutBuffer:
 		actor_hidden_state,
 		rnn_num_layers_q,
 		q_hidden_state,
-		obs_shape_reward_model,
+		# obs_shape_reward_model,
+		ally_obs_shape,
+		enemy_obs_shape,
 		num_actions, 
 		data_chunk_length,
 		norm_returns_q,
@@ -151,7 +165,9 @@ class RolloutBuffer:
 		self.actor_hidden_state = actor_hidden_state
 		self.rnn_num_layers_q = rnn_num_layers_q
 		self.q_hidden_state = q_hidden_state
-		self.obs_shape_reward_model = obs_shape_reward_model
+		# self.obs_shape_reward_model = obs_shape_reward_model
+		self.ally_obs_shape = ally_obs_shape
+		self.enemy_obs_shape = enemy_obs_shape
 		self.num_actions = num_actions
 
 		self.data_chunk_length = data_chunk_length
@@ -174,7 +190,9 @@ class RolloutBuffer:
 		self.Q_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
 		self.states_actor = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_actor))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
-		self.reward_model_obs = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_reward_model))
+		# self.reward_model_obs = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_reward_model))
+		self.ally_obs = np.zeros((num_episodes, max_time_steps, num_agents, ally_obs_shape))
+		self.enemy_obs = np.zeros((num_episodes, max_time_steps, num_enemies, enemy_obs_shape))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
@@ -193,7 +211,9 @@ class RolloutBuffer:
 		self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
 		self.states_actor = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_actor))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
-		self.reward_model_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_reward_model))
+		# self.reward_model_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_reward_model))
+		self.ally_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.ally_obs_shape))
+		self.enemy_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_enemies, self.enemy_obs_shape))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
@@ -219,7 +239,9 @@ class RolloutBuffer:
 		actions,  
 		one_hot_actions, 
 		action_masks, 
-		reward_model_obs,
+		# reward_model_obs,
+		ally_obs,
+		enemy_obs,
 		rewards, 
 		agent_dones,
 		team_dones,
@@ -234,7 +256,9 @@ class RolloutBuffer:
 		self.actions[self.episode_num][self.time_step] = actions
 		self.one_hot_actions[self.episode_num][self.time_step] = one_hot_actions
 		self.action_masks[self.episode_num][self.time_step] = action_masks
-		self.reward_model_obs[self.episode_num][self.time_step] = reward_model_obs
+		# self.reward_model_obs[self.episode_num][self.time_step] = reward_model_obs
+		self.ally_obs[self.episode_num][self.time_step] = ally_obs
+		self.enemy_obs[self.episode_num][self.time_step] = enemy_obs
 		self.rewards[self.episode_num][self.time_step] = rewards
 		self.agent_dones[self.episode_num][self.time_step] = agent_dones
 		self.team_dones[self.episode_num][self.time_step] = team_dones

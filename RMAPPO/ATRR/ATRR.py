@@ -179,12 +179,15 @@ class Time_Agent_Transformer(nn.Module):
 
 	def __init__(
 		self,
-		obs_shape, 
+		# obs_shape, 
+		ally_obs_shape, 
+		enemy_obs_shape, 
 		action_shape,
 		heads, 
 		depth, 
 		seq_length, 
 		n_agents, 
+		n_enemies,
 		n_actions,
 		agent=True, 
 		dropout=0.0, 
@@ -200,7 +203,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.version = version
 		self.device = device
 
-		self.obs_shape = obs_shape
+		# self.obs_shape = obs_shape
 		self.action_shape = action_shape
 		self.seq_length = seq_length
 		self.comp_emb = linear_compression_dim
@@ -209,12 +212,13 @@ class Time_Agent_Transformer(nn.Module):
 		self.depth = depth
 		self.agent_attn = agent
 
-		self.obs_compress_input = init_(nn.Linear(obs_shape, self.comp_emb), activate=False)
-		# self.action_compress_input = init_(nn.Linear(action_shape, self.comp_emb), activate=False)
+		self.ally_obs_compress_input = init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False)
+		self.enemy_obs_compress_input = init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
+		self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 
 
 		tblocks = []
@@ -262,7 +266,7 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, obs, actions, team_masks=None, agent_masks=None, episode_len=None):
+	def forward(self, ally_obs, enemy_obs, actions, team_masks=None, agent_masks=None, episode_len=None):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
@@ -271,12 +275,16 @@ class Time_Agent_Transformer(nn.Module):
 		# tokens = self.token_embedding(x)
 		
 		
-		b, n_a, t, _ = obs.size()
+		b, n_a, t, _ = ally_obs.size()
+		_, n_e, _, _ = enemy_obs.size()
 
+		enemy_embedding = self.enemy_embedding(torch.arange(n_e).to(self.device))[None, None, :, :].expand(b, t, n_e, self.comp_emb).permute(0, 2, 1, 3)
+		enemy_obs = (self.enemy_obs_compress_input(enemy_obs) + enemy_embedding).sum(dim=1).unsqueeze(1)
+		
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		
-		x = (self.obs_compress_input(obs) + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
+		x = (self.ally_obs_compress_input(ally_obs) + enemy_obs + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
