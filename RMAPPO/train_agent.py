@@ -425,7 +425,7 @@ if __name__ == '__main__':
 				"q_weight_decay": 5e-4,
 				"enable_grad_clip_critic_q": True,
 				"grad_clip_critic_q": 10.0,
-				"value_clip": 0.05,
+				"value_clip": 0.2,
 				"target_calc_style": "GAE", # GAE, TD_Lambda, N_steps
 				"td_lambda": 0.95, # 1 --> Monte Carlo; 0 --> TD(1)
 				"n_steps": 5,
@@ -441,7 +441,7 @@ if __name__ == '__main__':
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 10.0,
-				"policy_clip": 0.05,
+				"policy_clip": 0.2,
 				"policy_lr": 1e-3, #prd 1e-4
 				"policy_weight_decay": 5e-4,
 				"entropy_pen": 8e-3, #8e-3
