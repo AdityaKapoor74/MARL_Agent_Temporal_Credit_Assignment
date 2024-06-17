@@ -233,13 +233,13 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.tblocks = nn.Sequential(*tblocks)
 		
-		# self.pre_final_temporal_block_norm = nn.LayerNorm(self.comp_emb)
+		self.pre_final_norm = nn.LayerNorm(self.comp_emb)
 
 		# self.final_temporal_block = []
 		# for i in range(depth):
 		# 	self.final_temporal_block.append(TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 		# self.final_temporal_block = nn.Sequential(*self.final_temporal_block)
-		self.final_transformer_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide)
+		# self.final_transformer_block = TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide)
 
 
 		if norm_rewards:
@@ -287,7 +287,7 @@ class Time_Agent_Transformer(nn.Module):
 		x = (self.ally_obs_compress_input(ally_obs) + enemy_obs + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
-		i = 0
+		i = 0k
 
 		x_intermediate_temporal_agent = []
 		while i < len(self.tblocks):
@@ -356,7 +356,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# print((x.reshape(b, n_a, t, -1)[0, 0, indiv_agent_episode_len[0, 0, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 1, indiv_agent_episode_len[0, 1, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 2, indiv_agent_episode_len[0, 2, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 3, indiv_agent_episode_len[0, 3, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 4, indiv_agent_episode_len[0, 4, 0, 0], :]))
 
-			x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
+			x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
 
 			# print(x[0])
 
