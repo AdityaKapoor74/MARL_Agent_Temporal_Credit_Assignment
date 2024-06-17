@@ -444,8 +444,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.05,
 				"policy_lr": 1e-3, #prd 1e-4
 				"policy_weight_decay": 5e-4,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 8e-3, #8e-3
+				"entropy_pen_final": 8e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
