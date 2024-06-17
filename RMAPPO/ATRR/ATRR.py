@@ -287,7 +287,7 @@ class Time_Agent_Transformer(nn.Module):
 		x = (self.ally_obs_compress_input(ally_obs) + enemy_obs + self.action_embedding(actions.long()) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
-		i = 0k
+		i = 0
 
 		x_intermediate_temporal_agent = []
 		while i < len(self.tblocks):
