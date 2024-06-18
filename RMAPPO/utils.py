@@ -153,7 +153,7 @@ class RolloutBuffer:
 		gae_lambda,
 		n_steps,
 		gamma,
-		Q_PopArt,
+		# Q_PopArt,
 		):
 		self.num_episodes = num_episodes
 		self.max_time_steps = max_time_steps
@@ -179,8 +179,8 @@ class RolloutBuffer:
 		self.gamma = gamma
 		self.n_steps = n_steps
 			
-		if self.norm_returns_q:
-			self.q_value_norm = Q_PopArt
+		# if self.norm_returns_q:
+		# 	self.q_value_norm = Q_PopArt
 
 		self.episode_num = 0
 		self.time_step = 0
@@ -308,7 +308,7 @@ class RolloutBuffer:
 		return states_critic, hidden_state_q, states_actor, hidden_state_actor, logprobs, \
 		actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values, target_q_values, advantage
 
-	def calculate_targets(self):
+	def calculate_targets(self, q_value_norm):
 		
 		agent_masks = 1 - torch.from_numpy(self.agent_dones[:, :-1, :])
 		agent_next_mask = 1 - torch.from_numpy(self.agent_dones[:, -1, :])
@@ -320,10 +320,10 @@ class RolloutBuffer:
 
 		if self.norm_returns_q:
 			q_values_shape = q_values.shape
-			q_values = self.q_value_norm.denormalize(q_values.view(-1)).view(q_values_shape) * agent_masks.view(q_values_shape)
+			q_values = q_value_norm.denormalize(q_values.view(-1)).view(q_values_shape) * agent_masks.view(q_values_shape)
 
 			next_q_values_shape = next_q_values.shape
-			next_q_values = self.q_value_norm.denormalize(next_q_values.view(-1)).view(next_q_values_shape) * agent_next_mask.view(next_q_values_shape)
+			next_q_values = q_value_norm.denormalize(next_q_values.view(-1)).view(next_q_values_shape) * agent_next_mask.view(next_q_values_shape)
 
 		if self.target_calc_style == "GAE":
 			target_q_values = self.gae_targets(rewards, q_values, next_q_values, agent_masks, agent_next_mask)
@@ -332,11 +332,11 @@ class RolloutBuffer:
 
 		self.advantage = (target_q_values - q_values).detach()
 
-		if self.norm_returns_q:
-			targets_shape = target_q_values.shape
-			self.q_value_norm.update(target_q_values.view(-1), agent_masks.view(-1))
+		# if self.norm_returns_q:
+		# 	targets_shape = target_q_values.shape
+		# 	q_value_norm.update(target_q_values.view(-1), agent_masks.view(-1))
 			
-			target_q_values = self.q_value_norm.normalize(target_q_values.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+		# 	target_q_values = self.q_value_norm.normalize(target_q_values.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 		self.target_q_values = target_q_values.cpu()
 

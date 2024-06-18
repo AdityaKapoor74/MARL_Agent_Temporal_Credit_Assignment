@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
-from model import Policy, Q_network
+from model import Policy, Q_network, PopArt
 from utils import RolloutBuffer, RewardReplayMemory
 
 class PPOAgent:
@@ -107,7 +107,7 @@ class PPOAgent:
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_q,
-			value_norm=self.norm_returns_q,
+			# value_norm=self.norm_returns_q,
 			device=self.device, 
 			).to(self.device)
 		self.target_critic_network_q = Q_network(
@@ -116,7 +116,7 @@ class PPOAgent:
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_q,
-			value_norm=self.norm_returns_q,
+			# value_norm=self.norm_returns_q,
 			device=self.device, 
 			).to(self.device)
 		# Copy network params
@@ -124,6 +124,11 @@ class PPOAgent:
 		# Disable updates for old network
 		for param in self.target_critic_network_q.parameters():
 			param.requires_grad_(False)
+
+		if self.norm_returns_q:
+			self.Q_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
+		else:
+			self.Q_PopArt = None
 
 		# Policy Network
 		self.policy_network = Policy(
@@ -162,7 +167,7 @@ class PPOAgent:
 			gae_lambda=self.gae_lambda,
 			n_steps=self.n_steps,
 			gamma=self.gamma,
-			Q_PopArt=self.critic_network_q.q_value_layer[-1],
+			# Q_PopArt=self.critic_network_q.q_value_layer[-1],
 			)
 
 		# Loading models
@@ -616,7 +621,7 @@ class PPOAgent:
 		grad_norm_value_q_batch = 0
 		grad_norm_policy_batch = 0
 
-		self.buffer.calculate_targets()
+		self.buffer.calculate_targets(self.Q_PopArt)
 
 		
 		for _ in range(self.n_epochs):
@@ -646,6 +651,10 @@ class PPOAgent:
 			q_values_old *= agent_masks
 			q_values *= agent_masks.to(self.device)	
 			target_q_values *= agent_masks
+
+			if self.norm_returns_q:
+				targets_shape = target_q_values.shape
+				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 			
 			dists, _ = self.policy_network(
 					states_actor.to(self.device),
