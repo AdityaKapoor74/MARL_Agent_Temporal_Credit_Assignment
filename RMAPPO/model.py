@@ -162,7 +162,7 @@ def init(module, weight_init, bias_init, gain=1):
 
 def init_(m, gain=0.01, activate=False):
 	if activate:
-		gain = nn.init.calculate_gain('tanh')
+		gain = nn.init.calculate_gain('relu')
 	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
@@ -188,7 +188,7 @@ class Policy(nn.Module):
 		self.device = device
 		self.Layer_1 = nn.Sequential(
 			init_(nn.Linear(obs_input_dim, 64), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			nn.LayerNorm(64)
 			)
 		self.RNN = nn.GRU(input_size=64, hidden_size=64, num_layers=rnn_num_layers, batch_first=True)
@@ -239,10 +239,10 @@ class Q_network(nn.Module):
 		# Embedding Networks
 		self.mlp_layer = nn.Sequential(
 			init_(nn.Linear(obs_input_dim, 64, bias=True), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			nn.LayerNorm(64),
 			init_(nn.Linear(64, 64, bias=True), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			nn.LayerNorm(64),
 			)
 
