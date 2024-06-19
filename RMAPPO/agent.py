@@ -116,7 +116,7 @@ class PPOAgent:
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_q,
-			# value_norm=self.norm_returns_q,
+			comp_emb_shape=self.rnn_hidden_q,
 			device=self.device, 
 			).to(self.device)
 		# Copy network params
@@ -136,6 +136,7 @@ class PPOAgent:
 			num_agents=self.num_agents, 
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_actor,
+			comp_emb_shape=self.rnn_hidden_actor,
 			device=self.device
 			).to(self.device)
 		

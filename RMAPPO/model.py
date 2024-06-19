@@ -249,28 +249,28 @@ class Policy(nn.Module):
 		num_actions, 
 		num_agents, 
 		rnn_num_layers, 
+		comp_emb_shape,
 		device
 		):
 		super(Policy, self).__init__()
 
 		self.rnn_num_layers = rnn_num_layers
-		
-		self.mask_value = torch.tensor(
-				torch.finfo(torch.float).min, dtype=torch.float
-			)
-
 		self.num_agents = num_agents
 		self.num_actions = num_actions
 		self.device = device
-		self.Layer_1 = nn.Sequential(
-			init_(nn.Linear(obs_input_dim, 64), activate=True),
-			nn.GELU(),
-			nn.LayerNorm(64)
+
+		self.mask_value = torch.tensor(
+			torch.finfo(torch.float).min, dtype=torch.float
 			)
-		self.RNN = nn.GRU(input_size=64, hidden_size=64, num_layers=rnn_num_layers, batch_first=True)
+		
+		self.Layer_1 = nn.Sequential(
+			nn.LayerNorm(obs_input_dim),
+			init_(nn.Linear(obs_input_dim, comp_emb_shape), activate=True),
+			nn.GELU(),
+			)
+		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=rnn_num_layers, batch_first=True)
 		self.Layer_2 = nn.Sequential(
-			nn.LayerNorm(64),
-			init_(nn.Linear(64, num_actions), gain=0.01)
+			init_(nn.Linear(comp_emb_shape, num_actions), gain=0.01)
 			)
 
 		for name, param in self.RNN.named_parameters():
@@ -301,7 +301,7 @@ class Q_network(nn.Module):
 		num_enemies,
 		num_actions, 
 		rnn_num_layers,
-		# value_norm,
+		comp_emb_shape,
 		device, 
 		):
 		super(Q_network, self).__init__()
@@ -314,40 +314,27 @@ class Q_network(nn.Module):
 
 		# Embedding Networks
 		self.mlp_layer = nn.Sequential(
-			init_(nn.Linear(obs_input_dim, 64, bias=True), activate=True),
+			nn.LayerNorm(obs_input_dim)
+			init_(nn.Linear(obs_input_dim, comp_emb_shape, bias=True), activate=True),
 			nn.GELU(),
-			nn.LayerNorm(64),
-			init_(nn.Linear(64, 64, bias=True), activate=True),
+			init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
 			nn.GELU(),
-			nn.LayerNorm(64),
 			)
 
-		self.RNN = nn.GRU(input_size=64, hidden_size=64, num_layers=self.rnn_num_layers, batch_first=True)
+		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=self.rnn_num_layers, batch_first=True)
 		for name, param in self.RNN.named_parameters():
 			if 'bias' in name:
 				nn.init.constant_(param, 0)
 			elif 'weight' in name:
 				nn.init.orthogonal_(param)
 
-		# if value_norm:
-		# 	self.q_value_layer = nn.Sequential(
-		# 		nn.LayerNorm(64),
-		# 		init_(PopArt(64, 1, device=self.device), activate=False)
-		# 		)
-		# else:
-		# 	self.q_value_layer = nn.Sequential(
-		# 		nn.LayerNorm(64),
-		# 		init_(nn.Linear(64, 1), activate=False)
-		# 		)
-
 		self.q_value_layer = nn.Sequential(
-			nn.LayerNorm(64),
-			init_(nn.Linear(64, 1), activate=False)
+			init_(Linear(comp_emb_shape, 1), activate=False)
 			)
 		
 
 		self.mask_value = torch.tensor(
-				torch.finfo(torch.float).min, dtype=torch.float
+			torch.finfo(torch.float).min, dtype=torch.float
 			)
 
 
