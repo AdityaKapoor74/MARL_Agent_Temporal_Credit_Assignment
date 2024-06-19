@@ -245,19 +245,19 @@ class Time_Agent_Transformer(nn.Module):
 
 		if norm_rewards:
 			self.rblocks = nn.Sequential(
-				init_(nn.Linear(self.comp_emb, 64), activate=True),
+				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 				nn.GELU(),
-				init_(nn.Linear(64, 64), activate=True),
+				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 				nn.GELU(),
-				init_(PopArt(64, 1, device=self.device))
+				init_(PopArt(self.comp_emb, 1, device=self.device))
 				)
 		else:
 			self.rblocks = nn.Sequential(
-				init_(nn.Linear(self.comp_emb, 64), activate=True),
+				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 				nn.GELU(),
-				init_(nn.Linear(64, 64), activate=True),
+				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 				nn.GELU(),
-				init_(nn.Linear(64, 1))
+				init_(nn.Linear(self.comp_emb, 1))
 				)
 					   
 		self.do = nn.Dropout(dropout)
