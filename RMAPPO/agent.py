@@ -623,8 +623,10 @@ class PPOAgent:
 
 		self.buffer.calculate_targets(self.Q_PopArt)
 
+		if self.norm_returns_q:
+			train_normalizer = True
 		
-		for _ in range(self.n_epochs):
+		for ppo_epoch in range(self.n_epochs):
 
 			# SAMPLE DATA FROM BUFFER
 			states_critic, hidden_state_q, states_actor, hidden_state_actor, logprobs_old, \
@@ -654,8 +656,11 @@ class PPOAgent:
 
 			if self.norm_returns_q:
 				targets_shape = target_q_values.shape
-				target_q_values = (self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
-			
+				target_q_values = (self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1), train=train_normalizer).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
+				
+				if ppo_epoch>0:
+					train_normalizer = False
+
 			dists, _ = self.policy_network(
 					states_actor.to(self.device),
 					hidden_state_actor.to(self.device),
