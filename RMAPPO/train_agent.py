@@ -424,7 +424,7 @@ if __name__ == '__main__':
 				# CRITIC
 				"rnn_num_layers_q": 1,
 				"rnn_hidden_q": 64,
-				"q_value_lr": 5e-4, #1e-3
+				"q_value_lr": 1e-4, #1e-3
 				"temperature_q": 1.0,
 				"q_weight_decay": 0.0,
 				"enable_grad_clip_critic_q": True,
