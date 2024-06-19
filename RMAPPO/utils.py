@@ -338,7 +338,7 @@ class RolloutBuffer:
 			
 		# 	target_q_values = self.q_value_norm.normalize(target_q_values.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
-		self.target_q_values = target_q_values.cpu()
+		self.target_q_values = target_q_values.detach().cpu()
 
 
 	def gae_targets(self, rewards, values, next_value, masks, next_mask):
