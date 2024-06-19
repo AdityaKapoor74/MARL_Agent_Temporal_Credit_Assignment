@@ -314,7 +314,7 @@ class Q_network(nn.Module):
 
 		# Embedding Networks
 		self.mlp_layer = nn.Sequential(
-			nn.LayerNorm(obs_input_dim)
+			nn.LayerNorm(obs_input_dim),
 			init_(nn.Linear(obs_input_dim, comp_emb_shape, bias=True), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
@@ -329,7 +329,7 @@ class Q_network(nn.Module):
 				nn.init.orthogonal_(param)
 
 		self.q_value_layer = nn.Sequential(
-			init_(Linear(comp_emb_shape, 1), activate=False)
+			init_(nn.Linear(comp_emb_shape, 1), activate=False)
 			)
 		
 

@@ -107,7 +107,7 @@ class PPOAgent:
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_q,
-			# value_norm=self.norm_returns_q,
+			comp_emb_shape=self.rnn_hidden_q,
 			device=self.device, 
 			).to(self.device)
 		self.target_critic_network_q = Q_network(
