@@ -654,7 +654,7 @@ class PPOAgent:
 
 			if self.norm_returns_q:
 				targets_shape = target_q_values.shape
-				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+				target_q_values = (self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
 			
 			dists, _ = self.policy_network(
 					states_actor.to(self.device),
