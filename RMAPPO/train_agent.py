@@ -132,8 +132,8 @@ class MAPPO:
 			last_one_hot_actions = np.zeros((self.num_agents, self.num_actions))
 			states_actor = np.array(local_state)
 			states_actor = np.concatenate((self.agent_ids, local_state, last_one_hot_actions), axis=-1)
-			ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
-			enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
+			# ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
+			# enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
 			# reward_model_obs = np.concatenate((self.agent_ids, np.array(local_state)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
 			reward_ally_states = info["ally_states"]
 			reward_enemy_states = info["enemy_states"]
@@ -184,8 +184,8 @@ class MAPPO:
 				next_states_actor = np.array(next_local_states)
 				last_one_hot_actions = one_hot_actions
 				next_states_actor = np.concatenate((self.agent_ids, next_states_actor, last_one_hot_actions), axis=-1)
-				ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
-				enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
+				# ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
+				# enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
 				# next_reward_model_obs = np.concatenate((self.agent_ids, np.array(next_local_states)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
 				next_reward_ally_states = info["ally_states"]
 				next_reward_enemy_states = info["enemy_states"]
@@ -352,8 +352,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "IPPO_temporal_team"
+		experiment_type = "ATRR_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "IPPO_ATRR_temporal_attn_weights"
 		algorithm_type = "IPPO" # IPPO, MAPPO, IAC, MAAC
 
 		dictionary = {
@@ -397,7 +397,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
