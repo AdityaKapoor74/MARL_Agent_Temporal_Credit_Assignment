@@ -266,7 +266,7 @@ class Policy(nn.Module):
 		self.Layer_1 = nn.Sequential(
 			init_(nn.Linear(obs_input_dim, comp_emb_shape), activate=True),
 			nn.Tanh(),
-			nn.LayerNorm(obs_input_dim),
+			nn.LayerNorm(comp_emb_shape),
 			)
 		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=rnn_num_layers, batch_first=True)
 		self.Layer_2 = nn.Sequential(
