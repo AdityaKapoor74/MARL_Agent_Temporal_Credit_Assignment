@@ -270,7 +270,7 @@ class Policy(nn.Module):
 			)
 		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=rnn_num_layers, batch_first=True)
 		self.Layer_2 = nn.Sequential(
-			# nn.LayerNorm(comp_emb_shape),
+			nn.LayerNorm(comp_emb_shape),
 			init_(nn.Linear(comp_emb_shape, num_actions), gain=0.01)
 			)
 
@@ -330,7 +330,7 @@ class Q_network(nn.Module):
 				nn.init.orthogonal_(param)
 
 		self.q_value_layer = nn.Sequential(
-			# nn.LayerNorm(comp_emb_shape),
+			nn.LayerNorm(comp_emb_shape),
 			init_(nn.Linear(comp_emb_shape, 1), activate=False)
 			)
 		
