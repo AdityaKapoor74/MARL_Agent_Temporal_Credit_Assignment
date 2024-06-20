@@ -264,13 +264,14 @@ class Policy(nn.Module):
 			)
 		
 		self.Layer_1 = nn.Sequential(
+			nn.LayerNorm(obs_input_dim),
 			init_(nn.Linear(obs_input_dim, comp_emb_shape), activate=True),
 			nn.Tanh(),
-			nn.LayerNorm(comp_emb_shape),
+			# nn.LayerNorm(comp_emb_shape),
 			)
 		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=rnn_num_layers, batch_first=True)
 		self.Layer_2 = nn.Sequential(
-			nn.LayerNorm(comp_emb_shape),
+			# nn.LayerNorm(comp_emb_shape),
 			init_(nn.Linear(comp_emb_shape, num_actions), gain=0.01)
 			)
 
@@ -315,12 +316,13 @@ class Q_network(nn.Module):
 
 		# Embedding Networks
 		self.mlp_layer = nn.Sequential(
-			init_(nn.Linear(obs_input_dim, 64, bias=True), activate=True),
+			nn.LayerNorm(obs_input_dim),
+			init_(nn.Linear(obs_input_dim, comp_emb_shape, bias=True), activate=True),
 			nn.Tanh(),
-			nn.LayerNorm(64),
-			init_(nn.Linear(64, 64, bias=True), activate=True),
+			# nn.LayerNorm(comp_emb_shape),
+			init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
 			nn.Tanh(),
-			nn.LayerNorm(64),
+			# nn.LayerNorm(comp_emb_shape),
 			)
 
 		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=self.rnn_num_layers, batch_first=True)
@@ -331,7 +333,7 @@ class Q_network(nn.Module):
 				nn.init.orthogonal_(param)
 
 		self.q_value_layer = nn.Sequential(
-			nn.LayerNorm(comp_emb_shape),
+			# nn.LayerNorm(comp_emb_shape),
 			init_(nn.Linear(comp_emb_shape, 1), activate=False)
 			)
 		
