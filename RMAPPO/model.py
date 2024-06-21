@@ -266,8 +266,10 @@ class Policy(nn.Module):
 		self.Layer_1 = nn.Sequential(
 			nn.LayerNorm(obs_input_dim),
 			init_(nn.Linear(obs_input_dim, comp_emb_shape), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			# nn.LayerNorm(comp_emb_shape),
+			init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
+			nn.GELU(),
 			)
 		self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=rnn_num_layers, batch_first=True)
 		self.Layer_2 = nn.Sequential(
@@ -318,10 +320,10 @@ class Q_network(nn.Module):
 		self.mlp_layer = nn.Sequential(
 			nn.LayerNorm(obs_input_dim),
 			init_(nn.Linear(obs_input_dim, comp_emb_shape, bias=True), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			# nn.LayerNorm(comp_emb_shape),
 			init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
-			nn.Tanh(),
+			nn.GELU(),
 			# nn.LayerNorm(comp_emb_shape),
 			)
 
