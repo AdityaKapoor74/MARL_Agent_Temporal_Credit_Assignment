@@ -126,7 +126,7 @@ class PPOAgent:
 			param.requires_grad_(False)
 
 		if self.norm_returns_q:
-			self.Q_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
+			self.Q_PopArt = self.critic_network_q.q_value_layer[-1] # PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
 		else:
 			self.Q_PopArt = None
 
