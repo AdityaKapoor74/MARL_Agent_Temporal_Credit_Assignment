@@ -132,17 +132,16 @@ class RewardReplayMemory:
 class RolloutBuffer:
 	def __init__(
 		self, 
+		centralized_critic,
 		num_episodes, 
 		max_time_steps, 
 		num_agents, 
 		num_enemies,
-		obs_shape_critic, 
-		obs_shape_actor, 
+		local_obs_shape,
 		rnn_num_layers_actor,
 		actor_hidden_state,
 		rnn_num_layers_q,
 		q_hidden_state,
-		# obs_shape_reward_model,
 		ally_obs_shape,
 		enemy_obs_shape,
 		num_actions, 
@@ -153,19 +152,17 @@ class RolloutBuffer:
 		gae_lambda,
 		n_steps,
 		gamma,
-		# Q_PopArt,
 		):
+		self.centralized_critic = centralized_critic
 		self.num_episodes = num_episodes
 		self.max_time_steps = max_time_steps
 		self.num_agents = num_agents
 		self.num_enemies = num_enemies
-		self.obs_shape_critic = obs_shape_critic
-		self.obs_shape_actor = obs_shape_actor
+		self.local_obs_shape = local_obs_shape
 		self.rnn_num_layers_actor = rnn_num_layers_actor
 		self.actor_hidden_state = actor_hidden_state
 		self.rnn_num_layers_q = rnn_num_layers_q
 		self.q_hidden_state = q_hidden_state
-		# self.obs_shape_reward_model = obs_shape_reward_model
 		self.ally_obs_shape = ally_obs_shape
 		self.enemy_obs_shape = enemy_obs_shape
 		self.num_actions = num_actions
@@ -178,24 +175,24 @@ class RolloutBuffer:
 		self.gae_lambda = gae_lambda
 		self.gamma = gamma
 		self.n_steps = n_steps
-			
-		# if self.norm_returns_q:
-		# 	self.q_value_norm = Q_PopArt
 
 		self.episode_num = 0
 		self.time_step = 0
 
-		self.states_critic = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_critic))
-		self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, num_agents, q_hidden_state))
-		self.Q_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
-		self.states_actor = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_actor))
+		if self.centralized_critic:
+			self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, 1, q_hidden_state))
+			self.Q_values = np.zeros((num_episodes, max_time_steps+1, 1))
+		else:
+			self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, num_agents, q_hidden_state))
+			self.Q_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
+
+		self.local_observations = np.zeros((num_episodes, max_time_steps, num_agents, local_obs_shape))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
-		# self.reward_model_obs = np.zeros((num_episodes, max_time_steps, num_agents, obs_shape_reward_model))
 		self.ally_obs = np.zeros((num_episodes, max_time_steps, num_agents, ally_obs_shape))
 		self.enemy_obs = np.zeros((num_episodes, max_time_steps, num_enemies, enemy_obs_shape))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
-		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
+		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.action_masks = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
 		self.rewards = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.agent_dones = np.ones((num_episodes, max_time_steps+1, num_agents))
@@ -206,17 +203,20 @@ class RolloutBuffer:
 
 	def clear(self):
 
-		self.states_critic = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_critic))
-		self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state))
-		self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
-		self.states_actor = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_actor))
+		if self.centralized_critic:
+			self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, 1, self.q_hidden_state))
+			self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, 1))
+		else:
+			self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state))
+			self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
+		
+		self.local_observations = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.local_obs_shape))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
-		# self.reward_model_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.obs_shape_reward_model))
 		self.ally_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.ally_obs_shape))
 		self.enemy_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_enemies, self.enemy_obs_shape))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
-		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
+		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.action_masks = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
 		self.rewards = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.agent_dones = np.ones((self.num_episodes, self.max_time_steps+1, self.num_agents))
@@ -230,16 +230,14 @@ class RolloutBuffer:
 
 	def push(
 		self, 
-		state_critic, 
 		q_value,
 		hidden_state_q,
-		state_actor, 
+		local_obs, 
 		hidden_state_actor, 
-		logprobs, 
-		actions,  
-		one_hot_actions, 
+		logprobs,
+		actions,
+		one_hot_actions,  
 		action_masks, 
-		# reward_model_obs,
 		ally_obs,
 		enemy_obs,
 		rewards, 
@@ -247,16 +245,14 @@ class RolloutBuffer:
 		team_dones,
 		):
 
-		self.states_critic[self.episode_num][self.time_step] = state_critic
 		self.hidden_state_q[self.episode_num][self.time_step] = hidden_state_q
 		self.Q_values[self.episode_num][self.time_step] = q_value
-		self.states_actor[self.episode_num][self.time_step] = state_actor
+		self.local_observations[self.episode_num][self.time_step] = local_obs
 		self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor
 		self.logprobs[self.episode_num][self.time_step] = logprobs
-		self.actions[self.episode_num][self.time_step] = actions
 		self.one_hot_actions[self.episode_num][self.time_step] = one_hot_actions
+		self.actions[self.episode_num][self.time_step] = actions
 		self.action_masks[self.episode_num][self.time_step] = action_masks
-		# self.reward_model_obs[self.episode_num][self.time_step] = reward_model_obs
 		self.ally_obs[self.episode_num][self.time_step] = ally_obs
 		self.enemy_obs[self.episode_num][self.time_step] = enemy_obs
 		self.rewards[self.episode_num][self.time_step] = rewards
@@ -289,24 +285,32 @@ class RolloutBuffer:
 		rand_batch = np.random.permutation(self.num_episodes)
 		rand_time = np.random.permutation(data_chunks)
 
-		states_critic = torch.from_numpy(self.states_critic).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.obs_shape_critic)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.obs_shape_critic)
-		hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
-		states_actor = torch.from_numpy(self.states_actor).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.obs_shape_actor)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.obs_shape_actor).reshape(-1, self.data_chunk_length, self.num_agents, self.obs_shape_actor)
+		if self.centralized_critic:
+			hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, 1, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
+			q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
+			target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
+			advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
+		else:
+			hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
+			q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+			target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+			advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+
+		local_obs = torch.from_numpy(self.local_observations).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.local_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape)
+		ally_obs = torch.from_numpy(self.ally_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.ally_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.ally_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.ally_obs_shape)
+		enemy_obs = torch.from_numpy(self.enemy_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_enemies, self.enemy_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_enemies, self.enemy_obs_shape).reshape(-1, self.data_chunk_length, self.num_enemies, self.enemy_obs_shape)
 		hidden_state_actor = torch.from_numpy(self.hidden_state_actor).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_actor, -1, self.actor_hidden_state)
 		logprobs = torch.from_numpy(self.logprobs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		one_hot_actions = torch.from_numpy(self.one_hot_actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
+		first_last_actions = np.zeros((self.num_episodes, 1, self.num_agents), dtype=int) + self.num_actions
+		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		actions = torch.from_numpy(self.actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		one_hot_actions = torch.from_numpy(self.one_hot_actions).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		action_masks = torch.from_numpy(self.action_masks).bool().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		team_masks = 1-torch.from_numpy(self.team_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length)
 		agent_masks = 1-torch.from_numpy(self.agent_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		
-		# target_values, target_q_values, advantage = self.calculate_targets(advantage_type, episode, select_above_threshold)
-		q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		
-		return states_critic, hidden_state_q, states_actor, hidden_state_actor, logprobs, \
-		actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values, target_q_values, advantage
+		return local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs, \
+		last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values, target_q_values, advantage
 
 	def calculate_targets(self, q_value_norm):
 		
@@ -332,18 +336,10 @@ class RolloutBuffer:
 
 		self.advantage = (target_q_values - q_values).detach()
 
-		# if self.norm_returns_q:
-		# 	targets_shape = target_q_values.shape
-		# 	q_value_norm.update(target_q_values.view(-1), agent_masks.view(-1))
-			
-		# 	target_q_values = self.q_value_norm.normalize(target_q_values.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
-
 		self.target_q_values = target_q_values.detach().cpu()
 
 
 	def gae_targets(self, rewards, values, next_value, masks, next_mask):
-		
-		# advantages = rewards.new_zeros(*rewards.shape)
 		target_values = rewards.new_zeros(*rewards.shape)
 		advantage = 0
 
@@ -356,12 +352,6 @@ class RolloutBuffer:
 			
 			next_value = values.data[:, t, :]
 			next_mask = masks[:, t, :]
-
-			# advantages[:,t,:] = advantage
-
-		# target_values_ = advantages + values
-
-		# print(torch.sum(target_values - target_values_))
 
 		return target_values*masks
 

@@ -49,6 +49,11 @@ class MAPPO:
 		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
 
+		if self.algorithm_type in ["MAPPO", "MAAC"]:
+			self.centralized = True
+		else:
+			self.centralized = False
+
 		self.agent_ids = []
 		for i in range(self.num_agents):
 			agent_id = np.array([0 for i in range(self.num_agents)])
@@ -127,14 +132,9 @@ class MAPPO:
 
 		for episode in range(1,self.max_episodes+1):
 
-			local_state, info = self.env.reset(return_info=True)
+			local_states, info = self.env.reset(return_info=True)
 			mask_actions = np.array(info["avail_actions"], dtype=int)
-			last_one_hot_actions = np.zeros((self.num_agents, self.num_actions))
-			states_actor = np.array(local_state)
-			states_actor = np.concatenate((self.agent_ids, local_state, last_one_hot_actions), axis=-1)
-			# ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
-			# enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
-			# reward_model_obs = np.concatenate((self.agent_ids, np.array(local_state)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
+			last_actions = np.zeros((self.num_agents)) + self.num_actions
 			reward_ally_states = info["ally_states"]
 			reward_enemy_states = info["enemy_states"]
 			indiv_dones = [0]*self.num_agents
@@ -151,7 +151,10 @@ class MAPPO:
 			episode_indiv_rewards = [0 for i in range(self.num_agents)]
 			final_timestep = self.max_time_steps
 
-			rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, self.num_agents, self.rnn_hidden_q))
+			if self.centralized:
+				rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, 1, self.rnn_hidden_q))
+			else:
+				rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, self.num_agents, self.rnn_hidden_q))
 			rnn_hidden_state_actor = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
 			for step in range(1, self.max_time_steps+1):
@@ -162,31 +165,18 @@ class MAPPO:
 					self.env.render()
 					# Advance a step and render a new image
 					with torch.no_grad():
-						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, mask_actions, rnn_hidden_state_actor, greedy=False)
+						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_states, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
 				else:
-					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, mask_actions, rnn_hidden_state_actor)
+					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_states, last_actions, mask_actions, rnn_hidden_state_actor)
 
 				one_hot_actions = np.zeros((self.num_agents, self.num_actions))
 				for i, act in enumerate(actions):
 					one_hot_actions[i][act] = 1
 
 				
-				if self.algorithm_type in ["IPPO", "IAC"]:
-					states_critic = np.concatenate((self.agent_ids, local_state, one_hot_actions), axis=-1)
-				else:
-					ally_state = np.array([np.roll(np.concatenate((self.agent_ids, info["ally_states"], one_hot_actions), axis=-1), shift=-i, axis=0).reshape(-1) for i in range(self.num_agents)])
-					enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
-					states_critic = np.concatenate((ally_state, enemy_states), axis=-1)
-
-				q_value, next_rnn_hidden_state_q = self.agents.get_q_values(states_critic, rnn_hidden_state_q, indiv_dones)
+				q_value, next_rnn_hidden_state_q = self.agents.get_q_values(local_states, info["ally_states"], info["enemy_states"], actions, rnn_hidden_state_q)
 
 				next_local_states, rewards, next_dones, info = self.env.step(actions)
-				next_states_actor = np.array(next_local_states)
-				last_one_hot_actions = one_hot_actions
-				next_states_actor = np.concatenate((self.agent_ids, next_states_actor, last_one_hot_actions), axis=-1)
-				# ally_states = np.concatenate((self.agent_ids, info["ally_states"]), axis=-1)
-				# enemy_states = np.repeat(np.expand_dims(np.concatenate((self.enemy_ids, info["enemy_states"]), axis=-1).reshape(-1), axis=0), repeats=self.num_agents, axis=0)
-				# next_reward_model_obs = np.concatenate((self.agent_ids, np.array(next_local_states)), axis=-1) # np.concatenate((ally_states, enemy_states), axis=-1)	
 				next_reward_ally_states = info["ally_states"]
 				next_reward_enemy_states = info["enemy_states"]
 				next_mask_actions = np.array(info["avail_actions"], dtype=int)
@@ -204,8 +194,8 @@ class MAPPO:
 
 				if self.learn:
 					self.agents.buffer.push(
-						states_critic, q_value, rnn_hidden_state_q, \
-						states_actor, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+						q_value, rnn_hidden_state_q, \
+						local_states, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
 						reward_ally_states, reward_enemy_states, rewards_to_send, indiv_dones, dones,
 						)
 
@@ -218,7 +208,7 @@ class MAPPO:
 				episode_indiv_rewards = [r+info["indiv_rewards"][i] for i, r in enumerate(episode_indiv_rewards)]
 				action_frequency += np.sum(one_hot_actions, axis=0)
 
-				states_actor, reward_ally_states, reward_enemy_states, mask_actions, indiv_dones, dones = next_states_actor, next_reward_ally_states, next_reward_enemy_states, next_mask_actions, next_indiv_dones, next_dones
+				local_states, last_actions, reward_ally_states, reward_enemy_states, mask_actions, indiv_dones, dones = next_local_states, actions, next_reward_ally_states, next_reward_enemy_states, next_mask_actions, next_indiv_dones, next_dones
 				rnn_hidden_state_q, rnn_hidden_state_actor = next_rnn_hidden_state_q, next_rnn_hidden_state_actor
 
 				if all(indiv_dones) or step == self.max_time_steps:
@@ -242,13 +232,9 @@ class MAPPO:
 
 					if self.learn:
 						# add final time to buffer
-						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(states_actor, mask_actions, rnn_hidden_state_actor)
-					
-						one_hot_actions = np.zeros((self.num_agents,self.num_actions))
-						for i,act in enumerate(actions):
-							one_hot_actions[i][act] = 1
+						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_states, last_actions, mask_actions, rnn_hidden_state_actor)
 
-						q_value, _ = self.agents.get_q_values(states_critic, rnn_hidden_state_q, indiv_dones)
+						q_value, _ = self.agents.get_q_values(local_states, info["ally_states"], info["enemy_states"], actions, rnn_hidden_state_q)
 
 						self.agents.buffer.end_episode(final_timestep, q_value, indiv_dones, dones)
 
@@ -422,6 +408,7 @@ if __name__ == '__main__':
 				"algorithm_type": algorithm_type,
 
 				# CRITIC
+				"use_recurrent_critic": True,
 				"rnn_num_layers_q": 1,
 				"rnn_hidden_q": 64,
 				"q_value_lr": 5e-4, #1e-3
@@ -440,6 +427,7 @@ if __name__ == '__main__':
 				
 
 				# ACTOR
+				"use_recurrent_policy": True,
 				"data_chunk_length": 10,
 				"rnn_num_layers_actor": 1,
 				"rnn_hidden_actor": 64,
@@ -459,9 +447,7 @@ if __name__ == '__main__':
 		torch.manual_seed(seeds[dictionary["iteration"]-1])
 		env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
 		obs, info = env.reset(return_info=True)
-		dictionary["global_observation"] = (info["ally_states"][0].shape[0]+env.n_agents+env.action_space[0].n)*env.n_agents + (info["enemy_states"][0].shape[0]+env.n_enemies)*env.n_enemies
-		dictionary["local_observation"] = obs[0].shape[0]+env.n_agents+env.action_space[0].n
-		# dictionary["reward_model_obs_shape"] = obs[0].shape[0]+env.n_agents # env.n_agents+info["ally_states"].shape[1]+env.n_enemies*(info["enemy_states"].shape[1]+env.n_enemies)
+		dictionary["local_observation_shape"] = obs[0].shape[0]
 		dictionary["ally_obs_shape"] = info["ally_states"].shape[1]
 		dictionary["enemy_obs_shape"] = info["enemy_states"].shape[1]
 		ma_controller = MAPPO(env,dictionary)

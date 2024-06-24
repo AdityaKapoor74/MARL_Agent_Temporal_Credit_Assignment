@@ -63,10 +63,6 @@ class PPOAgent:
 		self.temperature_q = dictionary["temperature_q"]
 		self.rnn_num_layers_q = dictionary["rnn_num_layers_q"]
 		self.rnn_hidden_q = dictionary["rnn_hidden_q"]
-		if self.algorithm_type in ["IPPO", "IAC"]:
-			self.critic_observation_shape = dictionary["local_observation"]
-		else:
-			self.critic_observation_shape = dictionary["global_observation"]
 		self.q_value_lr = dictionary["q_value_lr"]
 		self.q_weight_decay = dictionary["q_weight_decay"]
 		self.target_calc_style = dictionary["target_calc_style"]
@@ -85,7 +81,6 @@ class PPOAgent:
 		self.data_chunk_length = dictionary["data_chunk_length"]
 		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
-		self.actor_observation_shape = dictionary["local_observation"]
 		self.policy_lr = dictionary["policy_lr"]
 		self.policy_weight_decay = dictionary["policy_weight_decay"]
 		self.gamma = dictionary["gamma"]
@@ -101,8 +96,18 @@ class PPOAgent:
 		print("EXPERIMENT TYPE", self.experiment_type)
 
 		# Q Network
+		if self.algorithm_type in ["MAPPO", "MAAC"]:
+			centralized = True
+		else:
+			centralized = False
+
+
 		self.critic_network_q = Q_network(
-			obs_input_dim=self.critic_observation_shape, 
+			use_recurrent_critic=dictionary["use_recurrent_critic"],
+			centralized=centralized,
+			local_observation_input_dim=dictionary["local_observation_shape"], 
+			ally_obs_input_dim=dictionary["ally_obs_shape"],
+			enemy_obs_input_dim=dictionary["enemy_obs_shape"],
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
@@ -111,7 +116,11 @@ class PPOAgent:
 			device=self.device, 
 			).to(self.device)
 		self.target_critic_network_q = Q_network(
-			obs_input_dim=self.critic_observation_shape, 
+			use_recurrent_critic=dictionary["use_recurrent_critic"],
+			centralized=centralized,
+			local_observation_input_dim=dictionary["local_observation_shape"], 
+			ally_obs_input_dim=dictionary["ally_obs_shape"],
+			enemy_obs_input_dim=dictionary["enemy_obs_shape"],
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies,
 			num_actions=self.num_actions, 
@@ -126,17 +135,18 @@ class PPOAgent:
 			param.requires_grad_(False)
 
 		if self.norm_returns_q:
-			self.Q_PopArt = self.critic_network_q.q_value_layer[-1] # PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
+			self.Q_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
 		else:
 			self.Q_PopArt = None
 
 		# Policy Network
 		self.policy_network = Policy(
-			obs_input_dim=self.actor_observation_shape, 
+			use_recurrent_policy=dictionary["use_recurrent_policy"],
+			obs_input_dim=dictionary["local_observation_shape"], 
 			num_agents=self.num_agents, 
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_actor,
-			comp_emb_shape=self.rnn_hidden_actor,
+			rnn_hidden_actor=self.rnn_hidden_actor,
 			device=self.device
 			).to(self.device)
 		
@@ -147,17 +157,16 @@ class PPOAgent:
 
 
 		self.buffer = RolloutBuffer(
+			centralized_critic=centralized,
 			num_episodes=self.update_ppo_agent, 
 			max_time_steps=self.max_time_steps, 
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies,
-			obs_shape_critic=self.critic_observation_shape, 
-			obs_shape_actor=self.actor_observation_shape, 
+			local_obs_shape=dictionary["local_observation_shape"], 
 			rnn_num_layers_actor=self.rnn_num_layers_actor,
 			actor_hidden_state=self.rnn_hidden_actor,
 			rnn_num_layers_q=self.rnn_num_layers_q,
 			q_hidden_state=self.rnn_hidden_q,
-			# obs_shape_reward_model=self.reward_model_obs_shape,
 			ally_obs_shape=self.ally_obs_shape,
 			enemy_obs_shape=self.enemy_obs_shape,
 			num_actions=self.num_actions,
@@ -168,7 +177,6 @@ class PPOAgent:
 			gae_lambda=self.gae_lambda,
 			n_steps=self.n_steps,
 			gamma=self.gamma,
-			# Q_PopArt=self.critic_network_q.q_value_layer[-1],
 			)
 
 		# Loading models
@@ -198,7 +206,6 @@ class PPOAgent:
 				max_episode_len = self.max_time_steps,
 				num_agents = self.num_agents,
 				num_enemies=self.num_enemies,
-				# reward_model_obs_shape = dictionary["reward_model_obs_shape"],
 				ally_obs_shape=self.ally_obs_shape,
 				enemy_obs_shape=self.enemy_obs_shape,
 				action_shape = self.num_actions,
@@ -275,23 +282,25 @@ class PPOAgent:
 			)
 
 	
-	def get_q_values(self, state_critic, rnn_hidden_state_q, indiv_dones):
+	def get_q_values(self, local_states, ally_states, enemy_states, actions, rnn_hidden_state_q):
 		with torch.no_grad():
-			indiv_masks = [1-d for d in indiv_dones]
-			indiv_masks = torch.FloatTensor(indiv_masks).unsqueeze(0).unsqueeze(0)
-			state_critic = torch.FloatTensor(state_critic).unsqueeze(0).unsqueeze(0)
+			local_states = torch.FloatTensor(local_states).unsqueeze(0).unsqueeze(0)
+			ally_states = torch.FloatTensor(ally_states).unsqueeze(0).unsqueeze(0)
+			enemy_states = torch.FloatTensor(enemy_states).unsqueeze(0).unsqueeze(0)
+			actions = torch.LongTensor(actions).unsqueeze(0).unsqueeze(0)
 			rnn_hidden_state_q = torch.FloatTensor(rnn_hidden_state_q)
-			Q_value, rnn_hidden_state_q = self.target_critic_network_q(state_critic.to(self.device), rnn_hidden_state_q.to(self.device), indiv_masks.to(self.device))
+			Q_value, rnn_hidden_state_q = self.target_critic_network_q(local_states.to(self.device), ally_states.to(self.device), enemy_states.to(self.device), actions.to(self.device), rnn_hidden_state_q.to(self.device))
 
 			return Q_value.squeeze(0).cpu().numpy(), rnn_hidden_state_q.cpu().numpy()
 
 	
-	def get_action(self, state_actor, mask_actions, hidden_state, greedy=False):
+	def get_action(self, state_actor, last_actions, mask_actions, hidden_state, greedy=False):
 		with torch.no_grad():
 			state_actor = torch.FloatTensor(state_actor).unsqueeze(0).unsqueeze(1).to(self.device)
+			last_actions = torch.LongTensor(last_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			hidden_state = torch.FloatTensor(hidden_state).to(self.device)
-			dists, hidden_state = self.policy_network(state_actor, hidden_state, mask_actions)
+			dists, hidden_state = self.policy_network(state_actor, last_actions, hidden_state, mask_actions)
 
 			if greedy:
 				actions = [dist.argmax().detach().cpu().item() for dist in dists.squeeze(0).squeeze(0)]
@@ -494,8 +503,7 @@ class PPOAgent:
 
 		
 			return rewards.cpu()
-
-		
+			
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
@@ -623,15 +631,12 @@ class PPOAgent:
 		grad_norm_policy_batch = 0
 
 		self.buffer.calculate_targets(self.Q_PopArt)
-
-		# if self.norm_returns_q:
-		# 	train_normalizer = True
 		
 		for ppo_epoch in range(self.n_epochs):
 
 			# SAMPLE DATA FROM BUFFER
-			states_critic, hidden_state_q, states_actor, hidden_state_actor, logprobs_old, \
-			actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
+			local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs_old, \
+			last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
 
 			if self.norm_adv:
 				shape = advantage.shape
@@ -645,9 +650,11 @@ class PPOAgent:
 
 			target_shape = q_values_old.shape
 			q_values, _ = self.critic_network_q(
-							states_critic.to(self.device),
+							local_obs.to(self.device),
+							ally_obs.to(self.device),
+							enemy_obs.to(self.device),
+							actions.to(self.device),
 							hidden_state_q.to(self.device),
-							agent_masks.to(self.device),
 							)
 			q_values = q_values.reshape(*target_shape)
 
@@ -658,12 +665,10 @@ class PPOAgent:
 			if self.norm_returns_q:
 				targets_shape = target_q_values.shape
 				target_q_values = (self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
-				
-				# if ppo_epoch>0:
-				# 	train_normalizer = False
 
 			dists, _ = self.policy_network(
-					states_actor.to(self.device),
+					local_obs.to(self.device),
+					last_actions.to(self.device),
 					hidden_state_actor.to(self.device),
 					action_masks.to(self.device),
 					)
