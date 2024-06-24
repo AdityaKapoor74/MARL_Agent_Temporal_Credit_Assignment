@@ -135,7 +135,7 @@ class PPOAgent:
 			param.requires_grad_(False)
 
 		if self.norm_returns_q:
-			self.Q_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
+			self.Q_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=torch.device('cpu'))
 		else:
 			self.Q_PopArt = None
 
@@ -664,7 +664,7 @@ class PPOAgent:
 
 			if self.norm_returns_q:
 				targets_shape = target_q_values.shape
-				target_q_values = (self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
+				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 			dists, _ = self.policy_network(
 					local_obs.to(self.device),
