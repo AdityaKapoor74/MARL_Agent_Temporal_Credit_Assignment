@@ -339,8 +339,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		env_name = "5m_vs_6m"
 		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "IPPO_temporal_team"
-		algorithm_type = "IPPO" # IPPO, MAPPO, IAC, MAAC
+		experiment_name = "MAPPO_temporal_team"
+		algorithm_type = "MAPPO" # IPPO, MAPPO, IAC, MAAC
 
 		dictionary = {
 				# TRAINING
