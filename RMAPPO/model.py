@@ -303,8 +303,8 @@ class Q_network(nn.Module):
 			batch, timesteps, _, _ = ally_states.shape
 			agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape)
 			enemy_embedding = self.enemy_embedding(torch.arange(self.num_enemies).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_enemies, self.comp_emb_shape)
-			ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2)
-			enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2)
+			ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2) / self.num_agents
+			enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2) / self.num_enemies
 
 			final_state_embedding = ally_state_embedding+enemy_state_embedding # self.state_action_embedding_layer_norm(ally_state_embedding+enemy_state_embedding)
 
