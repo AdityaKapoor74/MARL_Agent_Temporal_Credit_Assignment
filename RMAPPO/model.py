@@ -172,7 +172,7 @@ class Policy(nn.Module):
 				nn.GELU(),
 				)
 
-			# self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
+			self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
 			
 			self.RNN = nn.GRU(input_size=rnn_hidden_actor, hidden_size=rnn_hidden_actor, num_layers=rnn_num_layers, batch_first=True)
 			for name, param in self.RNN.named_parameters():
@@ -205,7 +205,7 @@ class Policy(nn.Module):
 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
 		last_action_embedding = self.action_embedding(last_actions.long())
 		obs_embedding = self.obs_embedding(local_observations)
-		final_obs_embedding = (obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+		final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # (obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) 
 
 		if self.use_recurrent_policy:
 			hidden_state = hidden_state.reshape(self.rnn_num_layers, batch*self.num_agents, -1)
@@ -263,12 +263,12 @@ class Q_network(nn.Module):
 				nn.GELU()
 				)
 
+			self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape*2)
+
 			self.intermediate_embedding = nn.Sequential(
 				init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
 				nn.GELU(),
 				)
-
-			# self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape)
 
 		else:
 			self.obs_embedding = nn.Sequential(
@@ -277,7 +277,7 @@ class Q_network(nn.Module):
 				nn.GELU()
 				)
 
-			# self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape)
+			self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape)
 				
 			self.intermediate_embedding = nn.Sequential(
 				init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
@@ -308,11 +308,11 @@ class Q_network(nn.Module):
 			batch, timesteps, _, _ = ally_states.shape
 			agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape)
 			enemy_embedding = self.enemy_embedding(torch.arange(self.num_enemies).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_enemies, self.comp_emb_shape)
-			ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2) / self.num_agents
-			enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2) / self.num_enemies
+			ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2) #/ self.num_agents
+			enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2) #/ self.num_enemies
 
 			# final_state_embedding = ally_state_embedding+enemy_state_embedding # self.state_action_embedding_layer_norm(ally_state_embedding+enemy_state_embedding)
-			final_state_embedding = torch.cat([ally_state_embedding, enemy_state_embedding], dim=-1)
+			final_state_embedding = self.state_action_embedding_layer_norm(torch.cat([ally_state_embedding, enemy_state_embedding], dim=-1))
 
 			final_state_embedding = self.intermediate_embedding(final_state_embedding)
 
