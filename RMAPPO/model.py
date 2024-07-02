@@ -282,6 +282,7 @@ class Q_network(nn.Module):
 				nn.GELU(),
 				init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
 				nn.GELU(),
+				nn.LayerNorm(comp_emb_shape)
 				)
 
 		else:
