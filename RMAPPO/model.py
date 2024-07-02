@@ -263,6 +263,11 @@ class Q_network(nn.Module):
 				nn.GELU()
 				)
 
+			self.intermediate_embedding = nn.Sequential(
+				init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
+				nn.GELU(),
+				)
+
 			# self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape)
 
 		else:
@@ -306,7 +311,10 @@ class Q_network(nn.Module):
 			ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2) / self.num_agents
 			enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2) / self.num_enemies
 
-			final_state_embedding = ally_state_embedding+enemy_state_embedding # self.state_action_embedding_layer_norm(ally_state_embedding+enemy_state_embedding)
+			# final_state_embedding = ally_state_embedding+enemy_state_embedding # self.state_action_embedding_layer_norm(ally_state_embedding+enemy_state_embedding)
+			final_state_embedding = torch.cat([ally_state_embedding, enemy_state_embedding], dim=-1)
+
+			final_state_embedding = self.intermediate_embedding(final_state_embedding)
 
 			if self.use_recurrent_critic:
 				final_state_embedding, h = self.RNN(final_state_embedding, rnn_hidden_state)
