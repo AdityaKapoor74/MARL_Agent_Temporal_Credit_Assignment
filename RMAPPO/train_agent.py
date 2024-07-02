@@ -415,7 +415,7 @@ if __name__ == '__main__':
 				"temperature_q": 1.0,
 				"q_weight_decay": 0.0,
 				"enable_grad_clip_critic_q": True,
-				"grad_clip_critic_q": 10.0,
+				"grad_clip_critic_q": 0.5,
 				"value_clip": 0.2,
 				"target_calc_style": "GAE", # GAE, TD_Lambda, N_steps
 				"td_lambda": 0.95, # 1 --> Monte Carlo; 0 --> TD(1)
@@ -432,7 +432,7 @@ if __name__ == '__main__':
 				"rnn_num_layers_actor": 1,
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
-				"grad_clip_actor": 10.0,
+				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
 				"policy_lr": 1e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
