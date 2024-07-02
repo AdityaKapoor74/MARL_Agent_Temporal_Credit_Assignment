@@ -165,14 +165,16 @@ class Policy(nn.Module):
 		self.agent_embedding = nn.Embedding(self.num_agents, self.rnn_hidden_actor)
 		self.action_embedding = nn.Embedding(self.num_actions+1, self.rnn_hidden_actor) # we assume the first "last action" to be NON-EXISTENT so one of the embedding represents that
 
+		self.one_hot_actions = torch.eye(self.num_actions+1).to(self.device)
+
 		if self.use_recurrent_policy:
 			
 			self.obs_embedding = nn.Sequential(
-				init_(nn.Linear(obs_input_dim, rnn_hidden_actor), activate=True),
+				init_(nn.Linear(obs_input_dim+self.num_actions+1, rnn_hidden_actor), activate=True),
 				nn.GELU(),
 				)
 
-			self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
+			# self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
 			
 			self.RNN = nn.GRU(input_size=rnn_hidden_actor, hidden_size=rnn_hidden_actor, num_layers=rnn_num_layers, batch_first=True)
 			for name, param in self.RNN.named_parameters():
@@ -192,7 +194,7 @@ class Policy(nn.Module):
 				nn.GELU(),
 				)
 
-			self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
+			# self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
 
 			self.final_layer = nn.Sequential(
 				init_(nn.Linear(rnn_hidden_actor, num_actions), gain=0.01)
@@ -202,10 +204,14 @@ class Policy(nn.Module):
 	def forward(self, local_observations, last_actions, hidden_state, mask_actions):
 
 		batch, timesteps, _, _ = local_observations.shape
-		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
-		last_action_embedding = self.action_embedding(last_actions.long())
-		obs_embedding = self.obs_embedding(local_observations)
-		final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # (obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) 
+		# agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
+		# last_action_embedding = self.action_embedding(last_actions.long())
+		# obs_embedding = self.obs_embedding(local_observations)
+		# final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # (obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) 
+
+		one_hot_actions = self.one_hot_actions[last_actions.long()]
+		final_obs_embedding = self.obs_embedding(torch.cat([local_observations, one_hot_actions], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+
 
 		if self.use_recurrent_policy:
 			hidden_state = hidden_state.reshape(self.rnn_num_layers, batch*self.num_agents, -1)
