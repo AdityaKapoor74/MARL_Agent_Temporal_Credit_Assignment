@@ -692,13 +692,12 @@ class PPOAgent:
 
 				# Finding the ratio (pi_theta / pi_theta__old)
 				ratios = torch.exp((logprobs - logprobs_old.to(self.device)))
-				
 				# Finding Surrogate Loss
-				surr1 = ratios * advantage.to(self.device) * masks.to(self.device)
-				surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.to(self.device) * masks.to(self.device)
+				surr1 = ratios * advantage.to(self.device) * agent_masks.to(self.device)
+				surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.to(self.device) * agent_masks.to(self.device)
 
 				# final loss of clipped objective PPO
-				policy_loss_ = (-torch.min(surr1, surr2).sum())/(masks.sum()+1e-5)
+				policy_loss_ = (-torch.min(surr1, surr2).sum())/(agent_masks.sum()+1e-5)
 
 			# calculate entropy
 			entropy = -torch.sum(torch.sum(dists*agent_masks.unsqueeze(-1).to(self.device) * torch.log(torch.clamp(dists*agent_masks.unsqueeze(-1).to(self.device), 1e-10,1.0)), dim=-1))/ (agent_masks.sum()+1e-5)
