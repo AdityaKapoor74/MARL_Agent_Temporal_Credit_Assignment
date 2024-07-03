@@ -638,19 +638,14 @@ class PPOAgent:
 			local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs_old, \
 			last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
 
-			if self.centralized:
-				masks = team_masks.unsqueeze(-1)
-			else:
-				masks = agent_masks
-
 			if self.norm_adv:
 				shape = advantage.shape
 				advantage_copy = copy.deepcopy(advantage)
-				advantage_copy[masks.view(*shape) == 0.0] = float('nan')
+				advantage_copy[agent_masks.view(*shape) == 0.0] = float('nan')
 				advantage_mean = torch.nanmean(advantage_copy)
 				advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 
-				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*masks.view(*shape)
+				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 
 
 			target_shape = q_values_old.shape
@@ -663,13 +658,13 @@ class PPOAgent:
 							)
 			q_values = q_values.reshape(*target_shape)
 
-			q_values_old *= masks
-			q_values *= masks.to(self.device)	
-			target_q_values *= masks
+			q_values_old *= agent_masks
+			q_values *= agent_masks.to(self.device)	
+			target_q_values *= agent_masks
 
 			if self.norm_returns_q:
 				targets_shape = target_q_values.shape
-				target_q_values = self.Q_PopArt(target_q_values.view(-1), masks.view(-1)).view(targets_shape) * masks.view(targets_shape)
+				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 			dists, _ = self.policy_network(
 					local_obs.to(self.device),
@@ -683,11 +678,11 @@ class PPOAgent:
 			
 			
 			if self.algorithm_type == "IAC" or self.algorithm_type == "MAAC":
-				critic_q_loss = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (masks.sum()+1e-5)
-				policy_loss_ = (logprobs * advantage.to(self.device) * masks.to(self.device)).sum()/(masks.sum()+1e-5)
+				critic_q_loss = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				policy_loss_ = (logprobs * advantage.to(self.device) * agent_masks.to(self.device)).sum()/(agent_masks.sum()+1e-5)
 			else:
-				critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (masks.sum()+1e-5)
-				critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (masks.sum()+1e-5)
+				critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
 				critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
 
 				# Finding the ratio (pi_theta / pi_theta__old)

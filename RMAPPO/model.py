@@ -335,13 +335,15 @@ class Q_network(nn.Module):
 			# final_state_embedding = self.intermediate_embedding(final_state_embedding)
 
 			one_hot_actions = self.one_hot_actions[actions.long()]
-			ally_observations = torch.cat([ally_states, one_hot_actions], dim=-1).reshape(batch, timesteps, -1)
-			enemy_observations = enemy_states.reshape(batch, timesteps, -1)
-			final_state_embedding = self.embedding(torch.cat([ally_observations, enemy_observations], dim=-1))
-
+			ally_observations = torch.cat([ally_states, one_hot_actions], dim=-1)
+			ally_observations = torch.stack([torch.roll(ally_observations, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
+			ally_observations = ally_observations.permute(1, 2, 0, 3, 4).reshape(batch, timesteps, self.num_agents, -1)
+			enemy_observations = enemy_states.reshape(batch, timesteps, -1).unsqueeze(2).repeat(1, 1, self.num_agents, 1)
+			final_state_embedding = self.embedding(torch.cat([ally_observations, enemy_observations], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
 
 			if self.use_recurrent_critic:
 				final_state_embedding, h = self.RNN(final_state_embedding, rnn_hidden_state)
+				final_state_embedding = final_state_embedding.reshape(batch, self.num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, self.num_agents, -1)
 
 			Q_value = self.q_value_layer(final_state_embedding)
 
