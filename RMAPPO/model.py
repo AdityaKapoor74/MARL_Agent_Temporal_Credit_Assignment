@@ -172,7 +172,7 @@ class Policy(nn.Module):
 			
 			self.obs_embedding = nn.Sequential(
 				init_(nn.Linear(self.num_agents+obs_input_dim+self.num_actions+1, rnn_hidden_actor), activate=True),
-				nn.GELU(),
+				nn.Tanh(),
 				nn.LayerNorm(rnn_hidden_actor)
 				)
 
@@ -281,10 +281,10 @@ class Q_network(nn.Module):
 
 			self.embedding = nn.Sequential(
 				init_(nn.Linear((self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies, comp_emb_shape*2, bias=True), activate=True),
-				nn.GELU(),
+				nn.Tanh(),
 				nn.LayerNorm(comp_emb_shape*2),
 				init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
-				nn.GELU(),
+				nn.Tanh(),
 				nn.LayerNorm(comp_emb_shape)
 				)
 
