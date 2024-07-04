@@ -340,7 +340,7 @@ class RolloutBuffer:
 			next_value = values.data[:, t, :]
 			next_mask = masks[:, t, :]
 
-		return target_values*masks
+		return target_values
 
 	
 	def build_td_lambda_targets(self, rewards, values, next_value, masks, next_mask):
