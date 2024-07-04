@@ -682,7 +682,9 @@ class PPOAgent:
 				policy_loss_ = (logprobs * advantage.to(self.device) * agent_masks.to(self.device)).sum()/(agent_masks.sum()+1e-5)
 			else:
 				critic_q_loss_1 = F.huber_loss(q_values, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
-				critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				# critic_q_loss_2 = F.huber_loss(torch.clamp(q_values, q_values_old.to(self.device)-self.value_clip, q_values_old.to(self.device)+self.value_clip), target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
+				q_values_clipped = (q_values_old.to(self.device) + (q_values - q_values_old.to(self.device)).clamp(-self.value_clip, self.value_clip)) * agent_masks.to(self.device)
+				critic_q_loss_2 = F.huber_loss(q_values_clipped, target_q_values.to(self.device), reduction="sum", delta=10.0) / (agent_masks.sum()+1e-5)
 				critic_q_loss = torch.max(critic_q_loss_1, critic_q_loss_2)
 
 				# Finding the ratio (pi_theta / pi_theta__old)
