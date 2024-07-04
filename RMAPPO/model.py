@@ -166,11 +166,12 @@ class Policy(nn.Module):
 		self.action_embedding = nn.Embedding(self.num_actions+1, self.rnn_hidden_actor) # we assume the first "last action" to be NON-EXISTENT so one of the embedding represents that
 
 		self.one_hot_actions = torch.eye(self.num_actions+1).to(self.device)
+		self.agent_ids = torch.eye(self.num_agents).to(self.device)
 
 		if self.use_recurrent_policy:
 			
 			self.obs_embedding = nn.Sequential(
-				init_(nn.Linear(obs_input_dim+self.num_actions+1, rnn_hidden_actor), activate=True),
+				init_(nn.Linear(self.num_agents+obs_input_dim+self.num_actions+1, rnn_hidden_actor), activate=True),
 				nn.GELU(),
 				nn.LayerNorm(rnn_hidden_actor)
 				)
@@ -211,7 +212,8 @@ class Policy(nn.Module):
 		# final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # (obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) 
 
 		one_hot_actions = self.one_hot_actions[last_actions.long()]
-		final_obs_embedding = self.obs_embedding(torch.cat([local_observations, one_hot_actions], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+		agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+		final_obs_embedding = self.obs_embedding(torch.cat([agent_ids, local_observations, one_hot_actions], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
 
 
 		if self.use_recurrent_policy:
@@ -278,7 +280,7 @@ class Q_network(nn.Module):
 			# 	)
 
 			self.embedding = nn.Sequential(
-				init_(nn.Linear((ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies, comp_emb_shape*2, bias=True), activate=True),
+				init_(nn.Linear((self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies, comp_emb_shape*2, bias=True), activate=True),
 				nn.GELU(),
 				nn.LayerNorm(comp_emb_shape*2),
 				init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
@@ -319,6 +321,7 @@ class Q_network(nn.Module):
 			)
 
 		self.one_hot_actions = torch.eye(self.num_actions).to(self.device)
+		self.agent_ids = torch.eye(self.num_agents).to(self.device)
 
 
 	def forward(self, local_observations, ally_states, enemy_states, actions, rnn_hidden_state):
@@ -335,7 +338,8 @@ class Q_network(nn.Module):
 			# final_state_embedding = self.intermediate_embedding(final_state_embedding)
 
 			one_hot_actions = self.one_hot_actions[actions.long()]
-			ally_observations = torch.cat([ally_states, one_hot_actions], dim=-1)
+			agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+			ally_observations = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
 			ally_observations = torch.stack([torch.roll(ally_observations, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
 			ally_observations = ally_observations.permute(1, 2, 0, 3, 4).reshape(batch, timesteps, self.num_agents, -1)
 			enemy_observations = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
