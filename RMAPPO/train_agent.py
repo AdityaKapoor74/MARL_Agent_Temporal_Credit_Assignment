@@ -408,7 +408,7 @@ if __name__ == '__main__':
 				"use_recurrent_critic": True,
 				"rnn_num_layers_q": 1,
 				"rnn_hidden_q": 64,
-				"q_value_lr": 1e-4, #1e-3
+				"q_value_lr": 5e-4, #1e-3
 				"temperature_q": 1.0,
 				"q_weight_decay": 0.0,
 				"enable_grad_clip_critic_q": True,
@@ -431,7 +431,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 10.0,
 				"policy_clip": 0.2,
-				"policy_lr": 1e-4, #prd 1e-4
+				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1e-2, #8e-3
 				"entropy_pen_final": 1e-2,
