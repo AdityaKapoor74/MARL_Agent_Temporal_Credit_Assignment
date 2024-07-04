@@ -134,7 +134,7 @@ def init(module, weight_init, bias_init, gain=1):
 
 def init_(m, gain=0.01, activate=False):
 	if activate:
-		gain = nn.init.calculate_gain('tanh')
+		gain = nn.init.calculate_gain('relu')
 	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
@@ -173,10 +173,10 @@ class Policy(nn.Module):
 			self.obs_embedding = nn.Sequential(
 				nn.LayerNorm(self.num_agents+obs_input_dim+self.num_actions+1),
 				init_(nn.Linear(self.num_agents+obs_input_dim+self.num_actions+1, rnn_hidden_actor), activate=True),
-				nn.Tanh(),
+				nn.GELU(),
 				nn.LayerNorm(rnn_hidden_actor),
 				init_(nn.Linear(rnn_hidden_actor, rnn_hidden_actor), activate=True),
-				nn.Tanh(),
+				nn.GELU(),
 				nn.LayerNorm(rnn_hidden_actor)
 				)
 
@@ -286,10 +286,10 @@ class Q_network(nn.Module):
 			self.embedding = nn.Sequential(
 				nn.LayerNorm((self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies),
 				init_(nn.Linear((self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies, comp_emb_shape, bias=True), activate=True),
-				nn.Tanh(),
+				nn.GELU(),
 				nn.LayerNorm(comp_emb_shape),
 				init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
-				nn.Tanh(),
+				nn.GELU(),
 				nn.LayerNorm(comp_emb_shape),
 				)
 
