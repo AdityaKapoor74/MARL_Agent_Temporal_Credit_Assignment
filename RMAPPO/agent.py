@@ -282,14 +282,15 @@ class PPOAgent:
 			)
 
 	
-	def get_q_values(self, local_states, ally_states, enemy_states, actions, rnn_hidden_state_q):
+	def get_q_values(self, local_states, ally_states, enemy_states, actions, rnn_hidden_state_q, agent_dones):
 		with torch.no_grad():
 			local_states = torch.FloatTensor(local_states).unsqueeze(0).unsqueeze(0)
 			ally_states = torch.FloatTensor(ally_states).unsqueeze(0).unsqueeze(0)
 			enemy_states = torch.FloatTensor(enemy_states).unsqueeze(0).unsqueeze(0)
 			actions = torch.LongTensor(actions).unsqueeze(0).unsqueeze(0)
 			rnn_hidden_state_q = torch.FloatTensor(rnn_hidden_state_q)
-			Q_value, rnn_hidden_state_q = self.target_critic_network_q(local_states.to(self.device), ally_states.to(self.device), enemy_states.to(self.device), actions.to(self.device), rnn_hidden_state_q.to(self.device))
+			agent_masks = 1-torch.FloatTensor(agent_dones).unsqueeze(0).unsqueeze(0)
+			Q_value, rnn_hidden_state_q = self.target_critic_network_q(local_states.to(self.device), ally_states.to(self.device), enemy_states.to(self.device), actions.to(self.device), rnn_hidden_state_q.to(self.device), agent_masks.to(self.device))
 
 			return Q_value.squeeze(0).cpu().numpy(), rnn_hidden_state_q.cpu().numpy()
 
@@ -632,6 +633,8 @@ class PPOAgent:
 
 		self.buffer.calculate_targets(self.Q_PopArt)
 
+
+		#  when using parallel training, update these statistic within each epoch because each thread would be using different set of datapoints
 		if self.norm_adv:
 			shape = self.buffer.advantage.shape
 			advantage_copy = copy.deepcopy(self.buffer.advantage)
@@ -642,10 +645,10 @@ class PPOAgent:
 
 			self.buffer.advantage = ((self.buffer.advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 		
-		if self.norm_returns_q:
-			targets_shape = self.buffer.target_q_values.shape
-			agent_masks = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1]).float()
-			self.buffer.target_q_values = self.Q_PopArt(self.buffer.target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+		# if self.norm_returns_q:
+		# 	targets_shape = self.buffer.target_q_values.shape
+		# 	agent_masks = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1]).float()
+		# 	self.buffer.target_q_values = self.Q_PopArt(self.buffer.target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 		for ppo_epoch in range(self.n_epochs):
 
@@ -670,6 +673,7 @@ class PPOAgent:
 							enemy_obs.to(self.device),
 							actions.to(self.device),
 							hidden_state_q.to(self.device),
+							agent_masks.to(self.device),
 							)
 			q_values = q_values.reshape(*target_shape)
 
@@ -677,9 +681,9 @@ class PPOAgent:
 			q_values *= agent_masks.to(self.device)	
 			target_q_values *= agent_masks
 
-			# if self.norm_returns_q:
-			# 	targets_shape = target_q_values.shape
-			# 	target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+			if self.norm_returns_q:
+				targets_shape = target_q_values.shape
+				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 			dists, _ = self.policy_network(
 					local_obs.to(self.device),
