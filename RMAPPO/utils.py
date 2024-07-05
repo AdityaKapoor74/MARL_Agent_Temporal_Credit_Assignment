@@ -47,7 +47,6 @@ def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold
 	return ret
 
 
-
 class RewardReplayMemory:
 	def __init__(
 		self, 
@@ -126,7 +125,7 @@ class RewardReplayMemory:
 
 	def __len__(self):
 		return self.length
-
+	
 
 
 class RolloutBuffer:
@@ -299,6 +298,7 @@ class RolloutBuffer:
 		return local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs, \
 		last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values, target_q_values, advantage
 
+	
 	def calculate_targets(self, q_value_norm):
 		
 		masks = 1 - torch.from_numpy(self.agent_dones[:, :-1, :])
@@ -321,7 +321,7 @@ class RolloutBuffer:
 		elif self.target_calc_style == "N_steps":
 			target_q_values = self.nstep_returns(rewards, q_values, next_q_values, masks, next_mask)
 
-		self.advantage = (target_q_values - q_values).detach()
+		self.advantage = (target_q_values - q_values).detach().cpu()
 
 		self.target_q_values = target_q_values.detach().cpu()
 
