@@ -631,21 +631,36 @@ class PPOAgent:
 		grad_norm_policy_batch = 0
 
 		self.buffer.calculate_targets(self.Q_PopArt)
+
+		if self.norm_adv:
+			shape = self.buffer.advantage.shape
+			advantage_copy = copy.deepcopy(self.buffer.advantage)
+			agent_masks = 1-torch.from_numpy(self.agent_dones[:, :-1]).float()
+			advantage_copy[agent_masks.view(*shape) == 0.0] = float('nan')
+			advantage_mean = torch.nanmean(advantage_copy)
+			advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
+
+			self.buffer.advantage = ((self.buffer.advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 		
+		if self.norm_returns_q:
+			targets_shape = self.buffer.target_q_values.shape
+			agent_masks = 1-torch.from_numpy(self.agent_dones[:, :-1]).float()
+			self.buffer.target_q_values = self.Q_PopArt(self.buffer.target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+
 		for ppo_epoch in range(self.n_epochs):
 
 			# SAMPLE DATA FROM BUFFER
 			local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs_old, \
 			last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
 
-			if self.norm_adv:
-				shape = advantage.shape
-				advantage_copy = copy.deepcopy(advantage)
-				advantage_copy[agent_masks.view(*shape) == 0.0] = float('nan')
-				advantage_mean = torch.nanmean(advantage_copy)
-				advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
+			# if self.norm_adv:
+			# 	shape = advantage.shape
+			# 	advantage_copy = copy.deepcopy(advantage)
+			# 	advantage_copy[agent_masks.view(*shape) == 0.0] = float('nan')
+			# 	advantage_mean = torch.nanmean(advantage_copy)
+			# 	advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 
-				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
+			# 	advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 
 
 			target_shape = q_values_old.shape
@@ -662,9 +677,9 @@ class PPOAgent:
 			q_values *= agent_masks.to(self.device)	
 			target_q_values *= agent_masks
 
-			if self.norm_returns_q:
-				targets_shape = target_q_values.shape
-				target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
+			# if self.norm_returns_q:
+			# 	targets_shape = target_q_values.shape
+			# 	target_q_values = self.Q_PopArt(target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 			dists, _ = self.policy_network(
 					local_obs.to(self.device),
