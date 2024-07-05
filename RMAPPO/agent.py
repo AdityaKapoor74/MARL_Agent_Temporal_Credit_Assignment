@@ -635,7 +635,7 @@ class PPOAgent:
 		if self.norm_adv:
 			shape = self.buffer.advantage.shape
 			advantage_copy = copy.deepcopy(self.buffer.advantage)
-			agent_masks = 1-torch.from_numpy(self.agent_dones[:, :-1]).float()
+			agent_masks = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1]).float()
 			advantage_copy[agent_masks.view(*shape) == 0.0] = float('nan')
 			advantage_mean = torch.nanmean(advantage_copy)
 			advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
@@ -644,7 +644,7 @@ class PPOAgent:
 		
 		if self.norm_returns_q:
 			targets_shape = self.buffer.target_q_values.shape
-			agent_masks = 1-torch.from_numpy(self.agent_dones[:, :-1]).float()
+			agent_masks = 1-torch.from_numpy(self.buffer.agent_dones[:, :-1]).float()
 			self.buffer.target_q_values = self.Q_PopArt(self.buffer.target_q_values.view(-1), agent_masks.view(-1)).view(targets_shape) * agent_masks.view(targets_shape)
 
 		for ppo_epoch in range(self.n_epochs):
