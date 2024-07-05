@@ -290,7 +290,7 @@ class PPOAgent:
 			actions = torch.LongTensor(actions).unsqueeze(0).unsqueeze(0)
 			rnn_hidden_state_q = torch.FloatTensor(rnn_hidden_state_q)
 			agent_masks = 1-torch.FloatTensor(agent_dones).unsqueeze(0).unsqueeze(0)
-			Q_value, rnn_hidden_state_q = self.target_critic_network_q(local_states.to(self.device), ally_states.to(self.device), enemy_states.to(self.device), actions.to(self.device), rnn_hidden_state_q.to(self.device), agent_masks.to(self.device))
+			Q_value, rnn_hidden_state_q = self.target_critic_network_q(local_states.to(self.device), ally_states.to(self.device), enemy_states.to(self.device), actions.to(self.device), rnn_hidden_state_q.to(self.device))#, agent_masks.to(self.device))
 
 			return Q_value.squeeze(0).cpu().numpy(), rnn_hidden_state_q.cpu().numpy()
 
@@ -673,7 +673,7 @@ class PPOAgent:
 							enemy_obs.to(self.device),
 							actions.to(self.device),
 							hidden_state_q.to(self.device),
-							agent_masks.to(self.device),
+							# agent_masks.to(self.device),
 							)
 			q_values = q_values.reshape(*target_shape)
 
