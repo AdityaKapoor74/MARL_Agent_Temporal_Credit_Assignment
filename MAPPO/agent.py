@@ -251,10 +251,7 @@ class PPOAgent:
 			local_obs, ally_obs, enemy_obs, hidden_state_q, hidden_state_actor, logprobs_old, \
 			last_actions, actions, one_hot_actions, action_masks, team_masks, agent_masks, q_values_old, target_q_values, advantage  = self.buffer.sample_recurrent_policy()
 
-			if self.centralized:
-				masks = team_masks.unsqueeze(-1)
-			else:
-				masks = agent_masks
+			masks = agent_masks
 
 			if self.norm_adv:
 				shape = advantage.shape

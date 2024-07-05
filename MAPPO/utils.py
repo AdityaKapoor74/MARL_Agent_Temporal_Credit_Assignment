@@ -53,14 +53,9 @@ class RolloutBuffer:
 		self.episode_num = 0
 		self.time_step = 0
 
-		if self.centralized_critic:
-			self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, 1, q_hidden_state))
-			self.Q_values = np.zeros((num_episodes, max_time_steps+1, 1))
-			self.rewards = np.zeros((num_episodes, max_time_steps, 1))
-		else:
-			self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, num_agents, q_hidden_state))
-			self.Q_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
-			self.rewards = np.zeros((num_episodes, max_time_steps, num_agents))
+		self.hidden_state_q = np.zeros((num_episodes, max_time_steps, rnn_num_layers_q, num_agents, q_hidden_state))
+		self.Q_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
+		self.rewards = np.zeros((num_episodes, max_time_steps, num_agents))
 
 		self.local_observations = np.zeros((num_episodes, max_time_steps, num_agents, local_obs_shape))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
@@ -78,14 +73,9 @@ class RolloutBuffer:
 
 	def clear(self):
 
-		if self.centralized_critic:
-			self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, 1, self.q_hidden_state))
-			self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, 1))
-			self.rewards = np.zeros((self.num_episodes, self.max_time_steps, 1))
-		else:
-			self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state))
-			self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
-			self.rewards = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
+		self.hidden_state_q = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state))
+		self.Q_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
+		self.rewards = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		
 		self.local_observations = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.local_obs_shape))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
@@ -161,16 +151,10 @@ class RolloutBuffer:
 		rand_batch = np.random.permutation(self.num_episodes)
 		rand_time = np.random.permutation(data_chunks)
 
-		if self.centralized_critic:
-			hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, 1, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
-			q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
-			target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
-			advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, 1)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, 1)
-		else:
-			hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
-			q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-			target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-			advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		hidden_state_q = torch.from_numpy(self.hidden_state_q).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_q, self.num_agents, self.q_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_q, -1, self.q_hidden_state)
+		q_values = torch.from_numpy(self.Q_values[:, :-1, :]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		target_q_values = self.target_q_values.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 
 		local_obs = torch.from_numpy(self.local_observations).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.local_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape)
 		ally_obs = torch.from_numpy(self.ally_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.ally_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.ally_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.ally_obs_shape)
@@ -190,12 +174,8 @@ class RolloutBuffer:
 
 	def calculate_targets(self, q_value_norm):
 		
-		if self.centralized_critic:
-			masks = 1 - torch.from_numpy(self.team_dones[:, :-1]).unsqueeze(-1)
-			next_mask = 1 - torch.from_numpy(self.team_dones[:, -1]).unsqueeze(-1)
-		else:
-			masks = 1 - torch.from_numpy(self.agent_dones[:, :-1, :])
-			next_mask = 1 - torch.from_numpy(self.agent_dones[:, -1, :])
+		masks = 1 - torch.from_numpy(self.agent_dones[:, :-1, :])
+		next_mask = 1 - torch.from_numpy(self.agent_dones[:, -1, :])
 
 		rewards = torch.from_numpy(self.rewards)
 

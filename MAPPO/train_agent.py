@@ -144,10 +144,7 @@ class MAPPO:
 			episode_indiv_rewards = [0 for i in range(self.num_agents)]
 			final_timestep = self.max_time_steps
 
-			if self.centralized:
-				rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, 1, self.rnn_hidden_q))
-			else:
-				rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, self.num_agents, self.rnn_hidden_q))
+			rnn_hidden_state_q = np.zeros((self.rnn_num_layers_q, self.num_agents, self.rnn_hidden_q))
 			rnn_hidden_state_actor = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
 			for step in range(1, self.max_time_steps+1):
