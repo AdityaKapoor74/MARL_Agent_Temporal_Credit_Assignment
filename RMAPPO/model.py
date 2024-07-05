@@ -370,221 +370,221 @@ class Q_network(nn.Module):
 
 
 
-class Q_network(nn.Module):
-	def __init__(
-		self, 
-		use_recurrent_critic,
-		ally_obs_input_dim, 
-		enemy_obs_input_dim,
-		num_agents, 
-		num_enemies,
-		num_actions, 
-		rnn_num_layers,
-		comp_emb_shape,
-		device, 
-		num_heads=1,
-		centralized=True,
-		num_teams=0,
-		enable_hard_attention=False, 
-		attention_dropout_prob=0.0, 
-		temperature=1.0,
-		norm_returns=True,
-		environment="StarCraft",
-		local_observation_input_dim=None,
-		):
-		super(Q_network, self).__init__()
+# class Q_network(nn.Module):
+# 	def __init__(
+# 		self, 
+# 		use_recurrent_critic,
+# 		ally_obs_input_dim, 
+# 		enemy_obs_input_dim,
+# 		num_agents, 
+# 		num_enemies,
+# 		num_actions, 
+# 		rnn_num_layers,
+# 		comp_emb_shape,
+# 		device, 
+# 		num_heads=1,
+# 		centralized=True,
+# 		num_teams=0,
+# 		enable_hard_attention=False, 
+# 		attention_dropout_prob=0.0, 
+# 		temperature=1.0,
+# 		norm_returns=True,
+# 		environment="StarCraft",
+# 		local_observation_input_dim=None,
+# 		):
+# 		super(Q_network, self).__init__()
 		
-		self.use_recurrent_critic = use_recurrent_critic
-		self.num_heads = num_heads
-		self.num_agents = num_agents
-		self.num_enemies = num_enemies
-		self.num_teams = num_teams
-		self.num_actions = num_actions
-		self.rnn_num_layers = rnn_num_layers
-		self.comp_emb_shape = comp_emb_shape
-		self.device = device
-		self.enable_hard_attention = enable_hard_attention
-		self.environment = environment
-		self.attention_dropout_prob = attention_dropout_prob
+# 		self.use_recurrent_critic = use_recurrent_critic
+# 		self.num_heads = num_heads
+# 		self.num_agents = num_agents
+# 		self.num_enemies = num_enemies
+# 		self.num_teams = num_teams
+# 		self.num_actions = num_actions
+# 		self.rnn_num_layers = rnn_num_layers
+# 		self.comp_emb_shape = comp_emb_shape
+# 		self.device = device
+# 		self.enable_hard_attention = enable_hard_attention
+# 		self.environment = environment
+# 		self.attention_dropout_prob = attention_dropout_prob
 
-		# self.attention_dropout = AttentionDropout(dropout_prob=attention_dropout_prob)
+# 		# self.attention_dropout = AttentionDropout(dropout_prob=attention_dropout_prob)
 
-		self.temperature = temperature
+# 		self.temperature = temperature
 
-		# positional, agent, enemy and team embeddings
-		self.agent_embedding = nn.Embedding(self.num_agents, self.comp_emb_shape)
-		self.action_embedding = nn.Embedding(self.num_actions, self.comp_emb_shape)
-		if "MPE" in self.environment:
-			self.team_embedding = nn.Embedding(self.num_teams, self.comp_emb_shape)
-		if "StarCraft" in self.environment:
-			self.enemy_embedding = nn.Embedding(self.num_enemies, self.comp_emb_shape)
-			self.enemy_state_embed = nn.Sequential(
-				# nn.LayerNorm(enemy_obs_input_dim),
-				init_(nn.Linear(enemy_obs_input_dim, self.comp_emb_shape, bias=True), activate=True),
-				nn.GELU(),
-				)
+# 		# positional, agent, enemy and team embeddings
+# 		self.agent_embedding = nn.Embedding(self.num_agents, self.comp_emb_shape)
+# 		self.action_embedding = nn.Embedding(self.num_actions, self.comp_emb_shape)
+# 		if "MPE" in self.environment:
+# 			self.team_embedding = nn.Embedding(self.num_teams, self.comp_emb_shape)
+# 		if "StarCraft" in self.environment:
+# 			self.enemy_embedding = nn.Embedding(self.num_enemies, self.comp_emb_shape)
+# 			self.enemy_state_embed = nn.Sequential(
+# 				# nn.LayerNorm(enemy_obs_input_dim),
+# 				init_(nn.Linear(enemy_obs_input_dim, self.comp_emb_shape, bias=True), activate=True),
+# 				nn.GELU(),
+# 				)
 
-		# Embedding Networks
-		self.ally_state_embed = nn.Sequential(
-			# nn.LayerNorm(ally_obs_input_dim),
-			init_(nn.Linear(ally_obs_input_dim, self.comp_emb_shape, bias=True), activate=True),
-			nn.GELU(),
-			)
+# 		# Embedding Networks
+# 		self.ally_state_embed = nn.Sequential(
+# 			# nn.LayerNorm(ally_obs_input_dim),
+# 			init_(nn.Linear(ally_obs_input_dim, self.comp_emb_shape, bias=True), activate=True),
+# 			nn.GELU(),
+# 			)
 
-		self.state_embed_layer_norm = nn.LayerNorm(self.comp_emb_shape)
+# 		self.state_embed_layer_norm = nn.LayerNorm(self.comp_emb_shape)
 			
-		# Key, Query, Attention Value, Hard Attention Networks
-		assert 64%self.num_heads == 0
-		self.key = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
-		self.query = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
-		self.attention_value = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
+# 		# Key, Query, Attention Value, Hard Attention Networks
+# 		assert 64%self.num_heads == 0
+# 		self.key = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
+# 		self.query = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
+# 		self.attention_value = init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape), activate=False)
 
-		self.attention_value_dropout = nn.Dropout(0.2)
-		self.attention_value_layer_norm = nn.LayerNorm(64)
+# 		self.attention_value_dropout = nn.Dropout(0.2)
+# 		self.attention_value_layer_norm = nn.LayerNorm(64)
 
-		self.attention_value_linear = nn.Sequential(
-			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True)),
-			)
-		self.attention_value_linear_dropout = nn.Dropout(0.2)
+# 		self.attention_value_linear = nn.Sequential(
+# 			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True), activate=True),
+# 			nn.GELU(),
+# 			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True)),
+# 			)
+# 		self.attention_value_linear_dropout = nn.Dropout(0.2)
 
-		self.attention_value_linear_layer_norm = nn.LayerNorm(self.comp_emb_shape)
+# 		self.attention_value_linear_layer_norm = nn.LayerNorm(self.comp_emb_shape)
 
-		if self.enable_hard_attention:
-			self.hard_attention = nn.Sequential(
-				init_(nn.Linear(self.comp_emb_shape+self.comp_emb_shape, 2, bias=True))
-				)
+# 		if self.enable_hard_attention:
+# 			self.hard_attention = nn.Sequential(
+# 				init_(nn.Linear(self.comp_emb_shape+self.comp_emb_shape, 2, bias=True))
+# 				)
 
-		# dimesion of key
-		self.d_k_agents = self.comp_emb_shape
+# 		# dimesion of key
+# 		self.d_k_agents = self.comp_emb_shape
 
-		self.common_layer = nn.Sequential(
-			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True), activate=True),
-			nn.GELU()
-			)
+# 		self.common_layer = nn.Sequential(
+# 			init_(nn.Linear(self.comp_emb_shape, self.comp_emb_shape, bias=True), activate=True),
+# 			nn.GELU()
+# 			)
 
-		if self.use_recurrent_critic:
-			self.RNN = nn.GRU(input_size=self.comp_emb_shape, hidden_size=self.comp_emb_shape, num_layers=self.rnn_num_layers, batch_first=True)
-			for name, param in self.RNN.named_parameters():
-				if 'bias' in name:
-					nn.init.constant_(param, 0)
-				elif 'weight' in name:
-					nn.init.orthogonal_(param)
+# 		if self.use_recurrent_critic:
+# 			self.RNN = nn.GRU(input_size=self.comp_emb_shape, hidden_size=self.comp_emb_shape, num_layers=self.rnn_num_layers, batch_first=True)
+# 			for name, param in self.RNN.named_parameters():
+# 				if 'bias' in name:
+# 					nn.init.constant_(param, 0)
+# 				elif 'weight' in name:
+# 					nn.init.orthogonal_(param)
 
 		
 
-		self.q_value_layer = nn.Sequential(
-			nn.LayerNorm(self.comp_emb_shape),
-			init_(nn.Linear(self.comp_emb_shape, 1, bias=True))
-			)
+# 		self.q_value_layer = nn.Sequential(
+# 			nn.LayerNorm(self.comp_emb_shape),
+# 			init_(nn.Linear(self.comp_emb_shape, 1, bias=True))
+# 			)
 
-		self.mask_value = torch.tensor(
-			torch.finfo(torch.float).min, dtype=torch.float
-			)
-
-
-	def get_attention_masks(self, agent_masks):
-		# since we add the attention masks to the score we want to have 0s where the agent is alive and -inf when agent is dead
-		attention_masks = copy.deepcopy(1-agent_masks).unsqueeze(-2).repeat(1, 1, self.num_agents, 1)
-		# choose columns in each row where the agent is dead and make it -inf
-		attention_masks[agent_masks.unsqueeze(-2).repeat(1, 1, self.num_agents, 1)[:, :, :, :] == 0.0] = self.mask_value
-		# choose rows of the agent which is dead and make it -inf
-		attention_masks[agent_masks.unsqueeze(-2).repeat(1, 1, self.num_agents, 1).transpose(-1,-2)[:, :, :, :] == 0.0] = self.mask_value
-
-		for i in range(self.num_agents):
-			attention_masks[:, :, i, i] = self.mask_value
-		return attention_masks
+# 		self.mask_value = torch.tensor(
+# 			torch.finfo(torch.float).min, dtype=torch.float
+# 			)
 
 
-	def forward(self, local_observations, states, enemy_states, actions, rnn_hidden_state, agent_masks):
-		batch, timesteps, num_agents, _ = states.shape
-		states = states.reshape(batch*timesteps, self.num_agents, -1)
-		actions = actions.reshape(batch*timesteps, num_agents)
+# 	def get_attention_masks(self, agent_masks):
+# 		# since we add the attention masks to the score we want to have 0s where the agent is alive and -inf when agent is dead
+# 		attention_masks = copy.deepcopy(1-agent_masks).unsqueeze(-2).repeat(1, 1, self.num_agents, 1)
+# 		# choose columns in each row where the agent is dead and make it -inf
+# 		attention_masks[agent_masks.unsqueeze(-2).repeat(1, 1, self.num_agents, 1)[:, :, :, :] == 0.0] = self.mask_value
+# 		# choose rows of the agent which is dead and make it -inf
+# 		attention_masks[agent_masks.unsqueeze(-2).repeat(1, 1, self.num_agents, 1).transpose(-1,-2)[:, :, :, :] == 0.0] = self.mask_value
 
-		# extract agent embedding
-		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape).reshape(batch*timesteps, self.num_agents, -1)
+# 		for i in range(self.num_agents):
+# 			attention_masks[:, :, i, i] = self.mask_value
+# 		return attention_masks
 
-		states_embed = self.ally_state_embed(states) + agent_embedding
 
-		if "MPE" in self.environment:
-			team_embedding = self.team_embedding(torch.arange(self.num_teams).to(self.device))[None, None, :, None, :].expand(batch, timesteps, self.num_teams, self.num_agents//self.num_teams, self.comp_emb_shape).reshape(batch*timesteps, self.num_agents, self.comp_emb_shape)
-			states_embed = states_embed + team_embedding
+# 	def forward(self, local_observations, states, enemy_states, actions, rnn_hidden_state, agent_masks):
+# 		batch, timesteps, num_agents, _ = states.shape
+# 		states = states.reshape(batch*timesteps, self.num_agents, -1)
+# 		actions = actions.reshape(batch*timesteps, num_agents)
 
-		if "StarCraft" in self.environment:
-			enemy_embedding = self.enemy_embedding(torch.arange(self.num_enemies).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_enemies, self.comp_emb_shape)
-			enemy_state_embed = (self.enemy_state_embed(enemy_states) + enemy_embedding).sum(dim=2).unsqueeze(2).reshape(batch*timesteps, 1, self.comp_emb_shape)
-			states_embed = states_embed + enemy_state_embed
+# 		# extract agent embedding
+# 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape).reshape(batch*timesteps, self.num_agents, -1)
+
+# 		states_embed = self.ally_state_embed(states) + agent_embedding
+
+# 		if "MPE" in self.environment:
+# 			team_embedding = self.team_embedding(torch.arange(self.num_teams).to(self.device))[None, None, :, None, :].expand(batch, timesteps, self.num_teams, self.num_agents//self.num_teams, self.comp_emb_shape).reshape(batch*timesteps, self.num_agents, self.comp_emb_shape)
+# 			states_embed = states_embed + team_embedding
+
+# 		if "StarCraft" in self.environment:
+# 			enemy_embedding = self.enemy_embedding(torch.arange(self.num_enemies).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_enemies, self.comp_emb_shape)
+# 			enemy_state_embed = (self.enemy_state_embed(enemy_states) + enemy_embedding).sum(dim=2).unsqueeze(2).reshape(batch*timesteps, 1, self.comp_emb_shape)
+# 			states_embed = states_embed + enemy_state_embed
 		
-		states_embed = self.state_embed_layer_norm(states_embed)
+# 		states_embed = self.state_embed_layer_norm(states_embed)
 
-		# if self.use_recurrent_critic:
-		# 	states_embed = states_embed.reshape(batch, timesteps, num_agents, -1).permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1)
-		# 	states_embed, h = self.RNN(states_embed, rnn_hidden_state)
-		# 	states_embed = states_embed.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, num_agents, -1)
+# 		# if self.use_recurrent_critic:
+# 		# 	states_embed = states_embed.reshape(batch, timesteps, num_agents, -1).permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1)
+# 		# 	states_embed, h = self.RNN(states_embed, rnn_hidden_state)
+# 		# 	states_embed = states_embed.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, num_agents, -1)
 
-		# KEYS
-		key_obs = self.key(states_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) # Batch_size, Num Heads, Num agents, dim
-		# QUERIES
-		query_obs = self.query(states_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) # Batch_size, Num Heads, Num agents, dim
+# 		# KEYS
+# 		key_obs = self.key(states_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) # Batch_size, Num Heads, Num agents, dim
+# 		# QUERIES
+# 		query_obs = self.query(states_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) # Batch_size, Num Heads, Num agents, dim
 
-		# HARD ATTENTION
-		if self.enable_hard_attention:
-			query_key_concat = torch.cat([query_obs.unsqueeze(3).repeat(1,1,1,self.num_agents,1), key_obs.unsqueeze(2).repeat(1,1,self.num_agents,1,1)], dim=-1) # Batch_size, Num Heads, Num agents, Num Agents, dim
-			query_key_concat_intermediate = self.hard_attention(query_key_concat) # Batch_size, Num Heads, Num agents, Num agents-1, dim
-			hard_attention_weights = F.gumbel_softmax(query_key_concat_intermediate, hard=True, tau=1.0)[:,:,:,:,1] # Batch_size, Num Heads, Num agents, Num Agents, 1			
-			for i in range(self.num_agents):
-				hard_attention_weights[:,:,i,i] = 1.0
-		else:
-			hard_attention_weights = torch.ones(states.shape[0], self.num_heads, self.num_agents, self.num_agents).float().to(self.device)
+# 		# HARD ATTENTION
+# 		if self.enable_hard_attention:
+# 			query_key_concat = torch.cat([query_obs.unsqueeze(3).repeat(1,1,1,self.num_agents,1), key_obs.unsqueeze(2).repeat(1,1,self.num_agents,1,1)], dim=-1) # Batch_size, Num Heads, Num agents, Num Agents, dim
+# 			query_key_concat_intermediate = self.hard_attention(query_key_concat) # Batch_size, Num Heads, Num agents, Num agents-1, dim
+# 			hard_attention_weights = F.gumbel_softmax(query_key_concat_intermediate, hard=True, tau=1.0)[:,:,:,:,1] # Batch_size, Num Heads, Num agents, Num Agents, 1			
+# 			for i in range(self.num_agents):
+# 				hard_attention_weights[:,:,i,i] = 1.0
+# 		else:
+# 			hard_attention_weights = torch.ones(states.shape[0], self.num_heads, self.num_agents, self.num_agents).float().to(self.device)
 			
 
-		# SOFT ATTENTION
-		score = torch.matmul(query_obs,(key_obs).transpose(-2,-1))/(self.d_k_agents//self.num_heads)**(1/2) # Batch_size, Num Heads, Num agents, Num Agents
+# 		# SOFT ATTENTION
+# 		score = torch.matmul(query_obs,(key_obs).transpose(-2,-1))/(self.d_k_agents//self.num_heads)**(1/2) # Batch_size, Num Heads, Num agents, Num Agents
 		
-		attention_masks = self.get_attention_masks(agent_masks).reshape(batch*timesteps, num_agents, num_agents).unsqueeze(1).repeat(1, self.num_heads, 1, 1)
-		attention_masks = attention_masks + (1-hard_attention_weights)*self.mask_value
-		weights = F.softmax((score/(torch.max(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-1).values-torch.min(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-1).values+1e-5).detach().unsqueeze(-1)) + attention_masks.reshape(*score.shape).to(score.device), dim=-1) # Batch_size, Num Heads, Num agents, Num Agents
+# 		attention_masks = self.get_attention_masks(agent_masks).reshape(batch*timesteps, num_agents, num_agents).unsqueeze(1).repeat(1, self.num_heads, 1, 1)
+# 		attention_masks = attention_masks + (1-hard_attention_weights)*self.mask_value
+# 		weights = F.softmax((score/(torch.max(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-1).values-torch.min(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-1).values+1e-5).detach().unsqueeze(-1)) + attention_masks.reshape(*score.shape).to(score.device), dim=-1) # Batch_size, Num Heads, Num agents, Num Agents
 		
-		# if self.attention_dropout_prob > 0.0:
-		# 	for head in range(self.num_heads):
-		# 		weights[:, head, :, :] = self.attention_dropout(weights[:, head, :, :])
+# 		# if self.attention_dropout_prob > 0.0:
+# 		# 	for head in range(self.num_heads):
+# 		# 		weights[:, head, :, :] = self.attention_dropout(weights[:, head, :, :])
 
-		final_weights = weights.clone()
-		prd_weights = F.softmax((score/(torch.max(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-2).values-torch.min(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-2).values+1e-5).detach().unsqueeze(-1)) + attention_masks.reshape(*score.shape).to(score.device), dim=-2) # Batch_size, Num Heads, Num agents, Num Agents
-		for i in range(self.num_agents):
-			final_weights[:, :, i, i] = 1.0 # since weights[:, :, i, i] = 0.0
-			prd_weights[:, :, i, i] = 1.0
+# 		final_weights = weights.clone()
+# 		prd_weights = F.softmax((score/(torch.max(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-2).values-torch.min(score*(attention_masks[:, :, :, :]!=self.mask_value).float(), dim=-2).values+1e-5).detach().unsqueeze(-1)) + attention_masks.reshape(*score.shape).to(score.device), dim=-2) # Batch_size, Num Heads, Num agents, Num Agents
+# 		for i in range(self.num_agents):
+# 			final_weights[:, :, i, i] = 1.0 # since weights[:, :, i, i] = 0.0
+# 			prd_weights[:, :, i, i] = 1.0
 
-		final_weights = final_weights * agent_masks.reshape(batch*timesteps, 1, self.num_agents, 1).repeat(1, self.num_heads, 1, self.num_agents)
-		final_weights = final_weights * agent_masks.reshape(batch*timesteps, 1, 1, self.num_agents).repeat(1, self.num_heads, self.num_agents, 1)
-		prd_weights = prd_weights * agent_masks.reshape(batch*timesteps, 1, self.num_agents, 1).repeat(1, self.num_heads, 1, self.num_agents)
-		prd_weights = prd_weights * agent_masks.reshape(batch*timesteps, 1, 1, self.num_agents).repeat(1, self.num_heads, self.num_agents, 1)
+# 		final_weights = final_weights * agent_masks.reshape(batch*timesteps, 1, self.num_agents, 1).repeat(1, self.num_heads, 1, self.num_agents)
+# 		final_weights = final_weights * agent_masks.reshape(batch*timesteps, 1, 1, self.num_agents).repeat(1, self.num_heads, self.num_agents, 1)
+# 		prd_weights = prd_weights * agent_masks.reshape(batch*timesteps, 1, self.num_agents, 1).repeat(1, self.num_heads, 1, self.num_agents)
+# 		prd_weights = prd_weights * agent_masks.reshape(batch*timesteps, 1, 1, self.num_agents).repeat(1, self.num_heads, self.num_agents, 1)
 
 		
-		# EMBED STATE ACTION
-		obs_actions_embed = states_embed + self.action_embedding(actions.long())
+# 		# EMBED STATE ACTION
+# 		obs_actions_embed = states_embed + self.action_embedding(actions.long())
 
-		attention_values = self.attention_value(obs_actions_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) #torch.stack([self.attention_value[i](obs_actions_embed) for i in range(self.num_heads)], dim=0).permute(1,0,2,3,4) # Batch_size, Num heads, Num agents, Num agents - 1, dim//num_heads
+# 		attention_values = self.attention_value(obs_actions_embed).reshape(batch*timesteps, num_agents, self.num_heads, -1).permute(0, 2, 1, 3) #torch.stack([self.attention_value[i](obs_actions_embed) for i in range(self.num_heads)], dim=0).permute(1,0,2,3,4) # Batch_size, Num heads, Num agents, Num agents - 1, dim//num_heads
 		
-		aggregated_node_features = torch.matmul(final_weights, attention_values) # Batch_size, Num heads, Num agents, dim//num_heads
-		aggregated_node_features = self.attention_value_dropout(aggregated_node_features)
-		aggregated_node_features = aggregated_node_features.permute(0,2,1,3).reshape(batch*timesteps, self.num_agents, -1) # Batch_size, Num agents, dim
-		aggregated_node_features_ = self.attention_value_layer_norm(obs_actions_embed+aggregated_node_features) # Batch_size, Num agents, dim
-		aggregated_node_features = self.attention_value_linear(aggregated_node_features_) # Batch_size, Num agents, dim
-		aggregated_node_features = self.attention_value_linear_dropout(aggregated_node_features)
-		aggregated_node_features = self.attention_value_linear_layer_norm(aggregated_node_features_+aggregated_node_features) # Batch_size, Num agents, dim
+# 		aggregated_node_features = torch.matmul(final_weights, attention_values) # Batch_size, Num heads, Num agents, dim//num_heads
+# 		aggregated_node_features = self.attention_value_dropout(aggregated_node_features)
+# 		aggregated_node_features = aggregated_node_features.permute(0,2,1,3).reshape(batch*timesteps, self.num_agents, -1) # Batch_size, Num agents, dim
+# 		aggregated_node_features_ = self.attention_value_layer_norm(obs_actions_embed+aggregated_node_features) # Batch_size, Num agents, dim
+# 		aggregated_node_features = self.attention_value_linear(aggregated_node_features_) # Batch_size, Num agents, dim
+# 		aggregated_node_features = self.attention_value_linear_dropout(aggregated_node_features)
+# 		aggregated_node_features = self.attention_value_linear_layer_norm(aggregated_node_features_+aggregated_node_features) # Batch_size, Num agents, dim
 		
-		curr_agent_node_features = self.common_layer(aggregated_node_features) # Batch_size, Num agents, dim
+# 		curr_agent_node_features = self.common_layer(aggregated_node_features) # Batch_size, Num agents, dim
 		
-		if self.use_recurrent_critic:
-			curr_agent_node_features = curr_agent_node_features.reshape(batch, timesteps, num_agents, -1).permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1)
-			rnn_output, h = self.RNN(curr_agent_node_features, rnn_hidden_state)
-			rnn_output = rnn_output.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, num_agents, -1)
-			Q_value = self.q_value_layer(rnn_output) # Batch_size, Num agents, 1
-		else:
-			Q_value = self.q_value_layer(curr_agent_node_features) # Batch_size, Num agents, 1
+# 		if self.use_recurrent_critic:
+# 			curr_agent_node_features = curr_agent_node_features.reshape(batch, timesteps, num_agents, -1).permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1)
+# 			rnn_output, h = self.RNN(curr_agent_node_features, rnn_hidden_state)
+# 			rnn_output = rnn_output.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, num_agents, -1)
+# 			Q_value = self.q_value_layer(rnn_output) # Batch_size, Num agents, 1
+# 		else:
+# 			Q_value = self.q_value_layer(curr_agent_node_features) # Batch_size, Num agents, 1
 
-		# Q_value = self.q_value_layer(curr_agent_node_features)
+# 		# Q_value = self.q_value_layer(curr_agent_node_features)
 
-		return Q_value.squeeze(-1), h
+# 		return Q_value.squeeze(-1), h
