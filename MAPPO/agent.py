@@ -427,6 +427,7 @@ class PPOAgent:
 		"policy_loss": policy_loss_batch,
 		"entropy": entropy_batch,
 		"grad_norm_policy": grad_norm_policy_batch,
+		"grad_norm_value_v": grad_norm_value_v_batch,
 		}
 		
 		if self.comet_ml is not None:
