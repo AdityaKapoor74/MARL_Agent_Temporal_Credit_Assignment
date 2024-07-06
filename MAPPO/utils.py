@@ -218,7 +218,6 @@ class RolloutBuffer:
 		logprobs = torch.from_numpy(self.logprobs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		actions = torch.from_numpy(self.actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		one_hot_actions = torch.from_numpy(self.one_hot_actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		action_masks = torch.from_numpy(self.action_masks).bool().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		agent_masks = 1-torch.from_numpy(self.indiv_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		team_masks = 1-torch.from_numpy(self.team_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length)
@@ -228,7 +227,7 @@ class RolloutBuffer:
 		advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 
 		return ally_states, enemy_states, hidden_state_v, local_obs, hidden_state_actor, logprobs, \
-		last_actions, actions, one_hot_actions, action_masks, agent_masks, team_masks, values, target_values, advantage
+		last_actions, actions, action_masks, agent_masks, team_masks, values, target_values, advantage
 
 
 	def calculate_targets(self, episode, v_value_norm=None):
