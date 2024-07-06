@@ -54,17 +54,11 @@ class MAPPO:
 		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
 
-		self.agent_ids = []
-		for i in range(self.num_agents):
-			agent_id = np.array([0 for i in range(self.num_agents)])
-			agent_id[i] = 1
-			self.agent_ids.append(agent_id)
-		self.agent_ids = np.array(self.agent_ids)
-
 
 		self.comet_ml = None
 		if self.save_comet_ml_plot:
 			self.comet_ml = Experiment("im5zK8gFkz6j07uflhc3hXk8I", project_name=dictionary["test_num"])
+			self.comet_ml.set_name(dictionary["experiment_name"])
 			self.comet_ml.log_parameters(dictionary)
 
 
@@ -141,31 +135,6 @@ class MAPPO:
 		clip.write_gif(fname, fps=fps)
 
 
-	# FOR COLLISION AVOIDANCE ENVIRONMENT
-	def split_states(self, states):
-		states_critic = []
-		states_actor = []
-		for i in range(self.num_agents):
-			states_critic.append(states[i][0])
-			states_actor.append(states[i][1])
-
-		states_critic = np.asarray(states_critic)
-		states_actor = np.asarray(states_actor)
-
-		return states_critic, states_actor
-
-
-	def preprocess_state(self, states):
-		states = np.array(states)
-		# bring agent states first and then food locations
-		states_ = np.concatenate([states[:, -self.num_agents*3:], states[:, :-self.num_agents*3]], axis=-1)
-		for curr_agent_num in range(states_.shape[0]):
-			curr_px, curr_py = states_[curr_agent_num][0], states_[curr_agent_num][1]
-			# looping over the state
-			for i in range(3, states_[curr_agent_num].shape[0], 3):
-				states_[curr_agent_num][i], states_[curr_agent_num][i+1] = states_[curr_agent_num][i]-curr_px, states_[curr_agent_num][i+1]-curr_py
-		return states_
-
 
 	def run(self):  
 		if self.eval_policy:
@@ -174,9 +143,6 @@ class MAPPO:
 			self.timesteps = []
 			self.timesteps_mean_per_1000_eps = []
 
-			if "MPE" in self.environment:
-				self.collision_rates = []
-				self.collison_rate_mean_per_1000_eps = []
 
 		for episode in range(1,self.max_episodes+1):
 
@@ -213,6 +179,9 @@ class MAPPO:
 				else:
 					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 
+				one_hot_actions = np.zeros((self.num_agents, self.num_actions))
+				for i, act in enumerate(actions):
+					one_hot_actions[i][act] = 1
 
 				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
 				
@@ -229,11 +198,18 @@ class MAPPO:
 
 				if self.learn:
 
-					rewards_to_send = [rewards]*self.num_agents
+					if self.experiment_type == "temporal_team":
+						rewards_to_send = [rewards]*self.num_agents
+					elif self.experiment_type == "episodic_team" or self.experiment_type == "uniform_team_redistribution" or "AREL" in self.experiment_type or "ATRR" in self.experiment_type:
+						episodic_team_reward = episodic_team_reward+rewards
+						if all(next_indiv_dones) or step == self.max_time_steps:
+							rewards_to_send = episodic_team_reward
+						else:
+							rewards_to_send = 0
 
 					self.agents.buffer.push(
 						ally_states, enemy_states, value, rnn_hidden_state_v, \
-						local_obs, rnn_hidden_state_actor, action_logprob, actions, mask_actions, \
+						local_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
 						rewards_to_send, indiv_dones, dones
 						)
 
@@ -313,7 +289,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ MPE/ PressurePlate/ PettingZoo/ LBForaging
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ crossing_team_greedy/ pressureplate-linear-6p-v0/ pursuit_v4/ "Foraging-{0}x{0}-{1}p-{2}f{3}-v2".format(grid_size, num_players, num_food, "-coop" if fully_coop else "")
-		experiment_type = "shared" # shared, prd_above_threshold_ascend, prd_above_threshold, prd_top_k, prd_above_threshold_decay, prd_soft_advantage, prd_soft_advantage_global, HAPPO
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_temporal_team"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -328,6 +305,7 @@ if __name__ == '__main__':
 				"n_epochs": 5,
 				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
+				"experiment_name": experiment_name,
 				"test_num": test_num,
 				"extension": extension,
 				"gamma": 0.99,

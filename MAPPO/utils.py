@@ -40,6 +40,8 @@ def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold
 		ret = y_soft
 	return ret
 
+
+
 class RolloutBuffer:
 	def __init__(
 		self, 
@@ -109,6 +111,7 @@ class RolloutBuffer:
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
+		self.one_hot_actions = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.action_masks = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
 		self.rewards = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.indiv_dones = np.ones((num_episodes, max_time_steps+1, num_agents))
@@ -130,6 +133,7 @@ class RolloutBuffer:
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
+		self.one_hot_actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.action_masks = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
 		self.rewards = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.indiv_dones = np.ones((self.num_episodes, self.max_time_steps+1, self.num_agents))
@@ -141,7 +145,6 @@ class RolloutBuffer:
 		self.episode_num = 0
 
 		data_chunks = self.max_time_steps//self.data_chunk_length
-		self.factor = torch.ones((self.num_episodes*data_chunks, self.data_chunk_length)).float()
 
 
 	def push(
@@ -154,6 +157,7 @@ class RolloutBuffer:
 		hidden_state_actor, 
 		logprobs, 
 		actions, 
+		one_hot_actions,
 		action_masks, 
 		rewards, 
 		indiv_dones,
@@ -172,6 +176,7 @@ class RolloutBuffer:
 		self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor
 		self.logprobs[self.episode_num][self.time_step] = logprobs
 		self.actions[self.episode_num][self.time_step] = actions
+		self.one_hot_actions[self.episode_num][self.time_step] = one_hot_actions
 		self.action_masks[self.episode_num][self.time_step] = action_masks
 		self.rewards[self.episode_num][self.time_step] = rewards
 		self.indiv_dones[self.episode_num][self.time_step] = indiv_dones
@@ -213,6 +218,7 @@ class RolloutBuffer:
 		logprobs = torch.from_numpy(self.logprobs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		actions = torch.from_numpy(self.actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		one_hot_actions = torch.from_numpy(self.one_hot_actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		action_masks = torch.from_numpy(self.action_masks).bool().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		agent_masks = 1-torch.from_numpy(self.indiv_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		team_masks = 1-torch.from_numpy(self.team_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length)
@@ -222,7 +228,7 @@ class RolloutBuffer:
 		advantage = self.advantage.float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 
 		return ally_states, enemy_states, hidden_state_v, local_obs, hidden_state_actor, logprobs, \
-		last_actions, actions, action_masks, agent_masks, team_masks, values, target_values, advantage
+		last_actions, actions, one_hot_actions, action_masks, agent_masks, team_masks, values, target_values, advantage
 
 
 	def calculate_targets(self, episode, v_value_norm=None):
