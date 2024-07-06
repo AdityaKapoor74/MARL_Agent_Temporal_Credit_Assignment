@@ -421,8 +421,17 @@ class Q_network(nn.Module):
 		num_actions, 
 		rnn_num_layers,
 		comp_emb_shape,
-		device, 
+		device,
+		 
+		num_heads, 
+		enable_hard_attention, 
+		attention_dropout_prob, 
+		temperature,
+		norm_returns,
+		environment,
+		experiment_type,
 		):
+		
 		super(Q_network, self).__init__()
 		
 		self.use_recurrent_critic = use_recurrent_critic
