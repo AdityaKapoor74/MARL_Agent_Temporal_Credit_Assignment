@@ -405,3 +405,141 @@ class V_network(nn.Module):
 		# V_value = self.v_value_layer(curr_agent_node_features) # Batch_size, Num agents, 1
 
 		return V_value.squeeze(-1), final_weights, score, h
+
+
+
+class Q_network(nn.Module):
+	def __init__(
+		self, 
+		use_recurrent_critic,
+		centralized,
+		local_observation_input_dim,
+		ally_obs_input_dim, 
+		enemy_obs_input_dim,
+		num_agents, 
+		num_enemies,
+		num_actions, 
+		rnn_num_layers,
+		comp_emb_shape,
+		device, 
+		):
+		super(Q_network, self).__init__()
+		
+		self.use_recurrent_critic = use_recurrent_critic
+		self.centralized = centralized
+		self.num_agents = num_agents
+		self.num_enemies = num_enemies
+		self.num_actions = num_actions
+		self.rnn_num_layers = rnn_num_layers
+		self.comp_emb_shape = comp_emb_shape
+		self.device = device
+
+		self.agent_embedding = nn.Embedding(self.num_agents, self.comp_emb_shape)
+		self.action_embedding = nn.Embedding(self.num_actions, self.comp_emb_shape)
+
+		if self.centralized:
+			# self.enemy_embedding = nn.Embedding(self.num_enemies, self.comp_emb_shape)
+
+			# self.ally_obs_embedding = nn.Sequential(
+			# 	# nn.LayerNorm(ally_obs_input_dim),
+			# 	init_(nn.Linear(ally_obs_input_dim, comp_emb_shape, bias=True), activate=True),
+			# 	nn.GELU()
+			# 	)
+			# self.enemy_obs_embedding = nn.Sequential(
+			# 	# nn.LayerNorm(enemy_obs_input_dim),
+			# 	init_(nn.Linear(enemy_obs_input_dim, comp_emb_shape, bias=True), activate=True),
+			# 	nn.GELU()
+			# 	)
+
+			# self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape*2)
+
+			# self.intermediate_embedding = nn.Sequential(
+			# 	init_(nn.Linear(comp_emb_shape*2, comp_emb_shape, bias=True), activate=True),
+			# 	nn.GELU(),
+			# 	)
+
+			self.embedding = nn.Sequential(
+				init_(nn.Linear((self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies, comp_emb_shape, bias=True), activate=True),
+				nn.GELU(),
+				nn.LayerNorm(comp_emb_shape),
+				init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
+				nn.GELU(),
+				nn.LayerNorm(comp_emb_shape),
+				)
+
+		else:
+			self.obs_embedding = nn.Sequential(
+				# nn.LayerNorm(local_observation_input_dim),
+				init_(nn.Linear(local_observation_input_dim, comp_emb_shape, bias=True), activate=True),
+				nn.GELU()
+				)
+
+			self.state_action_embedding_layer_norm = nn.LayerNorm(comp_emb_shape)
+				
+			self.intermediate_embedding = nn.Sequential(
+				init_(nn.Linear(comp_emb_shape, comp_emb_shape, bias=True), activate=True),
+				nn.GELU(),
+				)
+
+		if self.use_recurrent_critic:
+			self.RNN = nn.GRU(input_size=comp_emb_shape, hidden_size=comp_emb_shape, num_layers=self.rnn_num_layers, batch_first=True)
+			for name, param in self.RNN.named_parameters():
+				if 'bias' in name:
+					nn.init.constant_(param, 0)
+				elif 'weight' in name:
+					nn.init.orthogonal_(param)
+
+		self.q_value_layer = nn.Sequential(
+			nn.LayerNorm(comp_emb_shape),
+			init_(nn.Linear(comp_emb_shape, 1), activate=False)
+			)
+		
+
+		self.mask_value = torch.tensor(
+			torch.finfo(torch.float).min, dtype=torch.float
+			)
+
+		self.one_hot_actions = torch.eye(self.num_actions).to(self.device)
+		self.agent_ids = torch.eye(self.num_agents).to(self.device)
+
+
+	def forward(self, local_observations, ally_states, enemy_states, actions, rnn_hidden_state):
+		if self.centralized:
+			batch, timesteps, _, _ = ally_states.shape
+			# agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape)
+			# enemy_embedding = self.enemy_embedding(torch.arange(self.num_enemies).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_enemies, self.comp_emb_shape)
+			# ally_state_embedding = (self.ally_obs_embedding(ally_states) + agent_embedding + self.action_embedding(actions.long())).sum(dim=-2) #/ self.num_agents
+			# enemy_state_embedding = (self.enemy_obs_embedding(enemy_states) + enemy_embedding).sum(dim=-2) #/ self.num_enemies
+
+			# # final_state_embedding = ally_state_embedding+enemy_state_embedding # self.state_action_embedding_layer_norm(ally_state_embedding+enemy_state_embedding)
+			# final_state_embedding = self.state_action_embedding_layer_norm(torch.cat([ally_state_embedding, enemy_state_embedding], dim=-1))
+
+			# final_state_embedding = self.intermediate_embedding(final_state_embedding)
+
+			one_hot_actions = self.one_hot_actions[actions.long()]
+			agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+			ally_observations = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
+			ally_observations = torch.stack([torch.roll(ally_observations, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
+			ally_observations = ally_observations.permute(1, 2, 0, 3, 4).reshape(batch, timesteps, self.num_agents, -1)
+			enemy_observations = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
+			final_state_embedding = self.embedding(torch.cat([ally_observations, enemy_observations], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+
+			if self.use_recurrent_critic:
+				final_state_embedding, h = self.RNN(final_state_embedding, rnn_hidden_state)
+				final_state_embedding = final_state_embedding.reshape(batch, self.num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, self.num_agents, -1)
+
+			Q_value = self.q_value_layer(final_state_embedding)
+
+		else:
+			batch, timesteps, num_agents, _ = local_observations.shape
+			agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.comp_emb_shape)
+			obs_embedding = self.obs_embedding(local_observations) + agent_embedding + self.action_embedding(actions.long()) # self.state_action_embedding_layer_norm(self.obs_embedding(local_observations) + agent_embedding + self.action_embedding(actions.long()))
+			intermediate_embedding = self.intermediate_embedding(obs_embedding)
+			
+			if self.use_recurrent_critic:
+				intermediate_embedding, h = self.RNN(intermediate_embedding.permute(0, 2, 1, 3).reshape(batch*num_agents, timesteps, -1), rnn_hidden_state)
+				intermediate_embedding = intermediate_embedding.reshape(batch, num_agents, timesteps, -1).permute(0, 2, 1, 3).reshape(batch*timesteps, num_agents, -1)
+			
+			Q_value = self.q_value_layer(intermediate_embedding)
+
+		return Q_value.squeeze(-1), h
