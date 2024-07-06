@@ -314,6 +314,7 @@ if __name__ == '__main__':
 		environment = "StarCraft" # StarCraft/ MPE/ PressurePlate/ PettingZoo/ LBForaging
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ crossing_team_greedy/ pressureplate-linear-6p-v0/ pursuit_v4/ "Foraging-{0}x{0}-{1}p-{2}f{3}-v2".format(grid_size, num_players, num_food, "-coop" if fully_coop else "")
 		experiment_type = "shared" # shared, prd_above_threshold_ascend, prd_above_threshold, prd_top_k, prd_above_threshold_decay, prd_soft_advantage, prd_soft_advantage_global, HAPPO
+		algorithm_type = "MAPPO"
 
 		dictionary = {
 				# TRAINING
@@ -349,6 +350,32 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
+
+
+				# REWARD MODEL
+				"use_reward_model": False,
+				"reward_n_heads": 3, # 3
+				"reward_depth": 3, # 3
+				"reward_agent_attn": True,
+				"reward_dropout": 0.0,
+				"reward_attn_net_wide": True,
+				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"reward_linear_compression_dim": 64,
+				"reward_batch_size": 128, # 128
+				"reward_lr": 5e-4,
+				"reward_weight_decay": 0.0,
+				"temporal_score_coefficient": 0.0,
+				"agent_score_coefficient": 0.0,
+				"variance_loss_coeff": 0.0,
+				"enable_reward_grad_clip": True,
+				"reward_grad_clip_value": 10.0,
+				"replay_buffer_size": 5000,
+				"update_reward_model_freq": 200, # 200
+				"reward_model_update_epochs": 400, # 400
+				"norm_rewards": False,
+
+
+				"algorithm_type": algorithm_type,
 
 
 				# ENVIRONMENT

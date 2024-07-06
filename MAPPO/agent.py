@@ -244,7 +244,7 @@ class PPOAgent:
 			actions = torch.FloatTensor(actions).unsqueeze(0).unsqueeze(0)
 			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v)
 			
-			Value, _, _, rnn_hidden_state_v = self.target_critic_network_v(local_obs.to(self.device), state_allies.to(self.device), state_enemies.to(self.device), actions.to(self.device), rnn_hidden_state_v.to(self.device), indiv_masks.to(self.device))
+			Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs.to(self.device), state_allies.to(self.device), state_enemies.to(self.device), actions.to(self.device), rnn_hidden_state_v.to(self.device), indiv_masks.to(self.device))
 				
 			return Value.squeeze(0).cpu().numpy(), rnn_hidden_state_v.cpu().numpy()
 	
@@ -279,17 +279,9 @@ class PPOAgent:
 
 		self.comet_ml.log_metric('V_Value_Loss',self.plotting_dict["v_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
-		
-		# ENTROPY OF V WEIGHTS
-		for i in range(self.num_heads):
-			entropy_weights = -torch.sum(torch.sum((self.plotting_dict["weights_v"][:, i] * torch.log(torch.clamp(self.plotting_dict["weights_v"][:, i], 1e-10, 1.0)) * masks.view(-1, self.num_agents, 1)), dim=-1))/masks.sum()
-			self.comet_ml.log_metric('V_Weight_Entropy_Head_'+str(i+1), entropy_weights.item(), episode)
 
 
 	def update_parameters(self):
-		if self.critic_weight_entropy_pen_final + self.critic_weight_entropy_pen_decay_rate > self.critic_weight_entropy_pen:
-			self.critic_weight_entropy_pen += self.critic_weight_entropy_pen_decay_rate 
-
 		if self.entropy_pen - self.entropy_pen_decay > self.entropy_pen_final:
 			self.entropy_pen -= self.entropy_pen_decay
 
@@ -299,11 +291,8 @@ class PPOAgent:
 		v_value_loss_batch = 0
 		policy_loss_batch = 0
 		entropy_batch = 0
-		weight_v_batch = None
 		grad_norm_value_v_batch = 0
 		grad_norm_policy_batch = 0
-		agent_groups_over_episode_batch = 0
-		avg_agent_group_over_episode_batch = 0
 
 		self.buffer.calculate_targets(episode, self.V_PopArt)
 
@@ -330,7 +319,7 @@ class PPOAgent:
 
 			target_shape = values_old.shape
 
-			values, weight_v, score_v, h_v = self.critic_network_v(
+			values, h_v = self.critic_network_v(
 												local_obs.to(self.device),
 												ally_states.to(self.device),
 												enemy_states.to(self.device),
@@ -361,16 +350,9 @@ class PPOAgent:
 
 			probs = Categorical(dists)
 			logprobs = probs.log_prob(actions.to(self.device))
-			
-			entropy_weights_v = 0
-			score_v_cum = 0
-			
-			for i in range(self.num_heads):
-				entropy_weights_v += -torch.sum(torch.sum(weight_v[:, i] * torch.log(torch.clamp(weight_v[:, i], 1e-10, 1.0)) * agent_masks.view(-1, self.num_agents, 1).to(self.device), dim=-1))/agent_masks.sum()
-				score_v_cum += (score_v[:, i].squeeze(-2)**2 * agent_masks.view(-1, self.num_agents, 1).to(self.device)).sum()/agent_masks.sum()
-
+		
 				
-			critic_v_loss = torch.max(critic_v_loss_1, critic_v_loss_2) #+ self.critic_score_regularizer*score_v_cum + self.critic_weight_entropy_pen*entropy_weights_v
+			critic_v_loss = torch.max(critic_v_loss_1, critic_v_loss_2)
 			print("Critic V Loss", critic_v_loss.item())
 			
 			# Finding the ratio (pi_theta / pi_theta__old)
@@ -418,13 +400,7 @@ class PPOAgent:
 			
 			policy_loss_batch += policy_loss.item()
 			entropy_batch += entropy.item()
-			grad_norm_policy_batch += grad_norm_policy
-			v_value_loss_batch += critic_v_loss.item()
-			grad_norm_value_v_batch += grad_norm_value_v
-			if weight_v_batch is None:
-				weight_v_batch = weight_v.detach().cpu()
-			else:
-				weight_v_batch += weight_v.detach().cpu()
+			grad_norm_policy_batch += grad_norm_policy.item()
 			
 			
 
@@ -444,20 +420,17 @@ class PPOAgent:
 		grad_norm_policy_batch /= self.n_epochs
 		v_value_loss_batch /= self.n_epochs
 		grad_norm_value_v_batch /= self.n_epochs
-		weight_v_batch /= self.n_epochs
 			
 
 		self.plotting_dict = {
 		"v_value_loss": v_value_loss_batch,
 		"policy_loss": policy_loss_batch,
 		"entropy": entropy_batch,
-		"grad_norm_value_v": grad_norm_value_v_batch,
 		"grad_norm_policy": grad_norm_policy_batch,
-		"weights_v": weight_v_batch,
 		}
 		
 		if self.comet_ml is not None:
 			self.plot(agent_masks, episode)
 
-		del v_value_loss_batch, policy_loss_batch, entropy_batch, grad_norm_value_v_batch, grad_norm_policy_batch, weight_v_batch
+		del v_value_loss_batch, policy_loss_batch, entropy_batch, grad_norm_value_v_batch, grad_norm_policy_batch
 		torch.cuda.empty_cache()
