@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import Policy, V_network, PopArt
-from utils import RolloutBuffer
+from utils import RolloutBuffer, RewardReplayMemory
 
 class PPOAgent:
 
@@ -41,28 +41,35 @@ class PPOAgent:
 		self.update_ppo_agent = dictionary["update_ppo_agent"]
 		self.max_time_steps = dictionary["max_time_steps"]
 
-		# Critic Setup
-		self.use_recurrent_critic = dictionary["use_recurrent_critic"]
-		self.temperature_v = dictionary["temperature_v"]
-		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
-		self.rnn_hidden_v = dictionary["rnn_hidden_v"]
-		self.v_comp_emb_shape = dictionary["v_comp_emb_shape"]
+		# Model Setup
 		self.ally_observation_shape = dictionary["ally_observation_shape"]
 		self.num_enemies = dictionary["num_enemies"]
 		self.enemy_observation_shape = dictionary["enemy_observation_shape"]
+		self.local_observation_shape = dictionary["local_observation_shape"]
 
+		# Reward Model Setup
+		self.use_reward_model = dictionary["use_reward_model"]
+		self.version = dictionary["version"]
+		self.reward_lr = dictionary["reward_lr"]
+		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
+		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
+		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
+		self.reward_n_heads = dictionary["reward_n_heads"]
+		self.norm_rewards = dictionary["norm_rewards"]
+		self.temporal_score_coefficient = dictionary["temporal_score_coefficient"]
+		self.agent_score_coefficient = dictionary["agent_score_coefficient"]
+		self.reward_depth = dictionary["reward_depth"]
 
+		# Critic
+		self.use_recurrent_critic = dictionary["use_recurrent_critic"]
+		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
+		self.rnn_hidden_v = dictionary["rnn_hidden_v"]
+		self.v_comp_emb_shape = dictionary["v_comp_emb_shape"]
 		self.v_value_lr = dictionary["v_value_lr"]
 		self.v_weight_decay = dictionary["v_weight_decay"]
-		self.critic_weight_entropy_pen = dictionary["critic_weight_entropy_pen"]
-		self.critic_weight_entropy_pen_final = dictionary["critic_weight_entropy_pen_final"]
-		self.critic_weight_entropy_pen_decay_rate = (dictionary["critic_weight_entropy_pen_final"] - dictionary["critic_weight_entropy_pen"]) / dictionary["critic_weight_entropy_pen_steps"]
-		self.critic_score_regularizer = dictionary["critic_score_regularizer"]
 		self.target_calc_style = dictionary["target_calc_style"]
 		self.n_steps = dictionary["n_steps"]
 		self.value_clip = dictionary["value_clip"]
-		self.num_heads = dictionary["num_heads"]
-		self.enable_hard_attention = dictionary["enable_hard_attention"]
 		self.enable_grad_clip_critic_v = dictionary["enable_grad_clip_critic_v"]
 		self.grad_clip_critic_v = dictionary["grad_clip_critic_v"]
 		self.norm_returns_v = dictionary["norm_returns_v"]
@@ -71,12 +78,11 @@ class PPOAgent:
 		self.clamp_rewards_value_max = dictionary["clamp_rewards_value_max"]
 
 
-		# Actor Setup
+		# Actor
 		self.use_recurrent_policy = dictionary["use_recurrent_policy"]
 		self.data_chunk_length = dictionary["data_chunk_length"]
 		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
-		self.local_observation_shape = dictionary["local_observation_shape"]
 		self.policy_lr = dictionary["policy_lr"]
 		self.policy_weight_decay = dictionary["policy_weight_decay"]
 		self.gamma = dictionary["gamma"]
@@ -91,6 +97,11 @@ class PPOAgent:
 		
 		print("EXPERIMENT TYPE", self.experiment_type)
 
+		if dictionary["algorithm_type"] == "MAPPO":
+			centralized = True
+		else:
+			centralized = False
+
 		# Critic Network
 		if self.norm_returns_v:
 			self.V_PopArt = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
@@ -99,39 +110,29 @@ class PPOAgent:
 
 		self.critic_network_v = V_network(
 			use_recurrent_critic=self.use_recurrent_critic,
+			centralized=centralized,
+			local_observation_input_dim=self.local_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
-			enemy_obs_input_dim=self.enemy_observation_shape, 
-			num_heads=self.num_heads, 
+			enemy_obs_input_dim=self.enemy_observation_shape,
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies, 
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_v,
 			comp_emb_shape=self.v_comp_emb_shape,
 			device=self.device, 
-			enable_hard_attention=self.enable_hard_attention, 
-			attention_dropout_prob=dictionary["attention_dropout_prob_v"], 
-			temperature=self.temperature_v,
-			norm_returns=self.norm_returns_v,
-			environment=self.environment,
-			experiment_type=self.experiment_type,
 			).to(self.device)
 		self.target_critic_network_v = V_network(
 			use_recurrent_critic=self.use_recurrent_critic,
+			centralized=centralized,
+			local_observation_input_dim=self.local_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
 			enemy_obs_input_dim=self.enemy_observation_shape, 
-			num_heads=self.num_heads, 
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies, 
 			num_actions=self.num_actions, 
 			rnn_num_layers=self.rnn_num_layers_v,
 			comp_emb_shape=self.v_comp_emb_shape,
 			device=self.device, 
-			enable_hard_attention=self.enable_hard_attention, 
-			attention_dropout_prob=dictionary["attention_dropout_prob_v"], 
-			temperature=self.temperature_v,
-			norm_returns=self.norm_returns_v,
-			environment=self.environment,
-			experiment_type=self.experiment_type,
 			).to(self.device)
 		# Copy network params
 		self.target_critic_network_v.load_state_dict(self.critic_network_v.state_dict())
@@ -203,6 +204,79 @@ class PPOAgent:
 			self.scheduler_policy = optim.lr_scheduler.MultiStepLR(self.policy_optimizer, milestones=[1000, 20000], gamma=0.1)
 			self.scheduler_v_critic = optim.lr_scheduler.MultiStepLR(self.v_critic_optimizer, milestones=[1000, 20000], gamma=0.1)
 			
+		
+		if self.use_reward_model:
+			self.reward_model_buffer = RewardReplayMemory(
+				experiment_type = self.experiment_type,
+				capacity = dictionary["replay_buffer_size"],
+				max_episode_len = self.max_time_steps,
+				num_agents = self.num_agents,
+				num_enemies=self.num_enemies,
+				ally_obs_shape=self.ally_observation_shape,
+				enemy_obs_shape=self.enemy_observation_shape,
+				action_shape = self.num_actions,
+				device = self.device,
+				)
+
+			if "AREL" in self.experiment_type:
+				from AREL import AREL
+				self.reward_model = AREL.Time_Agent_Transformer(
+					emb=dictionary["reward_model_obs_shape"]+self.num_actions,
+					heads=dictionary["reward_n_heads"], 
+					depth=dictionary["reward_depth"], 
+					seq_length=dictionary["max_time_steps"], 
+					n_agents=self.num_agents, 
+					agent=dictionary["reward_agent_attn"], 
+					dropout=dictionary["reward_dropout"], 
+					wide=dictionary["reward_attn_net_wide"], 
+					version=dictionary["version"], 
+					norm_rewards=dictionary["norm_rewards"],
+					linear_compression_dim=dictionary["reward_linear_compression_dim"],
+					device=self.device,
+					).to(self.device)
+
+			elif "ATRR" in self.experiment_type:
+				from ATRR import ATRR
+				self.reward_model = ATRR.Time_Agent_Transformer(
+					ally_obs_shape=self.ally_observation_shape,
+					enemy_obs_shape=self.enemy_observation_shape,
+					action_shape=self.num_actions, 
+					heads=dictionary["reward_n_heads"], 
+					depth=dictionary["reward_depth"], 
+					seq_length=dictionary["max_time_steps"], 
+					n_agents=self.num_agents, 
+					n_enemies=self.num_enemies,
+					n_actions=self.num_actions,
+					agent=dictionary["reward_agent_attn"], 
+					dropout=dictionary["reward_dropout"], 
+					wide=dictionary["reward_attn_net_wide"], 
+					version=dictionary["version"], 
+					linear_compression_dim=dictionary["reward_linear_compression_dim"],
+					norm_rewards=dictionary["norm_rewards"],
+					device=self.device,
+					).to(self.device)
+
+			if self.norm_rewards:
+				self.reward_normalizer = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
+			
+			if dictionary["load_models"]:
+				# For CPU
+				if torch.cuda.is_available() is False:
+					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"], map_location=torch.device('cpu')))
+				# For GPU
+				else:
+					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"]))
+
+			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
+			
+			if self.scheduler_need:
+				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
+
+		else:
+			self.reward_model = None
+
+
+
 		self.comet_ml = None
 		if dictionary["save_comet_ml_plot"]:
 			self.comet_ml = comet_ml
@@ -268,6 +342,204 @@ class PPOAgent:
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
 			return actions, action_logprob, hidden_state.cpu().numpy()
+
+
+
+	def reward_model_output(self, eval_reward_model=False):
+		if eval_reward_model:
+			latest_sample_index = self.buffer.episode_num
+			# state_batch = torch.from_numpy(self.buffer.reward_model_obs[latest_sample_index]).float().unsqueeze(0)
+			ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0)
+			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0)
+			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
+			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions[latest_sample_index]).float().unsqueeze(0)
+			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
+			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
+			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
+		else:
+			# state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
+			ally_state_batch = torch.from_numpy(self.buffer.ally_states).float()
+			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float()
+			actions_batch = torch.from_numpy(self.buffer.actions).float()
+			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions).float()
+			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
+			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
+			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long()
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1)
+		
+		with torch.no_grad():
+			if "AREL" in self.experiment_type:
+				state_actions_batch = torch.cat([state_batch, one_hot_actions_batch], dim=-1)
+
+				with torch.no_grad():
+					reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = self.reward_model(
+						state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+						team_masks=team_mask_batch.to(self.device),
+						agent_masks=agent_masks_batch.to(self.device)
+						)
+
+				reward_batch = reward_time_wise.cpu()
+
+				if self.experiment_type == "AREL_agent":
+					reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
+				else:
+					reward_batch = reward_batch.unsqueeze(-1).repeat(1, 1, self.num_agents)
+
+				return reward_batch
+
+
+			elif "ATRR" in self.experiment_type:
+
+				with torch.no_grad():
+					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
+					temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
+						# state_batch.permute(0, 2, 1, 3).to(self.device), 
+						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+						actions_batch.permute(0, 2, 1).to(self.device), 
+						team_masks=team_mask_batch.to(self.device),
+						agent_masks=agent_masks_batch.to(self.device),
+						episode_len=episode_len_batch.to(self.device),
+						)
+
+					if self.experiment_type == "ATRR_temporal_attn_weights":
+						b, t, n_a, _ = state_batch.shape
+						
+						temporal_weights_final = F.softmax(torch.where(team_mask_batch.bool(), (temporal_scores[-1].mean(dim=1).sum(dim=1)/(agent_masks_batch.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
+						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1).repeat(1, 1, n_a)
+					
+
+					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
+						b, t, n_a, _ = ally_state_batch.shape
+						
+						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+
+						
+						agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						# renormalizing
+						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+						
+						multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
+						# renormalizing
+						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
+						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
+
+						rewards = agent_temporal_rewards
+					
+					if self.experiment_type == "ATRR_temporal":
+						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
+
+					if self.experiment_type == "ATRR_temporal_v2":
+						mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
+						# void weightage to timesteps after multi-agent system death
+						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
+						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
+
+		
+			return rewards.cpu()
+			
+
+	def update_reward_model(self, sample):
+		# sample episodes from replay buffer
+		ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		# convert numpy array to tensor
+		# reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
+		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
+		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
+		actions_batch = torch.from_numpy(actions_batch)
+		one_hot_actions_batch = torch.from_numpy(one_hot_actions_batch).float() # same as current one_hot_actions
+		reward_batch = torch.from_numpy(reward_batch).float()
+		episodic_reward_batch = reward_batch.sum(dim=1)
+		team_mask_batch = torch.from_numpy(team_mask_batch).float()
+		agent_masks_batch = torch.from_numpy(agent_masks_batch).float()
+		episode_len_batch = torch.from_numpy(episode_len_batch).long()
+
+		if self.norm_rewards:
+			shape = episodic_reward_batch.shape
+			episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
+
+		# if self.norm_rewards:
+		# 	shape = episodic_reward_batch.shape
+		# 	self.reward_normalizer.update(episodic_reward_batch.view(-1))
+			
+		# 	episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
+
+		if "AREL" in self.experiment_type:
+			state_actions_batch = torch.cat([reward_model_obs_batch, one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
+			reward_episode_wise, reward_time_wise, _, _, _, _ = self.reward_model(
+				state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+				team_masks=team_mask_batch.to(self.device),
+				agent_masks=agent_masks_batch.to(self.device)
+				)
+
+
+			shape = reward_time_wise.shape
+			# reward_copy = copy.deepcopy(reward_time_wise.detach())
+			# reward_copy[team_mask_batch.view(*shape) == 0.0] = 0.0 
+			# reward_mean = (reward_copy.sum(dim=-1)/team_mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
+			# print("Check for NaN")
+			# print(torch.isnan(reward_time_wise).any())
+			# print(torch.isnan(reward_mean).any())
+			# reward_var = (reward_time_wise - reward_mean)**2
+			# reward_var[team_mask_batch.view(*shape) == 0.0] = 0.0
+			# reward_var = reward_var.sum() / team_mask_batch.sum()
+
+			reward_var = torch.tensor([-1])
+			reward_loss = F.huber_loss((reward_time_wise*team_mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
+
+		elif "ATRR" in self.experiment_type:
+			
+			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
+				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
+				actions_batch.permute(0, 2, 1).to(self.device), 
+				team_masks=team_mask_batch.to(self.device),
+				agent_masks=agent_masks_batch.to(self.device),
+				episode_len=episode_len_batch.to(self.device),
+				)
+
+			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
+			# agent_weights = agent_weights.cpu().mean(dim=0)
+			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
+			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
+			
+			if temporal_weights_final_temporal_block is not None:
+				entropy_final_temporal_block = (-torch.sum(temporal_weights_final_temporal_block * torch.log(torch.clamp(temporal_weights_final_temporal_block, 1e-10, 1.0)))/team_mask_batch.shape[0]).item()
+			else:
+				entropy_final_temporal_block = None
+
+			if self.version == "agent_temporal_attn_weights":
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
+			else:
+				reward_loss = F.huber_loss(rewards.reshape(reward_model_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+			
+			if temporal_scores_final_temporal_block is not None:
+				reward_loss += self.temporal_score_coefficient * (temporal_scores_final_temporal_block**2).sum()
+
+		self.reward_optimizer.zero_grad()
+		reward_loss.backward()
+		if self.enable_reward_grad_clip:
+			grad_norm_value_reward = torch.nn.utils.clip_grad_norm_(self.reward_model.parameters(), self.reward_grad_clip_value)
+		else:
+			total_norm = 0
+			for name, p in self.reward_model.named_parameters():
+				if p.requires_grad is False or p.grad is None:
+					continue
+				param_norm = p.grad.detach().data.norm(2)
+				total_norm += param_norm.item() ** 2
+			grad_norm_value_reward = torch.tensor([total_norm ** 0.5])
+		self.reward_optimizer.step()
+
+		if "AREL" in self.experiment_type:
+			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
+		elif "ATRR" in self.experiment_type:
+			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), entropy_final_temporal_block, grad_norm_value_reward.item()
 
 
 
