@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from comet_ml import Experiment
 import numpy as np
@@ -357,8 +358,8 @@ if __name__ == '__main__':
 	for i in range(1, 2):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ MPE/ PressurePlate/ PettingZoo/ LBForaging
-		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ crossing_team_greedy/ pressureplate-linear-6p-v0/ pursuit_v4/ "Foraging-{0}x{0}-{1}p-{2}f{3}-v2".format(grid_size, num_players, num_food, "-coop" if fully_coop else "")
+		environment = "StarCraft" # StarCraft/ Alice_And_Bob
+		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_And_Bob
 		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
 		experiment_name = "IPPO_ATRR_agent_temporal_attn_weights"
 		algorithm_type = "IPPO"
@@ -459,8 +460,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 8e-3, #8e-3
+				"entropy_pen_final": 8e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
@@ -468,18 +469,23 @@ if __name__ == '__main__':
 
 		seeds = [42, 142, 242, 342, 442]
 		torch.manual_seed(seeds[dictionary["iteration"]-1])
-			
-		import gym
-		import smaclite  # noqa
 		
-		env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
-		obs, info = env.reset(return_info=True)
-		dictionary["ally_observation_shape"] = info["ally_states"][0].shape[0]
-		dictionary["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
-		dictionary["local_observation_shape"] = obs[0].shape[0]
-		dictionary["num_agents"] = env.n_agents
-		dictionary["num_enemies"] = env.n_enemies
-		dictionary["num_actions"] = env.action_space[0].n
+		if "StarCraft" in dictionary["environment"]:
+			import gym
+			import smaclite  # noqa
+			
+			env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
+			obs, info = env.reset(return_info=True)
+			dictionary["ally_observation_shape"] = info["ally_states"][0].shape[0]
+			dictionary["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
+			dictionary["local_observation_shape"] = obs[0].shape[0]
+			dictionary["num_agents"] = env.n_agents
+			dictionary["num_enemies"] = env.n_enemies
+			dictionary["num_actions"] = env.action_space[0].n
+		else:
+			sys.path.append("../../../environments/alice_and_bob/")
+			from alice_and_bob_simple_v3 import *
+
 
 		ma_controller = MAPPO(env,dictionary)
 		ma_controller.run()
