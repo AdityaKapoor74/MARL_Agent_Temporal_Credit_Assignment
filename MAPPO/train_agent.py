@@ -292,6 +292,8 @@ class MAPPO:
 							self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
 							self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
 							self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
+						elif "Alice_and_Bob" in self.environment:
+							self.comet_ml.log_metric('Agents Done', dones, episode)
 						
 					break
 
