@@ -155,11 +155,22 @@ class MAPPO:
 
 		for episode in range(1,self.max_episodes+1):
 
-			local_obs, info = self.env.reset(return_info=True)
-			mask_actions = np.array(info["avail_actions"], dtype=int)
+			if "StarCraft" in self.environment:
+				local_obs, info = self.env.reset(return_info=True)
+				mask_actions = np.array(info["avail_actions"], dtype=int)
+				ally_states = np.array(info["ally_states"])
+				enemy_states = np.array(info["enemy_states"])
+
+				global_obs = None
+			else:
+				local_obs = self.env.reset()
+				global_obs = self.env.get_state()
+				mask_actions = np.ones([self.num_agents, self.num_actions])
+
+				ally_states, enemy_states = None, None
+			
+
 			last_actions = np.zeros((self.num_agents)) + self.num_actions
-			ally_states = np.array(info["ally_states"])
-			enemy_states = np.array(info["enemy_states"])
 			local_obs = np.array(local_obs)
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
@@ -193,15 +204,32 @@ class MAPPO:
 				for i, act in enumerate(actions):
 					one_hot_actions[i][act] = 1
 
-				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
+				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
 				
 				next_local_obs, rewards, next_dones, info = self.env.step(actions)
 				next_local_obs = np.array(next_local_obs)
-				next_ally_states = np.array(info["ally_states"])
-				next_enemy_states = np.array(info["enemy_states"])
-				next_mask_actions = np.array(info["avail_actions"], dtype=int)
-				next_indiv_dones = info["indiv_dones"]
-				indiv_rewards = info["indiv_rewards"]
+
+				if "StarCraft" in self.environment:
+					next_ally_states = np.array(info["ally_states"])
+					next_enemy_states = np.array(info["enemy_states"])
+					next_mask_actions = np.array(info["avail_actions"], dtype=int)
+					next_indiv_dones = info["indiv_dones"]
+					indiv_rewards = info["indiv_rewards"]
+
+					next_global_obs = None
+
+				elif "Alice_and_Bob" in self.environment:
+					next_global_obs = self.env.get_state()
+
+					next_ally_states = None
+					next_enemy_states = None
+					next_mask_actions = np.ones([self.num_agents, self.num_actions])
+					# next_dones and rewards is a list: [global_val]*num_agents
+					next_indiv_dones = next_dones
+					next_dones = all(next_indiv_dones)
+					indiv_rewards = rewards
+					rewards = indiv_rewards[0]
+
 				
 				episode_reward += np.sum(rewards)
 				episode_indiv_rewards = [r+indiv_rewards[i] for i, r in enumerate(episode_indiv_rewards)]
@@ -218,7 +246,7 @@ class MAPPO:
 				if self.learn:
 					self.agents.buffer.push(
 						ally_states, enemy_states, value, rnn_hidden_state_v, \
-						local_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+						global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
 						rewards_to_send, indiv_dones, dones
 						)
 
@@ -230,7 +258,7 @@ class MAPPO:
 					ally_states, enemy_states = next_ally_states, next_enemy_states
 
 					
-				local_obs, last_actions, mask_actions, indiv_dones, dones = next_local_obs, actions, next_mask_actions, next_indiv_dones, next_dones
+				global_obs, local_obs, last_actions, mask_actions, indiv_dones, dones = next_global_obs, next_local_obs, actions, next_mask_actions, next_indiv_dones, next_dones
 				rnn_hidden_state_v, rnn_hidden_state_actor = next_rnn_hidden_state_v, next_rnn_hidden_state_actor
 
 				if all(indiv_dones) or step == self.max_time_steps:
@@ -241,7 +269,7 @@ class MAPPO:
 						# add final time to buffer
 						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 					
-						value, _ = self.agents.get_values(local_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
+						value, _ = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
 						
 						self.agents.buffer.end_episode(final_timestep, value, indiv_dones, dones)
 
@@ -250,16 +278,20 @@ class MAPPO:
 
 					print("*"*100)
 					print("EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(episode, np.round(episode_reward,decimals=4), step, self.max_time_steps, episode_indiv_rewards))
-					print("Num Allies Alive: {} | Num Enemies Alive: {} | AGENTS DEAD: {} \n".format(info["num_allies"], info["num_enemies"], info["indiv_dones"]))
+					if "StarCraft" in self.environment:
+						print("Num Allies Alive: {} | Num Enemies Alive: {} | AGENTS DEAD: {} \n".format(info["num_allies"], info["num_enemies"], info["indiv_dones"]))
+					elif "Alice_and_Bob" in self.environment:
+						print("AGENTS DONE: {} \n".format(indiv_dones))
 					print("*"*100)
 
 					if self.save_comet_ml_plot:
 						self.comet_ml.log_metric('Episode_Length', step, episode)
 						self.comet_ml.log_metric('Reward', episode_reward, episode)
-						self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
-						self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
-						self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
-						self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
+						if "StarCraft" in self.environment:
+							self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
+							self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
+							self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
+							self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
 						
 					break
 
@@ -358,10 +390,10 @@ if __name__ == '__main__':
 	for i in range(1, 2):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ Alice_And_Bob
-		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_And_Bob
-		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
+		environment = "Alice_and_Bob" # StarCraft/ Alice_and_Bob
+		env_name = "Alice_and_Bob" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_temporal_team"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -390,8 +422,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 30000, # 20000 (StarCraft environments)/ 30000 (MPE/PressurePlate)/ 5000 (PettingZoo)/ 15000 (LBForaging)
-				"max_time_steps": 50, # 100 (StarCraft environments & MPE)/ 70 (PressurePlate & LBForaging)/ 500 (PettingZoo)
+				"max_episodes": 2000, # 30000 (StarCraft environments)/ 2000 (Alice_and_Bob)
+				"max_time_steps": 40, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
@@ -403,7 +435,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,

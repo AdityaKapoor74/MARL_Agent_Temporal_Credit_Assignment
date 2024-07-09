@@ -210,7 +210,7 @@ class V_network(nn.Module):
 			if "StarCraft" in self.environment:
 				input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
 			elif "Alice_and_Bob" in self.environment:
-				input_dim = global_observation_input_dim
+				input_dim = global_observation_input_dim+self.num_agents+self.num_actions*self.num_agents
 		else:
 			input_dim = local_observation_input_dim
 
@@ -246,18 +246,30 @@ class V_network(nn.Module):
 		self.agent_ids = torch.eye(self.num_agents).to(self.device)
 
 
-	def forward(self, local_observations, ally_states, enemy_states, actions, rnn_hidden_state, agent_masks):
+	def forward(self, local_observations, global_observations, ally_states, enemy_states, actions, rnn_hidden_state, agent_masks):
 		if self.centralized:
-			batch, timesteps, _, _ = ally_states.shape
-			one_hot_actions = self.one_hot_actions[actions.long()]
-			agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
-			ally_states = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
-			ally_states = torch.stack([torch.roll(ally_states, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
-			ally_states = ally_states.permute(1, 2, 0, 3, 4)
-			ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions)
-			ally_states = ally_states.reshape(batch, timesteps, self.num_agents, -1)
-			enemy_states = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
-			final_state_embedding = self.embedding(torch.cat([ally_states, enemy_states], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+			if "StarCraft" in self.environment:
+				batch, timesteps, _, _ = ally_states.shape
+				one_hot_actions = self.one_hot_actions[actions.long()]
+				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+				ally_states = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
+				ally_states = torch.stack([torch.roll(ally_states, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
+				ally_states = ally_states.permute(1, 2, 0, 3, 4)
+				ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions)
+				ally_states = ally_states.reshape(batch, timesteps, self.num_agents, -1)
+				enemy_states = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
+				final_state_embedding = self.embedding(torch.cat([ally_states, enemy_states], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+			elif "Alice_and_Bob" in self.environment:
+				batch, timesteps,  _ = global_observations.shape
+				global_observations = global_observations.unsqueeze(-2).repeat(1, 1, self.num_agents, 1)
+				one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
+				one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
+				for i in range(self.num_agents):
+					one_hot_actions[:, :, i, i, :] = torch.zeros(batch, timesteps, self.num_actions).to(self.device)
+				one_hot_actions = one_hot_actions.reshape(batch, timesteps, self.num_agents, self.num_agents*self.num_actions)
+				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+				global_observations = torch.cat([agent_ids, global_observations, one_hot_actions], dim=-1)
+				final_state_embedding = self.embedding(global_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
 		else:
 			batch, timesteps, _, _ = local_observations.shape
 			final_state_embedding = self.embedding(local_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
