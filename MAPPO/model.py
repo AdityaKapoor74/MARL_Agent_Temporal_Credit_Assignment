@@ -179,9 +179,11 @@ class Policy(nn.Module):
 class V_network(nn.Module):
 	def __init__(
 		self, 
+		environment,
 		use_recurrent_critic,
 		centralized,
 		local_observation_input_dim,
+		global_observation_input_dim,
 		ally_obs_input_dim, 
 		enemy_obs_input_dim,
 		num_agents, 
@@ -194,6 +196,7 @@ class V_network(nn.Module):
 		
 		super(V_network, self).__init__()
 		
+		self.environment = environment
 		self.use_recurrent_critic = use_recurrent_critic
 		self.centralized = centralized
 		self.num_agents = num_agents
@@ -204,7 +207,10 @@ class V_network(nn.Module):
 		self.device = device
 
 		if self.centralized:
-			input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
+			if "StarCraft" in self.environment:
+				input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
+			elif "Alice_and_Bob" in self.environment:
+				input_dim = global_observation_input_dim
 		else:
 			input_dim = local_observation_input_dim
 

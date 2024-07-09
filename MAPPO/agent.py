@@ -42,9 +42,19 @@ class PPOAgent:
 		self.max_time_steps = dictionary["max_time_steps"]
 
 		# Model Setup
-		self.ally_observation_shape = dictionary["ally_observation_shape"]
-		self.num_enemies = dictionary["num_enemies"]
-		self.enemy_observation_shape = dictionary["enemy_observation_shape"]
+		if "StarCraft" in self.environment:
+			self.ally_observation_shape = dictionary["ally_observation_shape"]
+			self.num_enemies = dictionary["num_enemies"]
+			self.enemy_observation_shape = dictionary["enemy_observation_shape"]
+
+			self.global_observation_shape = None
+		elif "Alice_and_Bob" in self.environment:
+			self.global_observation_shape = dictionary["global_observation_shape"]
+
+			self.ally_observation_shape = None
+			self.num_enemies = None
+			self.enemy_observation_shape = None
+
 		self.local_observation_shape = dictionary["local_observation_shape"]
 
 		# Reward Model Setup
@@ -109,9 +119,11 @@ class PPOAgent:
 			self.V_PopArt = None
 
 		self.critic_network_v = V_network(
+			environment=self.environment,
 			use_recurrent_critic=self.use_recurrent_critic,
 			centralized=centralized,
 			local_observation_input_dim=self.local_observation_shape,
+			global_observation_shape=self.global_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
 			enemy_obs_input_dim=self.enemy_observation_shape,
 			num_agents=self.num_agents, 
@@ -122,11 +134,13 @@ class PPOAgent:
 			device=self.device, 
 			).to(self.device)
 		self.target_critic_network_v = V_network(
+			environment=self.environment,
 			use_recurrent_critic=self.use_recurrent_critic,
 			centralized=centralized,
 			local_observation_input_dim=self.local_observation_shape,
+			global_observation_input_dim=self.global_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
-			enemy_obs_input_dim=self.enemy_observation_shape, 
+			enemy_obs_input_dim=self.enemy_observation_shape,
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies, 
 			num_actions=self.num_actions, 

@@ -412,7 +412,7 @@ if __name__ == '__main__':
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 128, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
@@ -484,10 +484,16 @@ if __name__ == '__main__':
 			dictionary["num_actions"] = env.action_space[0].n
 		else:
 			sys.path.append("../../../environments/alice_and_bob/")
-			from alice_and_bob_simple_v3 import *
+			from alice_and_bob import *
+
+			env = Alice_and_Bob()
+			dictionary["num_agents"] = env.agent_num
+			dictionary["local_observation_shape"] = env.obs_dim
+			dictionary["global_observation_shape"] = env.state_dim
+			dictionary["num_actions"] = env.n_action
 
 
-		ma_controller = MAPPO(env,dictionary)
+		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()
 
 
