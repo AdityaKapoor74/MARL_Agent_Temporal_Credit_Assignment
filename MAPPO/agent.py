@@ -123,7 +123,7 @@ class PPOAgent:
 			use_recurrent_critic=self.use_recurrent_critic,
 			centralized=centralized,
 			local_observation_input_dim=self.local_observation_shape,
-			global_observation_shape=self.global_observation_shape,
+			global_observation_input_dim=self.global_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
 			enemy_obs_input_dim=self.enemy_observation_shape,
 			num_agents=self.num_agents, 
