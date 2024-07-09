@@ -515,7 +515,8 @@ if __name__ == '__main__':
 			dictionary["num_enemies"] = env.n_enemies
 			dictionary["num_actions"] = env.action_space[0].n
 		else:
-			sys.path.append("../../../environments/alice_and_bob/")
+			sys.path.append("../../../environments/alice_and_bob/") # local
+			sys.path.append("../../environments/alice_and_bob/") # remote
 			from alice_and_bob import *
 
 			env = Alice_and_Bob()
