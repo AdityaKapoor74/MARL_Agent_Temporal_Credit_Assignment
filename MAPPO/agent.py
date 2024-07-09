@@ -674,6 +674,8 @@ class PPOAgent:
 			policy_loss_batch += policy_loss.item()
 			entropy_batch += entropy.item()
 			grad_norm_policy_batch += grad_norm_policy.item()
+			v_value_loss_batch += critic_v_loss.item()
+			grad_norm_value_v_batch += grad_norm_value_v.item()
 			
 			
 
