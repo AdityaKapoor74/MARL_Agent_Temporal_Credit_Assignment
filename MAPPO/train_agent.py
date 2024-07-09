@@ -392,10 +392,10 @@ if __name__ == '__main__':
 	for i in range(1, 2):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "Alice_and_Bob" # StarCraft/ Alice_and_Bob
-		env_name = "Alice_and_Bob" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_temporal_team"
+		environment = "StarCraft" # StarCraft/ Alice_and_Bob
+		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -424,8 +424,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
-				"max_time_steps": 40, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
+				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
@@ -445,7 +445,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
-				"reward_batch_size": 128, # 128
+				"reward_batch_size": 256, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_coefficient": 0.0,
