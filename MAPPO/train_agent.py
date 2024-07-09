@@ -424,7 +424,7 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 2000, # 30000 (StarCraft environments)/ 2000 (Alice_and_Bob)
+				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
 				"max_time_steps": 40, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
