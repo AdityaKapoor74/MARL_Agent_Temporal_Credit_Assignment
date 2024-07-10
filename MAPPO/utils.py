@@ -45,8 +45,8 @@ def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold
 class RewardReplayMemory:
 	def __init__(
 		self, 
-		environment,
-		experiment_type,
+		# environment,
+		# experiment_type,
 		capacity, 
 		max_episode_len, 
 		num_agents, 
@@ -58,8 +58,8 @@ class RewardReplayMemory:
 		device,
 		):
 
-		self.environment = environment
-		self.experiment_type = experiment_type
+		# self.environment = environment
+		# self.experiment_type = experiment_type
 		self.capacity = capacity
 		self.length = 0
 		self.episode = 0
@@ -313,7 +313,7 @@ class RolloutBuffer:
 			enemy_states = torch.from_numpy(self.enemy_states).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_enemies, self.enemy_state_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_enemies, self.enemy_state_shape)
 			global_obs = None
 		else:
-			global_obs = torch.from_numpy(self.global_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.global_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.global_obs_shape)
+			global_obs = torch.from_numpy(self.global_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.global_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.global_obs_shape)
 			ally_states, enemy_states = None, None
 		hidden_state_v = torch.from_numpy(self.hidden_state_v).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_v, self.num_agents, self.v_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_v, -1, self.v_hidden_state)
 		local_obs = torch.from_numpy(self.local_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.local_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape)
