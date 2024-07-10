@@ -255,7 +255,7 @@ class V_network(nn.Module):
 				ally_states = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
 				ally_states = torch.stack([torch.roll(ally_states, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
 				ally_states = ally_states.permute(1, 2, 0, 3, 4)
-				ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions)
+				ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions).to(self.device)
 				ally_states = ally_states.reshape(batch, timesteps, self.num_agents, -1)
 				enemy_states = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
 				final_state_embedding = self.embedding(torch.cat([ally_states, enemy_states], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)

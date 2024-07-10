@@ -611,8 +611,8 @@ class PPOAgent:
 			target_shape = values_old.shape
 
 			if "StarCraft" in self.environment:
-				ally_states.to(self.device)
-				enemy_states.to(self.device)
+				ally_states = ally_states.to(self.device)
+				enemy_states = enemy_states.to(self.device)
 			elif "Alice_and_Bob" in self.environment:
 				global_obs = global_obs.to(self.device)
 
