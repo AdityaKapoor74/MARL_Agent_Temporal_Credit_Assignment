@@ -53,7 +53,7 @@ class RewardReplayMemory:
 		num_enemies,
 		ally_obs_shape,
 		enemy_obs_shape,
-		global_obs_shape,
+		# global_obs_shape,
 		action_shape,
 		device,
 		):

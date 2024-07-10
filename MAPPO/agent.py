@@ -222,7 +222,7 @@ class PPOAgent:
 		
 		if self.use_reward_model:
 			self.reward_model_buffer = RewardReplayMemory(
-				experiment_type = self.experiment_type,
+				# experiment_type = self.experiment_type,
 				capacity = dictionary["replay_buffer_size"],
 				max_episode_len = self.max_time_steps,
 				num_agents = self.num_agents,
