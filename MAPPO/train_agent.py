@@ -394,8 +394,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
-		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
+		experiment_type = "ATRR_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights
+		experiment_name = "MAPPO_ATRR_agent"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -453,9 +453,9 @@ if __name__ == '__main__':
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
-				"replay_buffer_size": 15000,
-				"update_reward_model_freq": 10, # 200
-				"reward_model_update_epochs": 20, # 400
+				"replay_buffer_size": 5000,
+				"update_reward_model_freq": 100, # 200
+				"reward_model_update_epochs": 200, # 400
 				"norm_rewards": False,
 
 
