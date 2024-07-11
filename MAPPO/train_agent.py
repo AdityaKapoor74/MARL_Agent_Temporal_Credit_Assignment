@@ -444,7 +444,7 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
-				"reward_linear_compression_dim": 64,
+				"reward_linear_compression_dim": 128,
 				"reward_batch_size": 256, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
