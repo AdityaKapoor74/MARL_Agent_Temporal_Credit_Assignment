@@ -435,7 +435,6 @@ class PPOAgent:
 						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
 						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
-						'''
 						agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
@@ -448,8 +447,8 @@ class PPOAgent:
 						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
 
 						rewards = agent_temporal_rewards
-						'''
-						rewards = rewards.transpose(1, 2).cpu() * temporal_weights_final
+						
+						# rewards = rewards.transpose(1, 2).cpu() * temporal_weights_final
 
 					
 					if self.experiment_type == "ATRR_temporal":
@@ -537,8 +536,8 @@ class PPOAgent:
 				entropy_final_temporal_block = None
 
 			if self.version == "agent_temporal_attn_weights":
-				# reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
-				reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
+				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:
 				reward_loss = F.huber_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
 			
