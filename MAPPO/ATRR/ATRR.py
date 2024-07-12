@@ -319,9 +319,11 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		last_action_ = torch.tensor(self.action_shape).reshape(1, 1, 1).repeat(b, n_a, 1).to(self.device)
-		last_actions = torch.cat([last_action_, actions[:, :, 1:]], dim=-1)
-		action_prediction = self.dynamics_model(state_embeddings_norm.view(b, n_a, t, self.comp_emb) + self.action_embedding(last_actions.long()))
+		# last_action_ = torch.tensor(self.action_shape).reshape(1, 1, 1).repeat(b, n_a, 1).to(self.device)
+		# last_actions = torch.cat([last_action_, actions[:, :, 1:]], dim=-1)
+		zeroth_state_embedding_norm = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
+		next_state_embeddings_norm = torch.cat([state_embeddings_norm.view(b, n_a, t, self.comp_emb)[:, :, :-1, :], zeroth_state_embedding_norm], dim=2)
+		action_prediction = self.dynamics_model(x.view(b, n_a, t, self.comp_emb)+next_state_embeddings_norm)
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
