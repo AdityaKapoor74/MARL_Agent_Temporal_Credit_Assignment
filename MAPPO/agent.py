@@ -287,6 +287,8 @@ class PPOAgent:
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
 
+			self.classification_loss = nn.CrossEntropyLoss()
+
 		else:
 			self.reward_model = None
 
@@ -411,7 +413,7 @@ class PPOAgent:
 
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
-					temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
+					temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
 						# state_batch.permute(0, 2, 1, 3).to(self.device), 
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -514,7 +516,7 @@ class PPOAgent:
 
 		elif "ATRR" in self.experiment_type:
 			
-			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block = self.reward_model(
+			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
 				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -536,7 +538,7 @@ class PPOAgent:
 				entropy_final_temporal_block = None
 
 			if self.version == "agent_temporal_attn_weights":
-				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
+				reward_loss = F.huber_loss(rewards.squeeze(-1), episodic_reward_batch.to(self.device)) + self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
 				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:
 				reward_loss = F.huber_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()

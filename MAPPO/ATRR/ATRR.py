@@ -215,7 +215,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.ally_obs_compress_input = init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False)
 		self.enemy_obs_compress_input = init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False)
 
-		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
+		self.action_embedding = nn.Embedding(n_actions+1, self.comp_emb)
 		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 		self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
@@ -235,6 +235,12 @@ class Time_Agent_Transformer(nn.Module):
 					)
 
 		self.tblocks = nn.Sequential(*tblocks)
+
+		self.dynamics_model = nn.Sequential(
+			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
+			)
 		
 		self.pre_final_norm = nn.LayerNorm(self.comp_emb)
 
@@ -287,12 +293,13 @@ class Time_Agent_Transformer(nn.Module):
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		
-		x = self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
+		state_embeddings_norm = self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
+		x = state_embeddings_norm + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
 
-		x_intermediate_temporal_agent = []
+		# x_intermediate_temporal_agent = []
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
@@ -312,9 +319,9 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-			# x_intermediate_temporal_agent.append(x)
-
-		# x_intermediate_temporal_agent = torch.stack(x_intermediate_temporal_agent, dim=0).sum(dim=0)
+		last_action_ = torch.tensor(self.action_shape).reshape(1, 1, 1).repeat(b, n_a, 1).to(self.device)
+		last_actions = torch.cat([last_action_, actions[:, :, 1:]], dim=-1)
+		action_prediction = self.dynamics_model(state_embeddings_norm.view(b, n_a, t, self.comp_emb) + self.action_embedding(last_actions.long()))
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
@@ -366,7 +373,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			rewards = self.rblocks(x).view(b, 1).contiguous()
 			# rewards = self.rblocks(x).view(b, n_a, 1).contiguous()
-			
+
 			# temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 			# temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
 			# ATTENTION ROLLOUT
@@ -411,7 +418,7 @@ class Time_Agent_Transformer(nn.Module):
 				pass
 
 
-		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block
+		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction
 
 
 
