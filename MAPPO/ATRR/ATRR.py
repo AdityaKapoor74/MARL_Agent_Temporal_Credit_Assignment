@@ -359,11 +359,13 @@ class Time_Agent_Transformer(nn.Module):
 
 			# print((x.reshape(b, n_a, t, -1)[0, 0, indiv_agent_episode_len[0, 0, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 1, indiv_agent_episode_len[0, 1, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 2, indiv_agent_episode_len[0, 2, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 3, indiv_agent_episode_len[0, 3, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 4, indiv_agent_episode_len[0, 4, 0, 0], :]))
 
-			x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
+			# x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
+			x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len)
 
 			# print(x[0])
 
-			rewards = self.rblocks(x).view(b, 1).contiguous()
+			# rewards = self.rblocks(x).view(b, 1).contiguous()
+			rewards = self.rblocks(x).view(b, n_a, 1).contiguous()
 			# temporal_scores_final_temporal_block  = torch.stack(temporal_scores_final_temporal_block, dim=0).reshape(self.depth, b, self.heads, t, t) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 			# temporal_weights_final_temporal_block = torch.stack(temporal_weights_final_temporal_block, dim=0).reshape(self.depth, b, t, t) * team_masks.unsqueeze(0).unsqueeze(-1) * team_masks.unsqueeze(0).unsqueeze(-2)
 			# ATTENTION ROLLOUT
