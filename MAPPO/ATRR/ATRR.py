@@ -214,15 +214,15 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.ally_obs_compress_input = nn.Sequential(
 			init_(nn.Linear(ally_obs_shape+n_agents, self.comp_emb), activate=True),
-			nn.GELU(),
+			# nn.GELU(),
 			)
 		self.enemy_obs_compress_input = nn.Sequential(
 			init_(nn.Linear(enemy_obs_shape+n_enemies, 16), activate=True),
-			nn.GELU(),
+			# nn.GELU(),
 			)
 		self.final_obs_embedding = nn.Sequential(
 			init_(nn.Linear(16+self.comp_emb, self.comp_emb), activate=True),
-			nn.GELU(),
+			# nn.GELU(),
 			)
 
 		self.agent_one_hot_ids = torch.eye(n_agents)
