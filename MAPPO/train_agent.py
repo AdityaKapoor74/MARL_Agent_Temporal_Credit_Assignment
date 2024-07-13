@@ -419,10 +419,10 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": False,
+				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
 				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
@@ -433,7 +433,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 0, # 2000
+				"warm_up_period": 2000, # 2000
 
 
 				# REWARD MODEL
@@ -445,7 +445,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
-				"reward_batch_size": 10, # 128
+				"reward_batch_size": 256, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_coefficient": 0.0,
@@ -454,8 +454,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 10, # 200
-				"reward_model_update_epochs": 10, # 400
+				"update_reward_model_freq": 100, # 200
+				"reward_model_update_epochs": 200, # 400
 				"norm_rewards": False,
 
 
