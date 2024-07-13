@@ -212,13 +212,26 @@ class Time_Agent_Transformer(nn.Module):
 		self.depth = depth
 		self.agent_attn = agent
 
-		self.ally_obs_compress_input = init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False)
-		self.enemy_obs_compress_input = init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False)
+		self.ally_obs_compress_input = nn.Sequential(
+			init_(nn.Linear(ally_obs_shape+n_agents, self.comp_emb), activate=True),
+			nn.GELU(),
+			)
+		self.enemy_obs_compress_input = nn.Sequential(
+			init_(nn.Linear(enemy_obs_shape+n_enemies, 16), activate=True),
+			nn.GELU(),
+			)
+		self.final_obs_embedding = nn.Sequential(
+			init_(nn.Linear(16+self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
+			)
 
-		self.action_embedding = nn.Embedding(n_actions+1, self.comp_emb)
+		self.agent_one_hot_ids = torch.eye(n_agents)
+		self.enemy_one_hot_ids = torch.eye(n_enemies)
+
+		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
-		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
-		self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
+		# self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
+		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
 		self.state_embedding_norm = nn.LayerNorm(self.comp_emb)
@@ -287,14 +300,22 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, _ = ally_obs.size()
 		_, n_e, _, _ = enemy_obs.size()
 
-		enemy_embedding = self.enemy_embedding(torch.arange(n_e).to(self.device))[None, None, :, :].expand(b, t, n_e, self.comp_emb).permute(0, 2, 1, 3)
-		enemy_obs = (self.enemy_obs_compress_input(enemy_obs) + enemy_embedding).sum(dim=1).unsqueeze(1)
-		
-		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		# enemy_embedding = self.enemy_embedding(torch.arange(n_e).to(self.device))[None, None, :, :].expand(b, t, n_e, self.comp_emb).permute(0, 2, 1, 3)
+		enemy_ids = self.enemy_one_hot_ids.reshape(1, n_e, 1, n_e).repeat(b, 1, t, 1).to(self.device)
+		enemy_obs = torch.cat([enemy_ids, enemy_obs], dim=-1)
+		enemy_obs = self.enemy_obs_compress_input(enemy_obs).sum(dim=1, keepdims=True) # (self.enemy_obs_compress_input(enemy_obs) + enemy_embedding).sum(dim=1).unsqueeze(1)
+	
+		# agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		agent_ids = self.agent_one_hot_ids.reshape(1, n_a, 1, n_a).repeat(b, 1, t, 1).to(self.device)
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		
-		state_embeddings_norm = (self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
-		x = state_embeddings_norm + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
+		# state_embeddings_norm = (self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
+		# x = state_embeddings_norm + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
+		ally_obs = torch.cat([agent_ids, ally_obs], dim=-1)
+		ally_obs = self.ally_obs_compress_input(ally_obs) + self.action_embedding(actions.long())
+
+		final_obs = torch.cat([ally_obs, enemy_obs.repeat(1, n_a, 1, 1)], dim=-1)
+		x = (self.final_obs_embedding(final_obs) + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
