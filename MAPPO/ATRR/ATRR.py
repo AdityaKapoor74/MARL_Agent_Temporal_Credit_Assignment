@@ -202,6 +202,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.n_agents = n_agents
 		self.version = version
 		self.device = device
+		self.depth = depth
 
 		# self.obs_shape = obs_shape
 		self.action_shape = action_shape
@@ -259,7 +260,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 		# 	)
 		
-		self.pre_final_norm = nn.LayerNorm(self.comp_emb)
+		self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		# self.final_temporal_block = []
 		# for i in range(depth):
@@ -278,11 +279,11 @@ class Time_Agent_Transformer(nn.Module):
 				)
 		else:
 			self.rblocks = nn.Sequential(
-				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-				nn.GELU(),
-				init_(nn.Linear(self.comp_emb, 1))
+				# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# nn.GELU(),
+				# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+				# nn.GELU(),
+				init_(nn.Linear(self.comp_emb*depth, 1))
 				)
 					   
 		self.do = nn.Dropout(dropout)
@@ -327,6 +328,7 @@ class Time_Agent_Transformer(nn.Module):
 		i = 0
 
 		# x_intermediate_temporal_agent = []
+		x_intermediate = []
 		while i < len(self.tblocks):
 			# even numbers have temporal attention
 			x = self.tblocks[i](x, masks=agent_masks)
@@ -342,6 +344,9 @@ class Time_Agent_Transformer(nn.Module):
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 
 				i += 1
+
+
+			x_intermediate.append(x)
 
 			if i == len(self.tblocks):
 				break
@@ -381,7 +386,7 @@ class Time_Agent_Transformer(nn.Module):
 			# 	temporal_weights_final_temporal_block.append(self.final_temporal_block[i].attention.attn_weights)
 			# 	temporal_scores_final_temporal_block.append(self.final_temporal_block[i].attention.attn_scores)
 
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb).long() # subtracting 1 for indexing purposes
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
 			
 			# print("Shape of x:", x.shape)
 			# print("Shape of x after reshaping:", x.reshape(b, n_a, t, -1).shape)
@@ -395,7 +400,8 @@ class Time_Agent_Transformer(nn.Module):
 
 			# print((x.reshape(b, n_a, t, -1)[0, 0, indiv_agent_episode_len[0, 0, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 1, indiv_agent_episode_len[0, 1, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 2, indiv_agent_episode_len[0, 2, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 3, indiv_agent_episode_len[0, 3, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 4, indiv_agent_episode_len[0, 4, 0, 0], :]))
 
-			x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
+			x = self.pre_final_norm(torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
+			# x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
 			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len)
 
 			# print(x[0])

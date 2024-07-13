@@ -462,7 +462,7 @@ class PPOAgent:
 						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
-		
+			print(torch.min(rewards), torch.max(rewards))
 			return rewards.cpu()
 			
 
@@ -613,8 +613,6 @@ class PPOAgent:
 				advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 
 				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
-			
-			print(torch.min(advantage), torch.max(advantage), advantage_mean, advantage_std, torch.nanmean(advantage_copy.reshape(-1, self.num_agents), dim=0), torch.from_numpy(np.array(np.nanstd(advantage_copy.reshape(-1, self.num_agents).cpu().numpy(), axis=0))).float())
 
 
 			values_old *= agent_masks
