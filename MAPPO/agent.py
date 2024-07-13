@@ -613,6 +613,8 @@ class PPOAgent:
 
 				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 			
+			print(torch.min(advantage), torch.max(advantage), advantage_mean, advantage_std, torch.nanmean(advantage_copy.reshape(-1, self.num_agents), dim=0), torch.from_numpy(np.array(np.nanstd(advantage_copy.reshape(-1, self.num_agents).cpu().numpy(), axis=0))).float())
+
 
 			values_old *= agent_masks
 
