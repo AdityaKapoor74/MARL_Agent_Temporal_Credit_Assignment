@@ -236,11 +236,11 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.tblocks = nn.Sequential(*tblocks)
 
-		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
-			)
+		# self.dynamics_model = nn.Sequential(
+		# 	init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(self.comp_emb, n_actions), activate=False)
+		# 	)
 		
 		self.pre_final_norm = nn.LayerNorm(self.comp_emb)
 
@@ -293,7 +293,7 @@ class Time_Agent_Transformer(nn.Module):
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		
-		state_embeddings_norm = self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
+		state_embeddings_norm = (self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 		x = state_embeddings_norm + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
@@ -319,12 +319,11 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		# last_action_ = torch.tensor(self.action_shape).reshape(1, 1, 1).repeat(b, n_a, 1).to(self.device)
-		# last_actions = torch.cat([last_action_, actions[:, :, 1:]], dim=-1)
-		zeroth_state_embedding_norm = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
-		next_state_embeddings_norm = torch.cat([state_embeddings_norm.view(b, n_a, t, self.comp_emb)[:, :, 1:, :], zeroth_state_embedding_norm], dim=2)
-		next_state_embeddings_norm = next_state_embeddings_norm.sum(dim=1, keepdim=True)
-		action_prediction = self.dynamics_model(x.view(b, n_a, t, self.comp_emb)+next_state_embeddings_norm)
+		# zeroth_state_embedding_norm = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
+		# next_state_embeddings_norm = torch.cat([state_embeddings_norm.view(b, n_a, t, self.comp_emb)[:, :, 1:, :], zeroth_state_embedding_norm], dim=2)
+		# next_state_embeddings_norm = next_state_embeddings_norm.sum(dim=1, keepdim=True)
+		# action_prediction = self.dynamics_model(x.view(b, n_a, t, self.comp_emb)+next_state_embeddings_norm)
+		action_prediction = None
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
