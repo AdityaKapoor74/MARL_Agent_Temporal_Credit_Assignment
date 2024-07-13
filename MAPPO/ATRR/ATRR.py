@@ -233,7 +233,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.enemy_one_hot_ids = torch.eye(n_enemies)
 		# self.one_hot_actions = torch.eye(n_agents, n_actions)
 
-		# self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
+		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		# self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
