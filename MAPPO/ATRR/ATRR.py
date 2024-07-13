@@ -311,7 +311,7 @@ class Time_Agent_Transformer(nn.Module):
 	
 		# agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
 		ally_ids = self.agent_one_hot_ids.reshape(1, n_a, 1, n_a).repeat(b, 1, t, 1).to(self.device)
-		ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1)
+		ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1).to(self.device)
 		ally_obs = torch.cat([ally_ids, ally_obs, ally_one_hot_actions], dim=-1)
 		ally_obs = self.ally_obs_compress_input(ally_obs) #+ self.action_embedding(actions.long())
 
