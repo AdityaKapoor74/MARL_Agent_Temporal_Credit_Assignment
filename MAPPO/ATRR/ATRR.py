@@ -146,6 +146,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.position_embedding[:, 0::2] = torch.sin(position * div_term)
 		self.position_embedding[:, 1::2] = torch.cos(position * div_term)
+		self.position_embedding = self.position_embedding.to(self.device)
 
 		# self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
