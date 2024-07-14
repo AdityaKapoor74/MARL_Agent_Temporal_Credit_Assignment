@@ -498,7 +498,7 @@ if __name__ == '__main__':
 				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
-				"norm_adv": False,
+				"norm_adv": True,
 			}
 
 		seeds = [42, 142, 242, 342, 442]

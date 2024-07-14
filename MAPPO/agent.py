@@ -433,9 +433,9 @@ class PPOAgent:
 						b, t, n_a, _ = ally_state_batch.shape
 						
 						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						temporal_weights_final = torch.gather(temporal_weights[-1].detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
-						agent_weights_final = agent_weights[-1].detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						
@@ -443,8 +443,20 @@ class PPOAgent:
 						multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
 						# renormalizing
 						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+						print("episodic reward")
+						print(episodic_reward_batch[0])
+						print("actions")
+						print(actions_batch[0])
+						print("multi agent_temporal_weights")
+						print(multi_agent_temporal_weights[0])
 						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
+						print("multi agent temporal rewards")
+						print(temporal_rewards[0])
 						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
+						print("agent level temporal weights")
+						print(agent_weights_final[0])
+						print("agent rewards")
+						print(agent_temporal_rewards[0])
 
 						rewards = agent_temporal_rewards
 						
