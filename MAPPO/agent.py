@@ -482,7 +482,7 @@ class PPOAgent:
 
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
-			episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
+			episodic_reward_batch = self.reward_normalizer(episodic_reward_batch.view(-1)).view(shape)
 
 		# if self.norm_rewards:
 		# 	shape = episodic_reward_batch.shape
