@@ -439,8 +439,8 @@ class PPOAgent:
 						# renormalizing
 						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						
-						# multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
-						multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
+						multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
+						# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
 						# renormalizing
 						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
 						print("episodic reward")
