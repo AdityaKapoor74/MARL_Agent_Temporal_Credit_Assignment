@@ -446,7 +446,7 @@ if __name__ == '__main__':
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64,
 				"reward_batch_size": 256, # 128
-				"reward_lr": 1e-3,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
@@ -456,7 +456,7 @@ if __name__ == '__main__':
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 100, # 200
 				"reward_model_update_epochs": 200, # 400
-				"norm_rewards": True,
+				"norm_rewards": False,
 
 
 				"algorithm_type": algorithm_type,
@@ -498,7 +498,7 @@ if __name__ == '__main__':
 				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
-				"norm_adv": True,
+				"norm_adv": False,
 			}
 
 		seeds = [42, 142, 242, 342, 442]
