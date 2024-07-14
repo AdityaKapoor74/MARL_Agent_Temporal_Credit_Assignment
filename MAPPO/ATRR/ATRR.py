@@ -177,7 +177,7 @@ class Time_Agent_Transformer(nn.Module):
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(self.comp_emb, 1))
+			init_(nn.Linear(self.comp_emb, 1)),
 			nn.ReLU(),
 			)
 					   
