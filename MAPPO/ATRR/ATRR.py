@@ -297,7 +297,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# print((x.reshape(b, n_a, t, -1)[0, 0, indiv_agent_episode_len[0, 0, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 1, indiv_agent_episode_len[0, 1, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 2, indiv_agent_episode_len[0, 2, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 3, indiv_agent_episode_len[0, 3, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 4, indiv_agent_episode_len[0, 4, 0, 0], :]))
 
-			x = self.pre_final_norm(torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
+			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
 			# x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
 			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len)
 
