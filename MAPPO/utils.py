@@ -178,7 +178,6 @@ class RolloutBuffer:
 		self.clamp_rewards = clamp_rewards
 		self.clamp_rewards_value_min = clamp_rewards_value_min
 		self.clamp_rewards_value_max = clamp_rewards_value_max
-		self.norm_rewards = norm_rewards
 
 		self.target_calc_style = target_calc_style
 		self.gae_lambda = gae_lambda
