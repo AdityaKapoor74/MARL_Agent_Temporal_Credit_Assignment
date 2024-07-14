@@ -138,15 +138,15 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 
-		# self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
+		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		# Create a matrix of shape (max_len, d_model) -- relative position embedding
-		self.position_embedding = torch.zeros(seq_length, self.comp_emb).float()
-		position = torch.arange(0, seq_length).float().unsqueeze(1)
-		div_term = torch.exp(torch.arange(0, self.comp_emb, 2).float() * -(torch.log(torch.tensor(10000.0)) / self.comp_emb))
+		# self.position_embedding = torch.zeros(seq_length, self.comp_emb).float()
+		# position = torch.arange(0, seq_length).float().unsqueeze(1)
+		# div_term = torch.exp(torch.arange(0, self.comp_emb, 2).float() * -(torch.log(torch.tensor(10000.0)) / self.comp_emb))
 
-		self.position_embedding[:, 0::2] = torch.sin(position * div_term)
-		self.position_embedding[:, 1::2] = torch.cos(position * div_term)
-		self.position_embedding = self.position_embedding.to(self.device)
+		# self.position_embedding[:, 0::2] = torch.sin(position * div_term)
+		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
+		# self.position_embedding = self.position_embedding.to(self.device)
 
 		# self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
