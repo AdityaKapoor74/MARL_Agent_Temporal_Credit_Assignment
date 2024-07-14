@@ -443,7 +443,7 @@ class PPOAgent:
 						multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
 						# renormalizing
 						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
-						temporal_rewards = multi_agent_temporal_weights * rewards.detach().cpu() # episodic_reward_batch.unsqueeze(-1)
+						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
 						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
 
 						rewards = agent_temporal_rewards
