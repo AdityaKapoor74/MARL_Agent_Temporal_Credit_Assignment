@@ -335,7 +335,7 @@ class MAPPO:
 				elif not self.use_reward_model:
 					self.agents.update(episode)
 
-			if self.learn and episode > self.warm_up_period:
+			if self.learn:
 				if self.use_reward_model and self.reward_batch_size <= self.agents.reward_model_buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
 					reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 					if "AREL" in self.experiment_type:
