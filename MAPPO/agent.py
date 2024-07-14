@@ -193,7 +193,6 @@ class PPOAgent:
 			clamp_rewards=self.clamp_rewards,
 			clamp_rewards_value_min=self.clamp_rewards_value_min,
 			clamp_rewards_value_max=self.clamp_rewards_value_max,
-			norm_rewards=self.norm_rewards,
 			target_calc_style=self.target_calc_style,
 			gae_lambda=self.gae_lambda,
 			n_steps=self.n_steps,

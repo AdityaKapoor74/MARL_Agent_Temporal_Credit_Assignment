@@ -148,7 +148,6 @@ class RolloutBuffer:
 		clamp_rewards,
 		clamp_rewards_value_min,
 		clamp_rewards_value_max,
-		norm_rewards,
 		target_calc_style,
 		gae_lambda,
 		n_steps,
@@ -185,9 +184,6 @@ class RolloutBuffer:
 		self.gae_lambda = gae_lambda
 		self.gamma = gamma
 		self.n_steps = n_steps
-
-		if self.norm_rewards:
-			self.reward_norm = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
 
 		self.episode_num = 0
 		self.time_step = 0
@@ -353,10 +349,6 @@ class RolloutBuffer:
 		if self.clamp_rewards:
 			rewards = torch.clamp(rewards, min=self.clamp_rewards_value_min, max=self.clamp_rewards_value_max)
 
-		if self.norm_rewards:
-			rewards_shape = rewards.shape
-			rewards = self.reward_norm.update(rewards.view(-1).to(self.device), masks.view(-1).to(self.device)).reshape(rewards_shape)
-		
 		# TARGET CALC
 		if self.target_calc_style == "GAE":
 			target_values = self.gae_targets(rewards, values, next_values, masks, next_mask)

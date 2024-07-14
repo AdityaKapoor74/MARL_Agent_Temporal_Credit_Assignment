@@ -223,11 +223,11 @@ class Time_Agent_Transformer(nn.Module):
 			)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
-		self.final_obs_embedding = nn.Sequential(
-			init_(nn.Linear(2*self.comp_emb, self.comp_emb), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=False),
-			)
+		# self.final_obs_embedding = nn.Sequential(
+		# 	init_(nn.Linear(2*self.comp_emb, self.comp_emb), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(self.comp_emb, self.comp_emb), activate=False),
+		# 	)
 
 		self.agent_one_hot_ids = torch.eye(n_agents)
 		self.enemy_one_hot_ids = torch.eye(n_enemies)
@@ -312,8 +312,9 @@ class Time_Agent_Transformer(nn.Module):
 		# state_embeddings_norm = (self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
 		# x = state_embeddings_norm + self.action_embedding(actions.long()).view(b*n_a, t, self.comp_emb)
 
-		final_obs = torch.cat([ally_obs, enemy_obs.repeat(1, n_a, 1, 1)], dim=-1)
-		x = (self.final_obs_embedding(final_obs) + position_embedding).view(b*n_a, t, self.comp_emb)
+		# final_obs = torch.cat([ally_obs, enemy_obs.repeat(1, n_a, 1, 1)], dim=-1)
+		# x = (self.final_obs_embedding(final_obs) + position_embedding).view(b*n_a, t, self.comp_emb)
+		x = (ally_obs + enemy_obs + position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
