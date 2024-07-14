@@ -368,7 +368,8 @@ class Time_Agent_Transformer(nn.Module):
 			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			rewards = self.rblocks(x).view(b, t).contiguous() * team_masks.to(x.device)
 		elif self.version == "agent_temporal":
-			x = x.reshape(b, n_a, t, -1)
+			# x = x.reshape(b, n_a, t, -1)
+			x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 		else:
 			# x = (x+x_intermediate_temporal_agent).reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
