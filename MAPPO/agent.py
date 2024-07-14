@@ -266,7 +266,6 @@ class PPOAgent:
 					wide=dictionary["reward_attn_net_wide"], 
 					version=dictionary["version"], 
 					linear_compression_dim=dictionary["reward_linear_compression_dim"],
-					norm_rewards=dictionary["norm_rewards"],
 					device=self.device,
 					).to(self.device)
 
@@ -481,7 +480,7 @@ class PPOAgent:
 
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
-			episodic_reward_batch = self.reward_normalizer(episodic_reward_batch.view(-1)).view(shape)
+			episodic_reward_batch = self.reward_normalizer(episodic_reward_batch.view(-1), None).view(shape)
 
 		# if self.norm_rewards:
 		# 	shape = episodic_reward_batch.shape

@@ -46,11 +46,18 @@ class PopArt(nn.Module):
 			# Detach input before adding it to running means to avoid backpropping through it on
 			# subsequent batches.
 			detached_input = input_vector.detach()
-			batch_mean = detached_input.sum(dim=tuple(range(self.norm_axes)))/mask.sum(dim=tuple(range(self.norm_axes)))
-			batch_sq_mean = (detached_input ** 2).sum(dim=tuple(range(self.norm_axes)))/mask.sum(dim=tuple(range(self.norm_axes)))
+			if mask is not None:
+				batch_mean = detached_input.sum(dim=tuple(range(self.norm_axes)))/mask.sum(dim=tuple(range(self.norm_axes)))
+				batch_sq_mean = (detached_input ** 2).sum(dim=tuple(range(self.norm_axes)))/mask.sum(dim=tuple(range(self.norm_axes)))
+			else:
+				batch_mean = detached_input.mean(dim=tuple(range(self.norm_axes)))
+				batch_sq_mean = (detached_input ** 2).mean(dim=tuple(range(self.norm_axes)))
 
 			if self.per_element_update:
-				batch_size = (mask.reshape(-1, self.num_agents).sum(dim=-1)>0.0).sum()
+				if mask is not None:
+					batch_size = (mask.reshape(-1, self.num_agents).sum(dim=-1)>0.0).sum()
+				else:
+					batch_size = detached_input.size()
 				weight = self.beta ** batch_size
 			else:
 				weight = self.beta
