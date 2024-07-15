@@ -443,20 +443,20 @@ class PPOAgent:
 						# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
 						# renormalizing
 						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
-						print("episodic reward")
-						print(episodic_reward_batch[0])
-						print("actions")
-						print(actions_batch[0])
-						print("multi agent_temporal_weights")
-						print(multi_agent_temporal_weights[0])
+						# print("episodic reward")
+						# print(episodic_reward_batch[0])
+						# print("actions")
+						# print(actions_batch[0])
+						# print("multi agent_temporal_weights")
+						# print(multi_agent_temporal_weights[0])
 						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
-						print("multi agent temporal rewards")
-						print(temporal_rewards[0])
+						# print("multi agent temporal rewards")
+						# print(temporal_rewards[0])
 						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
-						print("agent level temporal weights")
-						print(agent_weights_final[0])
-						print("agent rewards")
-						print(agent_temporal_rewards[0])
+						# print("agent level temporal weights")
+						# print(agent_weights_final[0])
+						# print("agent rewards")
+						# print(agent_temporal_rewards[0])
 
 						rewards = agent_temporal_rewards
 						

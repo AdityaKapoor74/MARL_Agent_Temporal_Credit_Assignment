@@ -294,8 +294,9 @@ class Time_Agent_Transformer(nn.Module):
 			# 	temporal_weights_final_temporal_block.append(self.final_temporal_block[i].attention.attn_weights)
 			# 	temporal_scores_final_temporal_block.append(self.final_temporal_block[i].attention.attn_scores)
 
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
-			
+			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
+			episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
+
 			# print("Shape of x:", x.shape)
 			# print("Shape of x after reshaping:", x.reshape(b, n_a, t, -1).shape)
 			# print("Shape of indiv_agent_episode_len:", indiv_agent_episode_len.shape)
@@ -308,9 +309,10 @@ class Time_Agent_Transformer(nn.Module):
 
 			# print((x.reshape(b, n_a, t, -1)[0, 0, indiv_agent_episode_len[0, 0, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 1, indiv_agent_episode_len[0, 1, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 2, indiv_agent_episode_len[0, 2, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 3, indiv_agent_episode_len[0, 3, 0, 0], :]+x.reshape(b, n_a, t, -1)[0, 4, indiv_agent_episode_len[0, 4, 0, 0], :]))
 
+			x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[torch.arange(b), final_agent.long()-1][torch.arange(b), episode_len.long()-1]
 			# x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
-			x = self.pre_final_norm(torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1))
-			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len)
+			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
+			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agnte_episode_len)
 
 			# print(x[0])
 
