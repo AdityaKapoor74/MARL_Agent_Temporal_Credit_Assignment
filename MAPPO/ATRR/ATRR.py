@@ -277,27 +277,14 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 		else:
 			
-			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
-			episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
+			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
 
+			# episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
+			# x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[torch.arange(b), final_agent.long()-1][torch.arange(b), episode_len.long()-1]
 			
-			x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[torch.arange(b), final_agent.long()-1][torch.arange(b), episode_len.long()-1]
-			# x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
-			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).sum(dim=1).squeeze(1)
-			# x = torch.gather(x.reshape(b, n_a, t, -1), 2, indiv_agnte_episode_len)
-
-			# print(x[0])
 
 			rewards = self.rblocks(x).view(b, 1).contiguous()
-			# rewards = self.rblocks(x).view(b, n_a, 1).contiguous()
-
-			if self.version == "temporal_attn_weights":
-				temporal_weights_final = F.softmax(torch.where(team_masks.bool(), (temporal_scores[-1].mean(dim=1).sum(dim=1)/(agent_masks.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
-				rewards = (rewards * temporal_weights_final.detach()).unsqueeze(-1).repeat(1, 1, n_a)
-			
-			elif self.version == "agent_temporal_attn_weights":
-				
-				pass
 
 
 		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction
