@@ -259,7 +259,7 @@ class Time_Agent_Transformer(nn.Module):
 		zeroth_state_embedding = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
 		past_state_action_embeddings = torch.cat([zeroth_state_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
 		current_state_embeddings = states.sum(dim=1, keepdim=True)
-		action_prediction = self.dynamics_model(torch.cat([current_state_embeddings.repeat(1, self.num_agents, 1, 1), past_state_action_embeddings], dim=-1))
+		action_prediction = self.dynamics_model(torch.cat([current_state_embeddings.repeat(1, self.n_agents, 1, 1), past_state_action_embeddings], dim=-1))
 		# action_prediction = None
 
 		# to ensure masking across rows and columns
