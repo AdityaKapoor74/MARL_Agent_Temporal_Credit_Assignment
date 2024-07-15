@@ -255,7 +255,7 @@ class Time_Agent_Transformer(nn.Module):
 				break
 
 		zeroth_state_embedding = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
-		past_state_action_embeddings = torch.cat([zeroth_state_embedding, x.view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
+		past_state_action_embeddings = torch.cat([zeroth_state_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
 		current_state_embeddings = states.sum(dim=1, keepdim=True)
 		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
 		action_prediction = self.dynamics_model(current_state_embeddings+past_state_action_embeddings+return_embedding)
