@@ -113,7 +113,7 @@ class STAS_ML(nn.Module):
 		if not action_space == 'discrete':
 			self.action_emb = nn.Linear(input_dim, emb_dim)
 		else:
-			self.action_emb = nn.Embedding(n_actions+1, emb_dim)t
+			self.action_emb = nn.Embedding(n_actions+1, emb_dim)
 
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
 		self.agent_embedding = nn.Embedding(n_agents, emb_dim)
