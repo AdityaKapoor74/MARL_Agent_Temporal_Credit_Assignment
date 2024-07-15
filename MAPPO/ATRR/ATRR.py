@@ -117,11 +117,11 @@ class Time_Agent_Transformer(nn.Module):
 		self.agent_attn = agent
 
 		self.ally_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(ally_obs_shape+n_agents, self.comp_emb), activate=False),
+			init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
 			# nn.GELU(),
 			)
 		self.enemy_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(enemy_obs_shape+n_enemies, self.comp_emb), activate=False),
+			init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
 			# nn.GELU(),
 			)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
@@ -132,8 +132,8 @@ class Time_Agent_Transformer(nn.Module):
 		# 	init_(nn.Linear(self.comp_emb, self.comp_emb), activate=False),
 		# 	)
 
-		self.agent_one_hot_ids = torch.eye(n_agents)
-		self.enemy_one_hot_ids = torch.eye(n_enemies)
+		# self.agent_one_hot_ids = torch.eye(n_agents)
+		# self.enemy_one_hot_ids = torch.eye(n_enemies)
 		# self.one_hot_actions = torch.eye(n_agents, n_actions)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
@@ -150,8 +150,8 @@ class Time_Agent_Transformer(nn.Module):
 		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
 		# self.position_embedding = self.position_embedding.to(self.device)
 
-		# self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
-		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
+		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
+		self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
 		# self.state_embedding_norm = nn.LayerNorm(self.comp_emb)
@@ -178,7 +178,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
+			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
 			# init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -206,16 +206,16 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, _ = ally_obs.size()
 		_, n_e, _, _ = enemy_obs.size()
 
-		# enemy_embedding = self.enemy_embedding(torch.arange(n_e).to(self.device))[None, None, :, :].expand(b, t, n_e, self.comp_emb).permute(0, 2, 1, 3)
-		enemy_ids = self.enemy_one_hot_ids.reshape(1, n_e, 1, n_e).repeat(b, 1, t, 1).to(self.device)
-		enemy_obs = torch.cat([enemy_ids, enemy_obs], dim=-1)#.permute(0, 2, 1, 3).reshape(b, 1, t, -1)
-		enemy_obs = self.enemy_obs_compress_input(enemy_obs).sum(dim=1, keepdims=True) # (self.enemy_obs_compress_input(enemy_obs) + enemy_embedding).sum(dim=1).unsqueeze(1)
+		enemy_embedding = self.enemy_embedding(torch.arange(n_e).to(self.device))[None, None, :, :].expand(b, t, n_e, self.comp_emb).permute(0, 2, 1, 3)
+		# enemy_ids = self.enemy_one_hot_ids.reshape(1, n_e, 1, n_e).repeat(b, 1, t, 1).to(self.device)
+		# enemy_obs = torch.cat([enemy_ids, enemy_obs], dim=-1)#.permute(0, 2, 1, 3).reshape(b, 1, t, -1)
+		enemy_obs = (self.enemy_obs_compress_input(enemy_obs)+enemy_embedding).sum(dim=1, keepdims=True) # (self.enemy_obs_compress_input(enemy_obs) + enemy_embedding).sum(dim=1).unsqueeze(1)
 	
-		# agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
-		ally_ids = self.agent_one_hot_ids.reshape(1, n_a, 1, n_a).repeat(b, 1, t, 1).to(self.device)
+		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb).permute(0, 2, 1, 3)
+		# ally_ids = self.agent_one_hot_ids.reshape(1, n_a, 1, n_a).repeat(b, 1, t, 1).to(self.device)
 		# ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1).to(self.device)
-		ally_obs = torch.cat([ally_ids, ally_obs], dim=-1)
-		ally_obs = self.ally_obs_compress_input(ally_obs) #+ self.action_embedding(actions.long())
+		# ally_obs = torch.cat([ally_ids, ally_obs], dim=-1)
+		ally_obs = (self.ally_obs_compress_input(ally_obs)+agent_embedding) #+ self.action_embedding(actions.long())
 
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
