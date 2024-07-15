@@ -92,11 +92,12 @@ class STAS(nn.Module):
 		return shapley_reward
 
 class STAS_ML(nn.Module):
-	def __init__(self, input_dim, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
+	def __init__(self, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
 				device, dropout=0.0, emb_dropout=0.5, action_space='discrete'):
 		super().__init__()
 
-		self.input_dim = input_dim
+		self.ally_obs_shape = ally_obs_shape
+		self.enemy_obs_shape = enemy_obs_shape
 		self.emb_dim = emb_dim
 		self.n_heads = n_heads
 		self.n_layer = n_layer
@@ -106,12 +107,17 @@ class STAS_ML(nn.Module):
 		self.n_agents = n_agents
 		self.emb_dropout = emb_dropout
 
-		self.state_emb = nn.Linear(input_dim, emb_dim)
+		self.ally_state_emb = nn.Linear(ally_obs_shape, emb_dim)
+		self.enemy_state_emb = nn.Linear(enemy_obs_shape, emb_dim)
+
 		if not action_space == 'discrete':
 			self.action_emb = nn.Linear(input_dim, emb_dim)
 		else:
-			self.action_emb = nn.Embedding(n_actions+1, emb_dim)
+			self.action_emb = nn.Embedding(n_actions+1, emb_dim)t
+
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
+		self.agent_embedding = nn.Embedding(n_agents, emb_dim)
+		self.enemy_embedding = nn.Embedding(n_enemies, emb_dim)
 
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
