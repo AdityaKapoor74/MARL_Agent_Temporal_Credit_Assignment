@@ -172,6 +172,8 @@ class Time_Agent_Transformer(nn.Module):
 		self.dynamics_model = nn.Sequential(
 			init_(nn.Linear(2*self.comp_emb, self.comp_emb), activate=True),
 			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 			)
 		

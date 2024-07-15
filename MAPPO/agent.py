@@ -269,6 +269,25 @@ class PPOAgent:
 					device=self.device,
 					).to(self.device)
 
+			elif "STAS" in self.experiment_type:
+				from STAS import stas
+				self.reward_model = stas.STAS_ML(
+					ally_obs_shape=self.ally_observation_shape,
+					enemy_obs_shape=self.enemy_observation_shape, 
+					n_actions=self.num_actions, 
+					emb_dim=dictionary["reward_linear_compression_dim"], 
+					n_heads=dictionary["reward_n_heads"], 
+					n_layer=dictionary["reward_depth"], 
+					seq_length=dictionary["max_time_steps"], 
+					n_agents=self.num_agents, 
+					n_enemies=self.num_enemies,
+					sample_num=5,
+					device=self.device, 
+					dropout=0.3, 
+					emb_dropout=0.0, 
+					action_space='discrete'
+					).to(self.device)
+
 			if self.norm_rewards:
 				self.reward_normalizer = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
 			
