@@ -169,11 +169,11 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.tblocks = nn.Sequential(*tblocks)
 
-		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
-			)
+		# self.dynamics_model = nn.Sequential(
+		# 	init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(self.comp_emb, n_actions), activate=False)
+		# 	)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
@@ -254,12 +254,12 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		zeroth_state_embedding = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
-		past_state_action_embeddings = torch.cat([zeroth_state_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
-		current_state_embeddings = states.sum(dim=1, keepdim=True)
-		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
-		action_prediction = self.dynamics_model(current_state_embeddings+past_state_action_embeddings+return_embedding)
-		# action_prediction = None
+		# zeroth_state_embedding = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
+		# past_state_action_embeddings = torch.cat([zeroth_state_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
+		# current_state_embeddings = states.sum(dim=1, keepdim=True)
+		# return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
+		# action_prediction = self.dynamics_model(current_state_embeddings+past_state_action_embeddings+return_embedding)
+		action_prediction = None
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
