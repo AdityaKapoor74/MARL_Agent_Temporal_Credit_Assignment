@@ -142,3 +142,8 @@ class STAS_ML(nn.Module):
 		shapley_reward = self.linear(torch.cat(shapley_rewards, dim=-1).reshape(b, n_a, t, -1)).squeeze()
 		
 		return shapley_reward
+
+
+
+reward_predictor = STAS_ML(input_dim=10, n_actions=12, emb_dim=64, n_heads=4, n_layer=3, seq_length=50, n_agents=5, sample_num=5,
+				device=torch.device('cpu'), dropout=0.0, emb_dropout=0.3)
