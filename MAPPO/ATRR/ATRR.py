@@ -179,10 +179,10 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.rblocks = nn.Sequential(
 			init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, 1)),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
 			)
 					   
@@ -217,6 +217,7 @@ class Time_Agent_Transformer(nn.Module):
 		ally_obs = self.ally_obs_compress_input(ally_obs) #+ self.action_embedding(actions.long())
 
 		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
+		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
 		# position_embedding = self.position_embedding[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 
 		# state_embeddings_norm = (self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
@@ -224,7 +225,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# final_obs = torch.cat([ally_obs, enemy_obs.repeat(1, n_a, 1, 1)], dim=-1)
 		# x = (self.final_obs_embedding(final_obs) + position_embedding).view(b*n_a, t, self.comp_emb)
-		states = (ally_obs + enemy_obs + position_embedding)
+		states = (ally_obs + enemy_obs + position_embedding + return_embedding)
 		x = (states + self.action_embedding(actions.long())).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
@@ -257,8 +258,7 @@ class Time_Agent_Transformer(nn.Module):
 		zeroth_state_embedding = torch.zeros((b, n_a, 1, self.comp_emb)).to(self.device)
 		past_state_action_embeddings = torch.cat([zeroth_state_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
 		current_state_embeddings = states.sum(dim=1, keepdim=True)
-		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, self.comp_emb)
-		action_prediction = self.dynamics_model(current_state_embeddings+past_state_action_embeddings+return_embedding)
+		action_prediction = self.dynamics_model(current_state_embeddings+past_state_action_embeddings)
 		# action_prediction = None
 
 		# to ensure masking across rows and columns
