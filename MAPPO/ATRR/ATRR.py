@@ -150,11 +150,11 @@ class Time_Agent_Transformer(nn.Module):
 		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
 		# self.position_embedding = self.position_embedding.to(self.device)
 
-		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb//2)
+		self.agent_embedding = nn.Embedding(n_agents, 3*self.comp_emb//2)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
-		self.state_embedding_norm = nn.LayerNorm(self.comp_emb)
+		self.state_embedding_norm = nn.LayerNorm(3*self.comp_emb//2)
 
 
 		tblocks = []
@@ -221,7 +221,7 @@ class Time_Agent_Transformer(nn.Module):
 		# ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1).to(self.device)
 		# ally_obs = torch.cat([ally_ids, ally_obs], dim=-1)
 		
-		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, self.comp_emb//2).permute(0, 2, 1, 3)
+		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 3*self.comp_emb//2).permute(0, 2, 1, 3)
 		# ally_obs = (self.ally_obs_compress_input(ally_obs)+agent_embedding) #+ self.action_embedding(actions.long())
 		ally_obs = self.ally_obs_compress_input(ally_obs)
 
@@ -237,7 +237,7 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# states = (self.state_embedding_norm(ally_obs + enemy_obs) + agent_embedding + position_embedding + return_embedding)
 		# x = (states + self.action_embedding(actions.long())).view(b*n_a, t, self.comp_emb)
-		states = torch.cat([ally_obs+agent_embedding, enemy_obs.repeat(1, self.n_agents, 1, 1), return_embedding.repeat(1, n_a, t, 1)], dim=-1)
+		states = self.state_embedding_norm(torch.cat([ally_obs, enemy_obs.repeat(1, self.n_agents, 1, 1), return_embedding.repeat(1, n_a, t, 1)], dim=-1)) + agent_embedding
 		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1) + position_embedding).view(b*n_a, t, 2*self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
