@@ -179,18 +179,23 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(16*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			# init_(nn.Linear(16*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
 			)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(16*4*depth, 1), activate=False),
-			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, 1)),
+			# init_(nn.Linear(16*4*depth, 1), activate=False),
+			init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, 1)),
 			nn.ReLU(),
 			)
 					   
