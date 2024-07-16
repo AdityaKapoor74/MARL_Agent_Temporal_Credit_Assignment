@@ -178,9 +178,9 @@ class Time_Agent_Transformer(nn.Module):
 		# 	init_(nn.Linear(16*4, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
 		# 	)
 
-		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(16*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
-			)
+		# self.dynamics_model = nn.Sequential(
+		# 	init_(nn.Linear(16*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+		# 	)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
@@ -277,7 +277,8 @@ class Time_Agent_Transformer(nn.Module):
 		# action_prediction = self.dynamics_model(torch.cat([current_state_embeddings.repeat(1, self.n_agents, 1, 1), past_state_action_embeddings], dim=-1))
 		# action_prediction = None
 
-		state_prediction = self.dynamics_model(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1).mean(dim=1))
+		# state_prediction = self.dynamics_model(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1).mean(dim=1))
+		state_prediction = None
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
