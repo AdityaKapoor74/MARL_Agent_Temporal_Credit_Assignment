@@ -140,7 +140,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.return_embedding = init_(nn.Linear(1, 16), activate=False)
 
-		self.position_embedding = nn.Embedding(seq_length, 16*3)
+		# self.position_embedding = nn.Embedding(seq_length, 16*3)
 		# Create a matrix of shape (max_len, d_model) -- relative position embedding
 		# self.position_embedding = torch.zeros(seq_length, self.comp_emb).float()
 		# position = torch.arange(0, seq_length).float().unsqueeze(1)
@@ -150,7 +150,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
 		# self.position_embedding = self.position_embedding.to(self.device)
 
-		self.agent_embedding = nn.Embedding(n_agents, 16)
+		# self.agent_embedding = nn.Embedding(n_agents, 16)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
@@ -221,13 +221,13 @@ class Time_Agent_Transformer(nn.Module):
 
 		enemy_obs = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdims=True)
 		
-		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16).permute(0, 2, 1, 3)
-		ally_obs = self.ally_obs_compress_input(ally_obs) + agent_embedding
+		# agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16).permute(0, 2, 1, 3)
+		ally_obs = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
 
-		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, 16*3)
+		# position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, 16*3)
 		
 		states = torch.cat([ally_obs, enemy_obs.repeat(1, self.n_agents, 1, 1)], dim=-1)
-		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1) + position_embedding).view(b*n_a, t, 16*3)
+		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, 16*3)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
