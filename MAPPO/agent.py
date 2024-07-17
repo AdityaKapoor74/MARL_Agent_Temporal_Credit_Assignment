@@ -457,7 +457,8 @@ class PPOAgent:
 
 					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
 						b, t, n_a, _ = ally_state_batch.shape
-						
+							
+						# use temporal and agent attention networks to distribute rewards
 						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
 						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
@@ -474,10 +475,17 @@ class PPOAgent:
 
 						# rewards = agent_temporal_rewards
 
+						# assuming predict episodic reward for each agent
+						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+						# rewards = rewards.detach().cpu() * temporal_weights_final
 
-						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
-						rewards = rewards.detach().cpu() * temporal_weights_final
+						# use agent attention network to distribute rewards
+						agent_episodic_contribution = F.softmax(agent_weights.mean(dim=0).detach().cpu().sum(dim=-2).sum(dim=1), dim=-1)
+						agent_episodic_rewards = agent_episodic_contribution * episodic_reward_batch.unsqueeze(-1)
+						agent_temporal_contribution = F.softmax(torch.where(agent_masks_batch.bool(), agent_weights.mean(dim=0).detach().cpu().sum(dim=-2), -1e9), dim=1)
+						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards.unsqueeze(1)
+						rewards = agent_temporal_rewards
 
 						print("rewards")
 						print(rewards[0])
