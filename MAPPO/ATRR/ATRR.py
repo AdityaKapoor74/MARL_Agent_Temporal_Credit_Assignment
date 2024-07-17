@@ -230,7 +230,7 @@ class Time_Agent_Transformer(nn.Module):
 		# ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1).to(self.device)
 		# ally_obs = torch.cat([ally_ids, ally_obs], dim=-1)
 		
-		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16*3).permute(0, 2, 1, 3)
+		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16*4).permute(0, 2, 1, 3)
 		# ally_obs = (self.ally_obs_compress_input(ally_obs)+agent_embedding) #+ self.action_embedding(actions.long())
 		ally_obs = self.ally_obs_compress_input(ally_obs)
 
