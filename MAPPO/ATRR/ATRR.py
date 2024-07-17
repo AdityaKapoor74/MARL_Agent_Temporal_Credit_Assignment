@@ -273,7 +273,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	nn.ReLU(),
 			# )
 
-		self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=ally_obs_shape*n_agents+enemy_obs_shape*n_enemies)
+		self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -346,10 +346,12 @@ class Time_Agent_Transformer(nn.Module):
 		elif self.version == "agent_temporal":
 			# x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			# rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
-			all_ally_enemy_obs = torch.cat([ally_obs.transpose(1, 2).reshape(b, t, -1), enemy_obs.transpose(1, 2).reshape(b, t, -1)], dim=-1)
-			final_state = torch.gather(all_ally_enemy_obs, 1, (team_masks.sum(dim=-1)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, all_ally_enemy_obs.shape[-1]).long()).squeeze(1)
+			# all_ally_enemy_obs = torch.cat([ally_obs.transpose(1, 2).reshape(b, t, -1), enemy_obs.transpose(1, 2).reshape(b, t, -1)], dim=-1)
+			# final_state = torch.gather(all_ally_enemy_obs, 1, (team_masks.sum(dim=-1)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, all_ally_enemy_obs.shape[-1]).long()).squeeze(1)
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
-			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_state.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
+			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).sum(dim=1)
+			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
 		else:
 			
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
