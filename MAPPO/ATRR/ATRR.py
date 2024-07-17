@@ -325,7 +325,7 @@ class Time_Agent_Transformer(nn.Module):
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(1)
-			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.mean(dim=1).reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2)
+			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.mean(dim=1).reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
 			print(rewards.shape)
 		else:
 			
