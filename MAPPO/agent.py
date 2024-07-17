@@ -478,6 +478,9 @@ class PPOAgent:
 						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
 						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 						rewards = rewards.detach().cpu() * temporal_weights_final
+
+						print("rewards")
+						print(rewards[0])
 						
 						# rewards = rewards.transpose(1, 2).cpu() * temporal_weights_final
 
