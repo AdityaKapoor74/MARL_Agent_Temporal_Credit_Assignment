@@ -81,36 +81,48 @@ class HyperNetwork(nn.Module):
 		self.obs_dim = obs_dim
 		self.hidden_dim = hidden_dim
 
+		# self.hyper_w1 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, obs_dim * hidden_dim))
+		# 	)
+		# self.hyper_b1 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+		# 	)
+		# self.hyper_w2 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+		# 	)
+		# self.hyper_b2 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim)),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, 1))
+		# 	)
+
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, obs_dim * hidden_dim))
+			init_(nn.Linear(final_state_dim, obs_dim * hidden_dim))
 			)
 		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim))
+			init_(nn.Linear(final_state_dim, hidden_dim))
 			)
+
 		self.hyper_w2 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim))
+			init_(nn.Linear(final_state_dim, hidden_dim))
 			)
 		self.hyper_b2 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim)),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, 1))
+			init_(nn.Linear(final_state_dim, 1))
 			)
 
 	def forward(self, obs, final_state):
-		print(obs.shape, final_state.shape)
 		obs = obs.reshape(-1, 1, self.obs_dim)
 		w1 = self.hyper_w1(final_state)
 		b1 = self.hyper_b1(final_state)
 		w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
 		b1 = b1.reshape(-1, 1, self.hidden_dim)
 
-		print(w1.shape, b1.shape)
 		x = F.gelu(torch.bmm(obs, w1) + b1)
 
 		w2 = self.hyper_w2(final_state)
