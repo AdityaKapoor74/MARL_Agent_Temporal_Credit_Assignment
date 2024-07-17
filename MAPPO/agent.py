@@ -442,6 +442,12 @@ class PPOAgent:
 						# episode_len=episode_len_batch.to(self.device),
 						)
 
+					print("*"*20)
+					print("actions")
+					print(actions_batch[0])
+					print("rewards")
+					print(rewards[0])
+
 					if self.experiment_type == "ATRR_temporal_attn_weights":
 						b, t, n_a, _ = state_batch.shape
 						
