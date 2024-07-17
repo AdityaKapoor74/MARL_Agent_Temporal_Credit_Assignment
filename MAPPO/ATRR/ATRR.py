@@ -190,11 +190,11 @@ class Time_Agent_Transformer(nn.Module):
 		self.agent_attn = agent
 
 		self.ally_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(ally_obs_shape, 16), activate=False),
+			init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
 			# nn.GELU(),
 			)
 		self.enemy_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(enemy_obs_shape, 16), activate=False),
+			init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
 			# nn.GELU(),
 			)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
@@ -209,7 +209,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.enemy_one_hot_ids = torch.eye(n_enemies)
 		# self.one_hot_actions = torch.eye(n_agents, n_actions)
 
-		self.action_embedding = nn.Embedding(n_actions, 16)
+		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 
 		# self.return_embedding = init_(nn.Linear(1, 16), activate=False)
 
@@ -233,11 +233,11 @@ class Time_Agent_Transformer(nn.Module):
 		tblocks = []
 		for i in range(depth):
 			tblocks.append(
-				TransformerBlock(emb=16*3, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+				TransformerBlock(emb=self.comp_emb*3, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 
 			if agent:
 				tblocks.append(
-					TransformerBlock_Agent(emb=16*3, heads=heads, seq_length=seq_length, n_agents=n_agents,
+					TransformerBlock_Agent(emb=self.comp_emb*3, heads=heads, seq_length=seq_length, n_agents=n_agents,
 					mask=False, dropout=dropout, wide=wide)
 					)
 
@@ -253,7 +253,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(16*3*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			init_(nn.Linear(self.comp_emb*3*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
 			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -264,7 +264,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(16*3*depth, 1), activate=False),
+			init_(nn.Linear(self.comp_emb*3*depth, 1), activate=False),
 
 
 			# init_(nn.Linear(16*3*depth*2, self.comp_emb), activate=True),
