@@ -102,35 +102,48 @@ class HyperNetwork(nn.Module):
 		# 	init_(nn.Linear(hidden_dim, 1))
 		# 	)
 
+		# self.hyper_w1 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, obs_dim * hidden_dim))
+		# 	)
+		# self.hyper_b1 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim))
+		# 	)
+
+		# self.hyper_w2 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, hidden_dim))
+		# 	)
+		# self.hyper_b2 = nn.Sequential(
+		# 	init_(nn.Linear(final_state_dim, 1))
+		# 	)
+
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, obs_dim * hidden_dim))
+			init_(nn.Linear(final_state_dim, obs_dim))
 			)
 		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim))
-			)
-
-		self.hyper_w2 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, hidden_dim))
-			)
-		self.hyper_b2 = nn.Sequential(
 			init_(nn.Linear(final_state_dim, 1))
 			)
 
 	def forward(self, obs, final_state):
 		obs = obs.reshape(-1, 1, self.obs_dim)
+		# w1 = self.hyper_w1(final_state)
+		# b1 = self.hyper_b1(final_state)
+		# w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
+		# b1 = b1.reshape(-1, 1, self.hidden_dim)
+
+		# x = F.gelu(torch.bmm(obs, w1) + b1)
+
+		# w2 = self.hyper_w2(final_state)
+		# b2 = self.hyper_b2(final_state)
+		# w2 = w2.reshape(-1, self.hidden_dim, 1)
+		# b2 = b2.reshape(-1, 1, 1)
+
+		# x = torch.bmm(x, w2) + b2
+
 		w1 = self.hyper_w1(final_state)
 		b1 = self.hyper_b1(final_state)
-		w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
-		b1 = b1.reshape(-1, 1, self.hidden_dim)
-
-		x = F.gelu(torch.bmm(obs, w1) + b1)
-
-		w2 = self.hyper_w2(final_state)
-		b2 = self.hyper_b2(final_state)
-		w2 = w2.reshape(-1, self.hidden_dim, 1)
-		b2 = b2.reshape(-1, 1, 1)
-
-		x = torch.bmm(x, w2) + b2
+		w1 = w1.reshape(-1, self.obs_dim, 1)
+		b1 = b1.reshape(-1, 1, 1)
+		x = torch.bmm(obs, w1) + b1
 
 		return x
 
@@ -337,7 +350,6 @@ class Time_Agent_Transformer(nn.Module):
 			final_state = torch.gather(all_ally_enemy_obs, 1, (team_masks.sum(dim=-1)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, all_ally_enemy_obs.shape[-1]).long()).squeeze(1)
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_state.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
-			print(rewards.shape)
 		else:
 			
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
