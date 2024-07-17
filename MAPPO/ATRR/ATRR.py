@@ -272,7 +272,7 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 			# nn.GELU(),
 			init_(nn.Linear(self.comp_emb, 1)),
-			nn.ReLU(),
+			# nn.ReLU(),
 			)
 
 		# self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
