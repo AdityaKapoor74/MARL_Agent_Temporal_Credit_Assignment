@@ -483,6 +483,8 @@ class PPOAgent:
 						# use agent attention network to distribute rewards
 						agent_episodic_contribution = F.softmax(agent_weights.mean(dim=0).detach().cpu().sum(dim=-2).sum(dim=1), dim=-1)
 						agent_episodic_rewards = agent_episodic_contribution * episodic_reward_batch.unsqueeze(-1)
+						# agent_temporal_contribution_weights = torch.gather(temporal_weights.mean(dim=0).reshape(b, n_a, t, t), (team_masks_batch.sum(dim=-1)-1).reshape(b, 1, 1).long())
+						# print(agent_temporal_contribution_weights.shape)
 						agent_temporal_contribution = F.softmax(torch.where(agent_masks_batch.bool(), agent_weights.mean(dim=0).detach().cpu().sum(dim=-2), -1e9), dim=1)
 						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards.unsqueeze(1)
 						rewards = agent_temporal_rewards
