@@ -302,7 +302,7 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 		else:
 			
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 8*4*self.depth).long() # subtracting 1 for indexing purposes
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*4*self.depth).long() # subtracting 1 for indexing purposes
 			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(1)
 
 			# episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
