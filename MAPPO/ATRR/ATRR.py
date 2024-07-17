@@ -159,13 +159,13 @@ class Time_Agent_Transformer(nn.Module):
 
 		tblocks = []
 		for i in range(depth):
-			tblocks.append(
-				TransformerBlock(emb=8*4, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 			if agent:
 				tblocks.append(
 					TransformerBlock_Agent(emb=8*4, heads=heads, seq_length=seq_length, n_agents=n_agents,
 					mask=False, dropout=dropout, wide=wide)
 					)
+			tblocks.append(
+				TransformerBlock(emb=8*4, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 
 		self.tblocks = nn.Sequential(*tblocks)
 
@@ -196,7 +196,7 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
-			# nn.ReLU(),
+			nn.ReLU(),
 			)
 					   
 		self.do = nn.Dropout(dropout)
@@ -255,13 +255,7 @@ class Time_Agent_Transformer(nn.Module):
 		# x_intermediate_temporal_agent = []
 		x_intermediate = []
 		while i < len(self.tblocks):
-			# even numbers have temporal attention
-			x = self.tblocks[i](x, masks=agent_masks)
-			temporal_weights.append(self.tblocks[i].attention.attn_weights)
-			temporal_scores.append(self.tblocks[i].attention.attn_scores)
 
-			i += 1
-			
 			if self.agent_attn:
 				# odd numbers have agent attention
 				x = self.tblocks[i](x, masks=agent_masks)
@@ -269,6 +263,13 @@ class Time_Agent_Transformer(nn.Module):
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 
 				i += 1
+			
+			# even numbers have temporal attention
+			x = self.tblocks[i](x, masks=agent_masks)
+			temporal_weights.append(self.tblocks[i].attention.attn_weights)
+			temporal_scores.append(self.tblocks[i].attention.attn_scores)
+
+			i += 1
 
 
 			x_intermediate.append(x)
