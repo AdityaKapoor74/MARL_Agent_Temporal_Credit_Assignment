@@ -28,47 +28,96 @@ def init_(m, gain=0.01, activate=False):
 	return init(m, nn.init.orthogonal_, lambda x: nn.init.constant_(x, 0), gain=gain)
 
 
+# class HyperNetwork(nn.Module):
+# 	def __init__(self, num_agents, hidden_dim, final_dim, obs_dim):
+# 		super(HyperNetwork, self).__init__()
+# 		self.num_agents = num_agents
+# 		self.hidden_dim = hidden_dim
+# 		self.final_dim = final_dim
+
+# 		self.hyper_w1 = nn.Sequential(
+# 			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+# 			nn.GELU(),
+# 			init_(nn.Linear(hidden_dim, num_agents * hidden_dim), activate=True)
+# 			)
+# 		self.hyper_b1 = nn.Sequential(
+# 			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+# 			nn.GELU(),
+# 			init_(nn.Linear(hidden_dim, hidden_dim), activate=True)
+# 			)
+# 		self.hyper_w2 = nn.Sequential(
+# 			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+# 			nn.GELU(),
+# 			init_(nn.Linear(hidden_dim, final_dim*hidden_dim))
+# 			)
+# 		self.hyper_b2 = nn.Sequential(
+# 			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+# 			nn.GELU(),
+# 			init_(nn.Linear(hidden_dim, hidden_dim))
+# 			)
+
+# 	def forward(self, one_hot_actions, obs):
+# 		one_hot_actions = one_hot_actions.reshape(-1, 1, self.num_agents)
+# 		w1 = self.hyper_w1(obs)
+# 		b1 = self.hyper_b1(obs)
+# 		w1 = w1.reshape(-1, self.num_agents, self.hidden_dim)
+# 		b1 = b1.reshape(-1, 1, self.hidden_dim)
+
+# 		x = F.gelu(torch.bmm(one_hot_actions, w1) + b1)
+
+# 		w2 = self.hyper_w2(obs)
+# 		b2 = self.hyper_b2(obs)
+# 		w2 = w2.reshape(-1, self.hidden_dim, self.final_dim)
+# 		b2 = b2.reshape(-1, 1, self.hidden_dim)
+
+# 		x = torch.bmm(x, w2) + b2
+
+# 		return x
+
+
 class HyperNetwork(nn.Module):
-	def __init__(self, num_actions, hidden_dim, final_dim, obs_dim):
+	def __init__(self, obs_dim, hidden_dim, final_state_dim):
 		super(HyperNetwork, self).__init__()
-		self.num_actions = num_actions
+		self.obs_dim = obs_dim
 		self.hidden_dim = hidden_dim
-		self.final_dim = final_dim
 
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(hidden_dim, num_actions * hidden_dim), activate=True)
+			init_(nn.Linear(hidden_dim, obs_dim * hidden_dim))
 			)
 		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim), activate=True)
-			)
-		self.hyper_w2 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, final_dim*hidden_dim))
-			)
-		self.hyper_b2 = nn.Sequential(
-			init_(nn.Linear(obs_dim, hidden_dim), activate=True),
+			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(hidden_dim, hidden_dim))
 			)
+		self.hyper_w2 = nn.Sequential(
+			init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, hidden_dim))
+			)
+		self.hyper_b2 = nn.Sequential(
+			init_(nn.Linear(final_state_dim, hidden_dim)),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, 1))
+			)
 
-	def forward(self, one_hot_actions, obs):
-		one_hot_actions = one_hot_actions.reshape(-1, 1, self.num_actions)
-		w1 = self.hyper_w1(obs)
-		b1 = self.hyper_b1(obs)
-		w1 = w1.reshape(-1, self.num_actions, self.hidden_dim)
+	def forward(self, obs, final_state):
+		print(obs.shape, final_state.shape)
+		obs = obs.reshape(-1, 1, self.obs_dim)
+		w1 = self.hyper_w1(final_state)
+		b1 = self.hyper_b1(final_state)
+		w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
 		b1 = b1.reshape(-1, 1, self.hidden_dim)
 
-		x = F.gelu(torch.bmm(one_hot_actions, w1) + b1)
+		print(w1.shape, b1.shape)
 
-		w2 = self.hyper_w2(obs)
-		b2 = self.hyper_b2(obs)
-		w2 = w2.reshape(-1, self.hidden_dim, self.final_dim)
-		b2 = b2.reshape(-1, 1, self.hidden_dim)
+		x = F.gelu(torch.bmm(obs, w1) + b1)
+
+		w2 = self.hyper_w2(final_state)
+		b2 = self.hyper_b2(final_state)
+		w2 = w2.reshape(-1, self.hidden_dim, 1)
+		b2 = b2.reshape(-1, 1, 1)
 
 		x = torch.bmm(x, w2) + b2
 
@@ -190,15 +239,17 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
-		self.rblocks = nn.Sequential(
-			init_(nn.Linear(16*3*depth, 1), activate=False),
-			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, 1)),
-			nn.ReLU(),
-			)
+		# self.rblocks = nn.Sequential(
+		# 	init_(nn.Linear(16*3*depth, 1), activate=False),
+		# 	# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
+		# 	# nn.GELU(),
+		# 	# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+		# 	# nn.GELU(),
+		# 	# init_(nn.Linear(self.comp_emb, 1)),
+		# 	nn.ReLU(),
+			# )
+
+		self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -269,13 +320,17 @@ class Time_Agent_Transformer(nn.Module):
 			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			rewards = self.rblocks(x).view(b, t).contiguous() * team_masks.to(x.device)
 		elif self.version == "agent_temporal":
-			x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
-			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
+			# x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
+			# rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
+			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
+			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(1)
+			rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.mean(dim=1).reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2)
+			print(rewards.shape)
 		else:
 			
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
-			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(1)
-
+			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2)
 			# episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
 			# x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[torch.arange(b), final_agent.long()-1][torch.arange(b), episode_len.long()-1]
 			
