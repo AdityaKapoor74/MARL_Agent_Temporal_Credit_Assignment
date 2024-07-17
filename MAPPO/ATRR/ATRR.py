@@ -117,11 +117,11 @@ class Time_Agent_Transformer(nn.Module):
 		self.agent_attn = agent
 
 		self.ally_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(ally_obs_shape, 16), activate=False),
+			init_(nn.Linear(ally_obs_shape, 8), activate=False),
 			# nn.GELU(),
 			)
 		self.enemy_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(enemy_obs_shape, 16), activate=False),
+			init_(nn.Linear(enemy_obs_shape, 8), activate=False),
 			# nn.GELU(),
 			)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
@@ -136,11 +136,11 @@ class Time_Agent_Transformer(nn.Module):
 		# self.enemy_one_hot_ids = torch.eye(n_enemies)
 		# self.one_hot_actions = torch.eye(n_agents, n_actions)
 
-		self.action_embedding = nn.Embedding(n_actions, 16)
+		self.action_embedding = nn.Embedding(n_actions, 8)
 
-		self.return_embedding = init_(nn.Linear(1, 16), activate=False)
+		self.return_embedding = init_(nn.Linear(1, 8), activate=False)
 
-		self.position_embedding = nn.Embedding(seq_length, 16*4)
+		self.position_embedding = nn.Embedding(seq_length, 8*4)
 		# Create a matrix of shape (max_len, d_model) -- relative position embedding
 		# self.position_embedding = torch.zeros(seq_length, self.comp_emb).float()
 		# position = torch.arange(0, seq_length).float().unsqueeze(1)
@@ -150,7 +150,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
 		# self.position_embedding = self.position_embedding.to(self.device)
 
-		self.agent_embedding = nn.Embedding(n_agents, 16*3)
+		self.agent_embedding = nn.Embedding(n_agents, 8*3)
 		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
 		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
@@ -160,10 +160,10 @@ class Time_Agent_Transformer(nn.Module):
 		tblocks = []
 		for i in range(depth):
 			tblocks.append(
-				TransformerBlock(emb=16*4, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+				TransformerBlock(emb=8*4, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 			if agent:
 				tblocks.append(
-					TransformerBlock_Agent(emb=16*4, heads=heads, seq_length=seq_length, n_agents=n_agents,
+					TransformerBlock_Agent(emb=8*4, heads=heads, seq_length=seq_length, n_agents=n_agents,
 					mask=False, dropout=dropout, wide=wide)
 					)
 
@@ -179,7 +179,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(16*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			init_(nn.Linear(8*4*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
 			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -190,7 +190,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(16*4*depth, 1), activate=False),
+			init_(nn.Linear(8*4*depth, 1), activate=False),
 			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -230,12 +230,12 @@ class Time_Agent_Transformer(nn.Module):
 		# ally_one_hot_actions = self.one_hot_actions.reshape(1, n_a, 1, self.action_shape).repeat(b, 1, t, 1).to(self.device)
 		# ally_obs = torch.cat([ally_ids, ally_obs], dim=-1)
 		
-		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16*3).permute(0, 2, 1, 3)
+		agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 8*3).permute(0, 2, 1, 3)
 		# ally_obs = (self.ally_obs_compress_input(ally_obs)+agent_embedding) #+ self.action_embedding(actions.long())
 		ally_obs = self.ally_obs_compress_input(ally_obs)
 
-		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, 16*4)
-		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, 16)
+		position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, 8*4)
+		return_embedding = self.return_embedding(episodic_reward.reshape(b, 1)).reshape(b, 1, 1, 8)
 		# position_embedding = self.position_embedding[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 
 		# state_embeddings_norm = (self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs) + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb) # self.state_embedding_norm(self.ally_obs_compress_input(ally_obs) + enemy_obs + agent_embedding + position_embedding).view(b*n_a, t, self.comp_emb)
@@ -247,7 +247,7 @@ class Time_Agent_Transformer(nn.Module):
 		# states = (self.state_embedding_norm(ally_obs + enemy_obs) + agent_embedding + position_embedding + return_embedding)
 		# x = (states + self.action_embedding(actions.long())).view(b*n_a, t, self.comp_emb)
 		states = torch.cat([ally_obs, enemy_obs.repeat(1, self.n_agents, 1, 1), return_embedding.repeat(1, n_a, t, 1)], dim=-1) + agent_embedding
-		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1) + position_embedding).view(b*n_a, t, 16*4)
+		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1) + position_embedding).view(b*n_a, t, 8*4)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
@@ -276,7 +276,7 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		# zeroth_state_action_embedding = torch.zeros((b, n_a, 1, 16*4)).to(self.device)
+		# zeroth_state_action_embedding = torch.zeros((b, n_a, 1, 8*4)).to(self.device)
 		# past_state_action_embeddings = torch.cat([zeroth_state_action_embedding, torch.stack(x_intermediate, dim=0).sum(dim=0).view(b, n_a, t, self.comp_emb*2)[:, :, :-1, :]], dim=2) # first past state-action embedding is 0
 		# current_state_embeddings = states.sum(dim=1, keepdim=True)
 		# action_prediction = self.dynamics_model(torch.cat([current_state_embeddings.repeat(1, self.n_agents, 1, 1), past_state_action_embeddings], dim=-1))
@@ -301,7 +301,7 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 		else:
 			
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*4*self.depth).long() # subtracting 1 for indexing purposes
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 8*4*self.depth).long() # subtracting 1 for indexing purposes
 			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(1)
 
 			# episode_len, final_agent = torch.max((agent_masks.sum(dim=-2)-1), dim=1)
