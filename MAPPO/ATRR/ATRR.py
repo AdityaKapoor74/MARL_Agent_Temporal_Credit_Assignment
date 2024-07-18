@@ -275,7 +275,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.projection = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*3*depth*2, self.comp_emb), activate=False),
+			init_(nn.Linear(self.comp_emb*3*depth, self.comp_emb), activate=False),
 			)
 
 		# self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
