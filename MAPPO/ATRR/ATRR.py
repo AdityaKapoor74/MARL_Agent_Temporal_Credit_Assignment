@@ -263,17 +263,16 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
-		# self.rblocks = nn.Sequential(
-		# 	init_(nn.Linear(self.comp_emb*3*depth, 1), activate=False),
-
-
-		# 	# init_(nn.Linear(16*3*depth*2, self.comp_emb), activate=True),
-		# 	# nn.GELU(),
-		# 	# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-		# 	# nn.GELU(),
-		# 	# init_(nn.Linear(self.comp_emb, 1)),
-		# 	nn.ReLU(),
-		# 	)
+		self.rblocks = nn.Sequential(
+			init_(nn.Linear(self.comp_emb*3*depth, 1), activate=False),
+			# init_(nn.Linear(16*3*depth*2, self.comp_emb), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(self.comp_emb, 1)),
+			# nn.ReLU(),
+			nn.Tanh()
+			)
 
 		# self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
 					   
@@ -355,7 +354,7 @@ class Time_Agent_Transformer(nn.Module):
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
 			# rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
 			# rewards = self.rblocks(torch.cat([all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)], dim=-1)).transpose(1, 2).squeeze(-1) * agent_masks.to(self.device)
-			rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1) * episodic_reward.reshape(b, 1, 1)).transpose(1, 2)
+			rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1) * episodic_reward.reshape(b, 1, 1)).transpose(1, 2)  * agent_masks.to(self.device)
 		else:
 			
 			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
