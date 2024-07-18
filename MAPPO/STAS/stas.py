@@ -125,8 +125,12 @@ class STAS_ML(nn.Module):
 		self.linear = nn.Linear(emb_dim*self.n_layer, 1)
 
 	def get_time_mask(self, episode_length):
-		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
-		mask = torch.triu(torch.bmm(mask.unsqueeze(-1), mask.unsqueeze(1))).transpose(-1,-2)
+		# mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
+		# mask = torch.triu(torch.bmm(mask.unsqueeze(-1), mask.unsqueeze(1))).transpose(-1, -2)
+		mask = (torch.arange(self.seq_length)[None, None, :].to(self.device) < episode_length[:, :, None]).float()
+		b, n_a, t = mask.shape
+		mask = torch.triu(torch.bmm(mask.reshape(b*n_a, t).unsqueeze(-1), mask.reshape(b*n_a, t).unsqueeze(1)))
+		print(mask.shape)
 		return mask
 
 	def forward(self, ally_states, enemy_states, actions, episode_length):
@@ -135,7 +139,8 @@ class STAS_ML(nn.Module):
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
 		x = self.ally_state_emb(ally_states) + self.enemy_state_emb(enemy_states).mean(dim=1, keepdims=True).repeat(1, n_a, 1, 1) + self.action_emb(actions).squeeze() + positions
 
-		time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
+		# time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
+		time_mask = self.get_time_mask(episode_length)
 		x = x.reshape(b*n_a, t, -1).squeeze()
 		shapley_rewards = []
 		for layer in self.layers:
