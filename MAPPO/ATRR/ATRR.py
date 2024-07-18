@@ -263,15 +263,19 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
-		self.rblocks = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*3*depth*2, 1), activate=False),
-			# init_(nn.Linear(16*3*depth*2, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, 1)),
-			# nn.ReLU(),
-			nn.Sigmoid()
+		# self.rblocks = nn.Sequential(
+		# 	init_(nn.Linear(self.comp_emb*3*depth*2, 1), activate=False),
+		# 	# init_(nn.Linear(16*3*depth*2, self.comp_emb), activate=True),
+		# 	# nn.GELU(),
+		# 	# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
+		# 	# nn.GELU(),
+		# 	# init_(nn.Linear(self.comp_emb, 1)),
+		# 	# nn.ReLU(),
+		# 	nn.Sigmoid()
+		# 	)
+
+		self.projection = nn.Sequential(
+			init_(nn.Linear(self.comp_emb*3*depth*2, self.comp_emb), activate=False),
 			)
 
 		# self.rblocks = HyperNetwork(obs_dim=16*3*depth, hidden_dim=64, final_state_dim=16*3*depth)
@@ -349,12 +353,17 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards = self.rblocks(x).view(b, n_a, t).permute(0, 2, 1).contiguous() * agent_masks.to(x.device)
 			# all_ally_enemy_obs = torch.cat([ally_obs.transpose(1, 2).reshape(b, t, -1), enemy_obs.transpose(1, 2).reshape(b, t, -1)], dim=-1)
 			# final_state = torch.gather(all_ally_enemy_obs, 1, (team_masks.sum(dim=-1)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, all_ally_enemy_obs.shape[-1]).long()).squeeze(1)
-			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
-			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
+			# all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
+			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
+			# final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
 			# rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
-			rewards = self.rblocks(torch.cat([all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)], dim=-1)).transpose(1, 2).squeeze(-1) * agent_masks.to(self.device)
-			# rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1) * episodic_reward.reshape(b, 1, 1)).transpose(1, 2)  * agent_masks.to(self.device)
+			# rewards = self.rblocks(torch.cat([all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)], dim=-1)).transpose(1, 2).squeeze(-1) * agent_masks.to(self.device)
+			
+			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
+			all_x = self.projection(all_x)
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb).long() # subtracting 1 for indexing purposes
+			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
+			rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1) * episodic_reward.reshape(b, 1, 1)).transpose(1, 2)  * agent_masks.to(self.device)
 		else:
 			
 			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
