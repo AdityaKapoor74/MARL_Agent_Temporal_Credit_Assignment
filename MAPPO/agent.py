@@ -487,7 +487,7 @@ class PPOAgent:
 						agent_temporal_contribution = torch.where(agent_masks_batch.bool(), (agent_weights.mean(dim=0).detach().cpu()).sum(dim=-2)*agent_temporal_contribution_weights, 0.0)
 						agent_temporal_contribution = agent_temporal_contribution / (agent_temporal_contribution.sum(dim=1, keepdims=True)+1e-5)
 						# agent_temporal_contribution = F.softmax(torch.where(agent_masks_batch.bool(), agent_weights.mean(dim=0).detach().cpu().sum(dim=-2), -1e9), dim=1)
-						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards.unsqueeze(1)
+						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards#.unsqueeze(1)
 						rewards = agent_temporal_rewards
 
 						# print("agent_episodic_contribution")
