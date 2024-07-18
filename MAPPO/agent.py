@@ -490,8 +490,8 @@ class PPOAgent:
 						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards.unsqueeze(1)
 						rewards = agent_temporal_rewards
 
-						print("agent_episodic_contribution")
-						print(agent_episodic_contribution)
+						# print("agent_episodic_contribution")
+						# print(agent_episodic_contribution)
 						print("agent_temporal_contribution")
 						print(agent_temporal_contribution)
 
