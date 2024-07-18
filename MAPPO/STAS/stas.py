@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import numpy as np
 import torch.nn.functional as F
-from modules import *
+from .modules import *
 
 class ShapelyAttention(nn.Module):
 	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0):
@@ -117,7 +117,7 @@ class STAS_ML(nn.Module):
 
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
 		self.agent_embedding = nn.Embedding(n_agents, emb_dim)
-		self.enemy_embedding = nn.Embedding(n_enemies, emb_dim)
+		# self.enemy_embedding = nn.Embedding(n_enemies, emb_dim)
 
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
@@ -129,11 +129,11 @@ class STAS_ML(nn.Module):
 		mask = torch.triu(torch.bmm(mask.unsqueeze(-1), mask.unsqueeze(1))).transpose(-1,-2)
 		return mask
 
-	def forward(self, states, actions, episode_length):
-		b, n_a, t, e = states.size()
+	def forward(self, ally_states, enemy_states, actions, episode_length):
+		b, n_a, t, e = ally_states.size()
 
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
-		x = self.state_emb(states) + self.action_emb(actions).squeeze() + positions
+		x = self.ally_state_emb(ally_states) + self.enemy_state_emb(enemy_states).mean(dim=1, keepdims=True).repeat(1, n_a, 1, 1) + self.action_emb(actions).squeeze() + positions
 
 		time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
 		x = x.reshape(b*n_a, t, -1).squeeze()
@@ -151,5 +151,5 @@ class STAS_ML(nn.Module):
 
 
 
-reward_predictor = STAS_ML(input_dim=10, n_actions=12, emb_dim=64, n_heads=4, n_layer=3, seq_length=50, n_agents=5, sample_num=5,
-				device=torch.device('cpu'), dropout=0.0, emb_dropout=0.3)
+# reward_predictor = STAS_ML(input_dim=10, n_actions=12, emb_dim=64, n_heads=4, n_layer=3, seq_length=50, n_agents=5, sample_num=5,
+# 				device=torch.device('cpu'), dropout=0.0, emb_dropout=0.3)

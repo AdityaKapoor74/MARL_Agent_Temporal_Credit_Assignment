@@ -510,6 +510,19 @@ class PPOAgent:
 						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
 						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
 
+			elif "STAS" in self.experiment_type:
+
+				with torch.no_grad():
+					rewards = self.reward_model( 
+						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						actions_batch.long().permute(0, 2, 1).to(self.device), 
+						episode_len_batch.long().to(self.device),
+						)
+
+					rewards = rewards.transpose(1, 2)
+
+
 			return rewards.cpu()
 			
 
@@ -597,6 +610,19 @@ class PPOAgent:
 			if temporal_scores_final_temporal_block is not None:
 				reward_loss += self.temporal_score_coefficient * (temporal_scores_final_temporal_block**2).sum()
 
+		elif "STAS" in self.experiment_type:
+			
+			rewards = self.reward_model(
+				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				actions_batch.long().permute(0, 2, 1).to(self.device), 
+				episode_len_batch.long().to(self.device),
+				)
+
+			rewards = rewards.transpose(1, 2) * agent_masks_batch.to(self.device)
+
+			reward_loss = F.mse_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
+
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()
 		if self.enable_reward_grad_clip:
@@ -615,7 +641,8 @@ class PPOAgent:
 			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
 		elif "ATRR" in self.experiment_type:
 			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), entropy_final_temporal_block, grad_norm_value_reward.item()
-
+		elif "STAS" in self.experiment_type:
+			return reward_loss.item(), grad_norm_value_reward.item()
 
 
 	def plot(self, masks, episode):
