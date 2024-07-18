@@ -438,7 +438,7 @@ if __name__ == '__main__':
 				# REWARD MODEL
 				"use_reward_model": True,
 				"reward_n_heads": 3, # 3
-				"reward_depth": 3, # 3
+				"reward_depth": 1, # 3
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
