@@ -130,7 +130,6 @@ class STAS_ML(nn.Module):
 		mask = (torch.arange(self.seq_length)[None, None, :].to(self.device) < episode_length[:, :, None]).float()
 		b, n_a, t = mask.shape
 		mask = torch.triu(torch.bmm(mask.reshape(b*n_a, t).unsqueeze(-1), mask.reshape(b*n_a, t).unsqueeze(1)))
-		print(mask.shape)
 		return mask
 
 	def forward(self, ally_states, enemy_states, actions, episode_length):
