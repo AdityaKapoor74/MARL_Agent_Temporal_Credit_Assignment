@@ -443,7 +443,7 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
-				"reward_linear_compression_dim": 32, # 16 for ATRR_agent_temporal
+				"reward_linear_compression_dim": 16, # 16 for ATRR_agent_temporal
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
@@ -453,8 +453,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 10, # 200
-				"reward_model_update_epochs": 5, # 400
+				"update_reward_model_freq": 50, # 200
+				"reward_model_update_epochs": 50, # 400
 				"norm_rewards": False,
 
 
