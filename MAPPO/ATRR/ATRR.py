@@ -370,7 +370,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# sink-horn algorithm
 			# reward b x t x n
-			for i in range(4):
+			for i in range(10):
 				rewards = rewards / (rewards.sum(dim=1, keepdims=True) + 1e-5)
 				rewards = rewards / (rewards.sum(dim=-1, keepdims=True) + 1e-5)
 		else:
