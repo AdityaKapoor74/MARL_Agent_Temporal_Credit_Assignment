@@ -364,7 +364,7 @@ class Time_Agent_Transformer(nn.Module):
 			# all_x = self.projection(all_x)
 			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb).long() # subtracting 1 for indexing purposes
 			# final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
-			rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1).transpose(1, 2))  * agent_masks.to(self.device) #* episodic_reward.reshape(b, 1, 1)).transpose(1, 2)
+			rewards = (F.cosine_similarity(all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1), dim=-1).transpose(1, 2)+1) * 0.5  * agent_masks.to(self.device) #* episodic_reward.reshape(b, 1, 1)).transpose(1, 2)
 		else:
 			
 			# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 16*3*self.depth).long() # subtracting 1 for indexing purposes
