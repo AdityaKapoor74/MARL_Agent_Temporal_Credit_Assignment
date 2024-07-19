@@ -608,8 +608,8 @@ class PPOAgent:
 			else:
 				batch = ally_obs_batch.shape[0]
 				reward_loss = F.huber_loss(rewards.reshape(batch, -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
-				weights = rewards / (episodic_reward_batch.reshape(batch, 1, 1)+1e-5)
-				constraint_loss_1 = ((1 - weights.sum(dim=-1))**2 * team_mask_batch.to(self.device)).sum() / team_mask_batch.sum()
+				weights = rewards / (episodic_reward_batch.reshape(batch, 1, 1).to(self.device)+1e-5)
+				constraint_loss_1 = ((1 - weights.sum(dim=-1))**2 * team_mask_batch.to(self.device)).sum() / team_mask_batch.to(self.device).sum()
 				reward_loss += constraint_loss_1
 
 
