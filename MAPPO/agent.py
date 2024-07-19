@@ -442,6 +442,8 @@ class PPOAgent:
 						# episode_len=episode_len_batch.to(self.device),
 						)
 
+					rewards = rewards.cpu() * episodic_reward_batch.reshape(rewards.shape[0], 1, 1)
+
 					print("*"*20)
 					print("actions")
 					print(actions_batch[0])
