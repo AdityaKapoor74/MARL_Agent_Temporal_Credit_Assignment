@@ -442,8 +442,6 @@ class PPOAgent:
 						# episode_len=episode_len_batch.to(self.device),
 						)
 
-					rewards = rewards.cpu() * episodic_reward_batch.reshape(rewards.shape[0], 1, 1)
-
 					print("*"*20)
 					print("actions")
 					print(actions_batch[0])
@@ -608,8 +606,13 @@ class PPOAgent:
 				# reward_loss = torch.mean(torch.log(torch.cosh(rewards.squeeze(-1) - episodic_reward_batch.to(self.device))))
 				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:
-				reward_loss = F.huber_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
-			
+				batch = ally_obs_batch.shape[0]
+				reward_loss = F.huber_loss(rewards.reshape(batch, -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
+				weights = rewards / (episodic_reward_batch.reshape(batch, 1, 1)+1e-5)
+				constraint_loss_1 = ((1 - weights.sum(dim=-1))**2 * team_mask_batch.to(self.device)).sum() / team_mask_batch.sum()
+				reward_loss += constraint_loss_1
+
+
 			if temporal_scores_final_temporal_block is not None:
 				reward_loss += self.temporal_score_coefficient * (temporal_scores_final_temporal_block**2).sum()
 
