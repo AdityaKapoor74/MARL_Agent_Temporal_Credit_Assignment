@@ -459,21 +459,20 @@ class PPOAgent:
 						b, t, n_a, _ = ally_state_batch.shape
 							
 						# use temporal and agent attention networks to distribute rewards
-						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
-						# agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1).unsqueeze(-1)+1e-5)
+						agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1, keepdim=True)+1e-5)
 						# # renormalizing
-						# agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						
 						# # multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
-						# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1)
+						multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
 						# # renormalizing
-						# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
-						# temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
-						# agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
-
-						# rewards = agent_temporal_rewards
+						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
+						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
+						rewards = agent_temporal_rewards
 
 						# assuming predict episodic reward for each agent
 						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
@@ -481,14 +480,14 @@ class PPOAgent:
 						# rewards = rewards.detach().cpu() * temporal_weights_final
 
 						# use agent attention network to distribute rewards
-						agent_temporal_contribution_weights = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, (team_mask_batch.sum(dim=-1)-1).reshape(b, 1, 1, 1).repeat(1, n_a, 1, t).long()).squeeze(2).transpose(1, 2)
+						# agent_temporal_contribution_weights = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, (team_mask_batch.sum(dim=-1)-1).reshape(b, 1, 1, 1).repeat(1, n_a, 1, t).long()).squeeze(2).transpose(1, 2)
 						# agent_episodic_contribution = (agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)*agent_temporal_contribution_weights).sum(dim=1) / (agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)*agent_temporal_contribution_weights).sum(dim=1).sum(dim=-1, keepdims=True)
-						agent_episodic_rewards = rewards.cpu() # agent_episodic_contribution * episodic_reward_batch.unsqueeze(-1)
-						agent_temporal_contribution = torch.where(agent_masks_batch.bool(), (agent_weights.mean(dim=0).detach().cpu()).sum(dim=-2)*agent_temporal_contribution_weights, 0.0)
-						agent_temporal_contribution = agent_temporal_contribution / (agent_temporal_contribution.sum(dim=1, keepdims=True)+1e-5)
+						# agent_episodic_rewards = rewards.cpu() # agent_episodic_contribution * episodic_reward_batch.unsqueeze(-1)
+						# agent_temporal_contribution = torch.where(agent_masks_batch.bool(), (agent_weights.mean(dim=0).detach().cpu()).sum(dim=-2)*agent_temporal_contribution_weights, 0.0)
+						# agent_temporal_contribution = agent_temporal_contribution / (agent_temporal_contribution.sum(dim=1, keepdims=True)+1e-5)
 						# agent_temporal_contribution = F.softmax(torch.where(agent_masks_batch.bool(), agent_weights.mean(dim=0).detach().cpu().sum(dim=-2), -1e9), dim=1)
-						agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards#.unsqueeze(1)
-						rewards = agent_temporal_rewards
+						# agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards#.unsqueeze(1)
+						# rewards = agent_temporal_rewards
 
 						# print("agent_episodic_contribution")
 						# print(agent_episodic_contribution)

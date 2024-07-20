@@ -233,7 +233,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*3*depth*2, 1), activate=False),
+			init_(nn.Linear(self.comp_emb*3*depth, 1), activate=False),
 			# init_(nn.Linear(self.comp_emb*3*depth*2, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -241,7 +241,7 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
 			# nn.Sigmoid(),
-			nn.ReLU(),
+			# nn.ReLU(),
 			)
 
 		# self.projection = nn.Sequential(
@@ -364,9 +364,9 @@ class Time_Agent_Transformer(nn.Module):
 			
 			# rewards = self.rblocks(x).view(b, 1, n_a).contiguous()
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*3*self.depth).long() # subtracting 1 for indexing purposes
-			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
+			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2).sum(dim=1) / (agent_masks.sum(dim=-1, keepdim=True)+1e-5)
 
-			rewards = self.rblocks(x).view(b, 1, n_a).contiguous()
+			rewards = self.rblocks(x).view(b, 1).contiguous()
 
 
 		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
