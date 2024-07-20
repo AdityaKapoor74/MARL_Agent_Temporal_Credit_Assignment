@@ -418,8 +418,8 @@ class Time_Agent_Transformer(nn.Module):
 
 			# rewards = self.rblocks(x).view(b, 1).contiguous()
 
-			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2).sum(dim=1)
-			returns = self.return_mix_network(rewards, final_x.mean(dim=1)).reshape(b, 1)
+			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)
+			returns = self.return_mix_network(rewards.sum(dim=1), final_x.mean(dim=1)).reshape(b, 1)
 
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
