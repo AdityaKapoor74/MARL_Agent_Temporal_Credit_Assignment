@@ -199,7 +199,7 @@ class Time_Agent_Transformer(nn.Module):
 		self.final_obs_embedding = nn.Sequential(
 			init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=False),
+			# init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=False),
 			)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
