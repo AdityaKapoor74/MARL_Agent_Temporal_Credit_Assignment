@@ -241,7 +241,7 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
 			# nn.Sigmoid(),
-			# nn.ReLU(),
+			nn.ReLU(),
 			)
 
 		# self.projection = nn.Sequential(
