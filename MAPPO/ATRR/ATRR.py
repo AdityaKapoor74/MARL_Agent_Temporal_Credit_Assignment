@@ -155,42 +155,56 @@ class ReturnMixNetwork(nn.Module):
 		self.num_agents = num_agents
 		self.hidden_dim = hidden_dim
 
+		# self.hyper_w1 = nn.Sequential(
+		# 	init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, num_agents * hidden_dim))
+		# 	)
+		# self.hyper_b1 = nn.Sequential(
+		# 	init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+		# 	)
+		# self.hyper_w2 = nn.Sequential(
+		# 	init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+		# 	)
+		# self.hyper_b2 = nn.Sequential(
+		# 	init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+		# 	nn.GELU(),
+		# 	init_(nn.Linear(hidden_dim, 1))
+		# 	)
+
 		self.hyper_w1 = nn.Sequential(
 			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
 			nn.GELU(),
-			init_(nn.Linear(hidden_dim, num_agents * hidden_dim))
-			)
-		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim))
-			)
-		self.hyper_w2 = nn.Sequential(
-			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, hidden_dim))
-			)
-		self.hyper_b2 = nn.Sequential(
-			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, 1))
+			init_(nn.Linear(hidden_dim, num_agents))
 			)
 
 	def forward(self, q_values, total_obs):
+		# q_values = q_values.reshape(-1, 1, self.num_agents)
+		# w1 = torch.abs(self.hyper_w1(total_obs))
+		# b1 = self.hyper_b1(total_obs)
+		# w1 = w1.reshape(-1, self.num_agents, self.hidden_dim)
+		# b1 = b1.reshape(-1, 1, self.hidden_dim)
+
+		# x = F.elu(torch.bmm(q_values, w1) + b1)
+
+		# w2 = torch.abs(self.hyper_w2(total_obs))
+		# b2 = self.hyper_b2(total_obs)
+		# w2 = w2.reshape(-1, self.hidden_dim, 1)
+		# b2 = b2.reshape(-1, 1, 1)
+
+		# x = torch.bmm(x, w2) + b2
+
 		q_values = q_values.reshape(-1, 1, self.num_agents)
-		w1 = torch.abs(self.hyper_w1(total_obs))
-		b1 = self.hyper_b1(total_obs)
-		w1 = w1.reshape(-1, self.num_agents, self.hidden_dim)
-		b1 = b1.reshape(-1, 1, self.hidden_dim)
+		w1 = self.hyper_w1(total_obs)
+		w1 = F.softmax(w1.reshape(-1, self.num_agents, 1), dim=1)
 
-		x = F.elu(torch.bmm(q_values, w1) + b1)
+		x = torch.bmm(q_values, w1)
 
-		w2 = torch.abs(self.hyper_w2(total_obs))
-		b2 = self.hyper_b2(total_obs)
-		w2 = w2.reshape(-1, self.hidden_dim, 1)
-		b2 = b2.reshape(-1, 1, 1)
-
-		x = torch.bmm(x, w2) + b2
+		self.w1 = w1
 
 		return x
 
@@ -420,6 +434,9 @@ class Time_Agent_Transformer(nn.Module):
 
 			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device)
 			returns = self.return_mix_network(rewards.sum(dim=1), final_x.mean(dim=1)).reshape(b, 1)
+
+			# correction
+			rewards = rewards * self.return_mix_network.w1.detach().transpose(1, 2)
 
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
