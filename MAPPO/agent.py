@@ -491,8 +491,8 @@ class PPOAgent:
 
 						# print("agent_episodic_contribution")
 						# print(agent_episodic_contribution)
-						print("agent_temporal_contribution")
-						print(agent_temporal_contribution)
+						# print("agent_temporal_contribution")
+						# print(agent_temporal_contribution)
 
 						print("rewards")
 						print(rewards[0])
