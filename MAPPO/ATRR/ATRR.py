@@ -413,15 +413,16 @@ class Time_Agent_Transformer(nn.Module):
 			
 			# rewards = self.rblocks(x).view(b, 1, n_a).contiguous()
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*3*self.depth).long() # subtracting 1 for indexing purposes
-			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
+			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
+			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
 
 			# rewards = self.rblocks(x).view(b, 1).contiguous()
 
-			agent_returns = self.rblocks(x).view(b, n_a).contiguous()
-			rewards = self.return_mix_network(agent_returns, x.mean(dim=1)).reshape(b, 1)
+			rewards = self.rblocks(x).view(b, n_a, t).contiguous().transpose(1, 2).sum(dim=1)
+			returns = self.return_mix_network(rewards, final_x.mean(dim=1)).reshape(b, 1)
 
 
-		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
+		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
 
 
 

@@ -429,7 +429,7 @@ class PPOAgent:
 			elif "ATRR" in self.experiment_type:
 
 				with torch.no_grad():
-					rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
+					returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
 					temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction = self.reward_model(
 						# state_batch.permute(0, 2, 1, 3).to(self.device), 
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -456,23 +456,23 @@ class PPOAgent:
 					
 
 					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
-						b, t, n_a, _ = ally_state_batch.shape
+						# b, t, n_a, _ = ally_state_batch.shape
 							
-						# use temporal and agent attention networks to distribute rewards
-						indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+						# # use temporal and agent attention networks to distribute rewards
+						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 
-						agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1, keepdim=True)+1e-5)
-						# # renormalizing
-						agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+						# agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1, keepdim=True)+1e-5)
+						# # # renormalizing
+						# agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
 						
-						# # multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
-						multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
-						# # renormalizing
-						multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
-						temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
-						agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
-						rewards = agent_temporal_rewards
+						# # # multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
+						# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
+						# # # renormalizing
+						# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+						# temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
+						# agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
+						# rewards = agent_temporal_rewards
 
 						# assuming predict episodic reward for each agent
 						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
@@ -576,7 +576,7 @@ class PPOAgent:
 
 		elif "ATRR" in self.experiment_type:
 			
-			rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction = self.reward_model(
+			returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction = self.reward_model(
 				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -601,7 +601,8 @@ class PPOAgent:
 			if self.version == "agent_temporal_attn_weights":
 				b, t, _, e = ally_obs_batch.shape
 				state_target = torch.cat([ally_obs_batch.reshape(b, t, -1), enemy_obs_batch.reshape(b, t, -1)], dim=-1).to(self.device)
-				reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) + 5e-2*(F.mse_loss(state_prediction, state_target, reduction='none') * team_mask_batch.unsqueeze(-1).to(self.device)).sum() / team_mask_batch.sum() #+ 1e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
+				# reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ 5e-2*(F.mse_loss(state_prediction, state_target, reduction='none') * team_mask_batch.unsqueeze(-1).to(self.device)).sum() / team_mask_batch.sum() #+ 1e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
+				reward_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
 				# reward_loss = torch.mean(torch.log(torch.cosh(rewards.squeeze(-1) - episodic_reward_batch.to(self.device))))
 				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:
