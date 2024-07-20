@@ -311,8 +311,8 @@ class Time_Agent_Transformer(nn.Module):
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
-			nn.Tanh(),
-			nn.ReLU(),
+			nn.Sigmoid(),
+			# nn.ReLU(),
 			)
 
 		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
@@ -451,7 +451,8 @@ class Time_Agent_Transformer(nn.Module):
 			# state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
 			returns = self.return_mix_network(rewards, all_x.mean(dim=1)+final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1)
 			# correction
-			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
+			rewards = returns.clone()
+			# rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
