@@ -198,6 +198,14 @@ class ReturnMixNetwork(nn.Module):
 
 		# x = torch.bmm(x, w2) + b2
 
+		# q_values = q_values.reshape(-1, 1, self.num_agents)
+		# w1 = self.hyper_w1(total_obs)
+		# w1 = F.softmax(w1.reshape(-1, self.num_agents, 1), dim=1)
+
+		# x = torch.bmm(q_values, w1)
+
+		# self.w1 = w1
+
 		q_values = q_values.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(total_obs)
 		w1 = F.softmax(w1.reshape(-1, self.num_agents, 1), dim=1)
@@ -305,7 +313,7 @@ class Time_Agent_Transformer(nn.Module):
 			nn.ReLU(),
 			)
 
-		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
+		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth*2)
 
 		# self.projection = nn.Sequential(
 		# 	init_(nn.Linear(self.comp_emb*3*depth, self.comp_emb), activate=True),
@@ -433,11 +441,14 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards = self.rblocks(x).view(b, 1).contiguous()
 
 			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device)
-			returns = self.return_mix_network(rewards.sum(dim=1), final_x.mean(dim=1)).reshape(b, 1)
-
+			# returns = self.return_mix_network(rewards.sum(dim=1), final_x.mean(dim=1)).reshape(b, 1)
 			# correction
-			rewards = rewards * self.return_mix_network.w1.detach().transpose(1, 2)
+			# rewards = rewards * self.return_mix_network.w1.detach().transpose(1, 2)
 
+			state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
+			returns = self.return_mix_network(rewards, state).reshape(b, t, 1)
+			# correction
+			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
 
