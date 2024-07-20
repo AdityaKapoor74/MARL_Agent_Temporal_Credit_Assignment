@@ -182,7 +182,7 @@ class ReturnMixNetwork(nn.Module):
 			init_(nn.Linear(hidden_dim, num_agents))
 			)
 
-	def forward(self, q_values, total_obs):
+	def forward(self, q_values, total_obs, agent_masks):
 		# q_values = q_values.reshape(-1, 1, self.num_agents)
 		# w1 = torch.abs(self.hyper_w1(total_obs))
 		# b1 = self.hyper_b1(total_obs)
@@ -208,7 +208,7 @@ class ReturnMixNetwork(nn.Module):
 
 		q_values = q_values.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(total_obs)
-		w1 = F.softmax(w1.reshape(-1, self.num_agents, 1), dim=1)
+		w1 = F.softmax(torch.where(agent_masks.bool().to(self.device).reshape(-1, self.num_agents), w1.reshape(-1, self.num_agents), -1e9), dim=-1).reshape(-1, self.num_agents, 1)
 
 		x = torch.bmm(q_values, w1)
 
@@ -446,7 +446,7 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards = rewards * self.return_mix_network.w1.detach().transpose(1, 2)
 
 			state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
-			returns = self.return_mix_network(rewards, state).reshape(b, t, 1)
+			returns = self.return_mix_network(rewards, state, agent_masks).reshape(b, t, 1)
 			# correction
 			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
 
