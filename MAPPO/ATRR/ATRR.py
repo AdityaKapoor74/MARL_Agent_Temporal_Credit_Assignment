@@ -311,8 +311,8 @@ class Time_Agent_Transformer(nn.Module):
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
-			nn.Sigmoid(),
-			# nn.ReLU(),
+			nn.Tanh(),
+			nn.ReLU(),
 			)
 
 		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
