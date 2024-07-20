@@ -75,75 +75,122 @@ def init_(m, gain=0.01, activate=False):
 # 		return x
 
 
-class HyperNetwork(nn.Module):
-	def __init__(self, obs_dim, hidden_dim, final_state_dim):
-		super(HyperNetwork, self).__init__()
-		self.obs_dim = obs_dim
+# class HyperNetwork(nn.Module):
+# 	def __init__(self, obs_dim, hidden_dim, final_state_dim):
+# 		super(HyperNetwork, self).__init__()
+# 		self.obs_dim = obs_dim
+# 		self.hidden_dim = hidden_dim
+
+# 		# self.hyper_w1 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+# 		# 	nn.GELU(),
+# 		# 	init_(nn.Linear(hidden_dim, obs_dim * hidden_dim))
+# 		# 	)
+# 		# self.hyper_b1 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+# 		# 	nn.GELU(),
+# 		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+# 		# 	)
+# 		# self.hyper_w2 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
+# 		# 	nn.GELU(),
+# 		# 	init_(nn.Linear(hidden_dim, hidden_dim))
+# 		# 	)
+# 		# self.hyper_b2 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim)),
+# 		# 	nn.GELU(),
+# 		# 	init_(nn.Linear(hidden_dim, 1))
+# 		# 	)
+
+# 		# self.hyper_w1 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, obs_dim * hidden_dim))
+# 		# 	)
+# 		# self.hyper_b1 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim))
+# 		# 	)
+
+# 		# self.hyper_w2 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, hidden_dim))
+# 		# 	)
+# 		# self.hyper_b2 = nn.Sequential(
+# 		# 	init_(nn.Linear(final_state_dim, 1))
+# 		# 	)
+
+# 		self.hyper_w1 = nn.Sequential(
+# 			init_(nn.Linear(final_state_dim, obs_dim))
+# 			)
+# 		self.hyper_b1 = nn.Sequential(
+# 			init_(nn.Linear(final_state_dim, 1))
+# 			)
+
+# 	def forward(self, obs, final_state):
+# 		obs = obs.reshape(-1, 1, self.obs_dim)
+# 		# w1 = self.hyper_w1(final_state)
+# 		# b1 = self.hyper_b1(final_state)
+# 		# w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
+# 		# b1 = b1.reshape(-1, 1, self.hidden_dim)
+
+# 		# x = F.gelu(torch.bmm(obs, w1) + b1)
+
+# 		# w2 = self.hyper_w2(final_state)
+# 		# b2 = self.hyper_b2(final_state)
+# 		# w2 = w2.reshape(-1, self.hidden_dim, 1)
+# 		# b2 = b2.reshape(-1, 1, 1)
+
+# 		# x = torch.bmm(x, w2) + b2
+
+# 		w1 = self.hyper_w1(final_state)
+# 		b1 = self.hyper_b1(final_state)
+# 		w1 = w1.reshape(-1, self.obs_dim, 1)
+# 		b1 = b1.reshape(-1, 1, 1)
+# 		x = torch.bmm(obs, w1) + b1
+
+# 		return x
+
+
+
+class ReturnMixNetwork(nn.Module):
+	def __init__(self, num_agents, hidden_dim, total_obs_dim):
+		super(ReturnMixNetwork, self).__init__()
+		self.num_agents = num_agents
 		self.hidden_dim = hidden_dim
 
-		# self.hyper_w1 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-		# 	nn.GELU(),
-		# 	init_(nn.Linear(hidden_dim, obs_dim * hidden_dim))
-		# 	)
-		# self.hyper_b1 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-		# 	nn.GELU(),
-		# 	init_(nn.Linear(hidden_dim, hidden_dim))
-		# 	)
-		# self.hyper_w2 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim), activate=True),
-		# 	nn.GELU(),
-		# 	init_(nn.Linear(hidden_dim, hidden_dim))
-		# 	)
-		# self.hyper_b2 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim)),
-		# 	nn.GELU(),
-		# 	init_(nn.Linear(hidden_dim, 1))
-		# 	)
-
-		# self.hyper_w1 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, obs_dim * hidden_dim))
-		# 	)
-		# self.hyper_b1 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim))
-		# 	)
-
-		# self.hyper_w2 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, hidden_dim))
-		# 	)
-		# self.hyper_b2 = nn.Sequential(
-		# 	init_(nn.Linear(final_state_dim, 1))
-		# 	)
-
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, obs_dim))
+			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, num_agents * hidden_dim))
 			)
 		self.hyper_b1 = nn.Sequential(
-			init_(nn.Linear(final_state_dim, 1))
+			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, hidden_dim))
+			)
+		self.hyper_w2 = nn.Sequential(
+			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, hidden_dim))
+			)
+		self.hyper_b2 = nn.Sequential(
+			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, 1))
 			)
 
-	def forward(self, obs, final_state):
-		obs = obs.reshape(-1, 1, self.obs_dim)
-		# w1 = self.hyper_w1(final_state)
-		# b1 = self.hyper_b1(final_state)
-		# w1 = w1.reshape(-1, self.obs_dim, self.hidden_dim)
-		# b1 = b1.reshape(-1, 1, self.hidden_dim)
+	def forward(self, q_values, total_obs):
+		q_values = q_values.reshape(-1, 1, self.num_agents)
+		w1 = torch.abs(self.hyper_w1(total_obs))
+		b1 = self.hyper_b1(total_obs)
+		w1 = w1.reshape(-1, self.num_agents, self.hidden_dim)
+		b1 = b1.reshape(-1, 1, self.hidden_dim)
 
-		# x = F.gelu(torch.bmm(obs, w1) + b1)
+		x = F.elu(torch.bmm(q_values, w1) + b1)
 
-		# w2 = self.hyper_w2(final_state)
-		# b2 = self.hyper_b2(final_state)
-		# w2 = w2.reshape(-1, self.hidden_dim, 1)
-		# b2 = b2.reshape(-1, 1, 1)
+		w2 = torch.abs(self.hyper_w2(total_obs))
+		b2 = self.hyper_b2(total_obs)
+		w2 = w2.reshape(-1, self.hidden_dim, 1)
+		b2 = b2.reshape(-1, 1, 1)
 
-		# x = torch.bmm(x, w2) + b2
-
-		w1 = self.hyper_w1(final_state)
-		b1 = self.hyper_b1(final_state)
-		w1 = w1.reshape(-1, self.obs_dim, 1)
-		b1 = b1.reshape(-1, 1, 1)
-		x = torch.bmm(obs, w1) + b1
+		x = torch.bmm(x, w2) + b2
 
 		return x
 
@@ -241,8 +288,10 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
 			# nn.Sigmoid(),
-			# nn.ReLU(),
+			nn.ReLU(),
 			)
+
+		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
 
 		# self.projection = nn.Sequential(
 		# 	init_(nn.Linear(self.comp_emb*3*depth, self.comp_emb), activate=True),
@@ -364,9 +413,12 @@ class Time_Agent_Transformer(nn.Module):
 			
 			# rewards = self.rblocks(x).view(b, 1, n_a).contiguous()
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*3*self.depth).long() # subtracting 1 for indexing purposes
-			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2).mean(dim=1)
+			x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
 
-			rewards = self.rblocks(x).view(b, 1).contiguous()
+			# rewards = self.rblocks(x).view(b, 1).contiguous()
+
+			agent_returns = self.rblocks(x).view(b, n_a).contiguous()
+			rewards = self.return_mix_network(agent_returns, x.mean(dim=1)).reshape(b, 1)
 
 
 		return rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
