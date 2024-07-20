@@ -418,7 +418,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# rewards = self.rblocks(x).view(b, 1).contiguous()
 
-			rewards = self.rblocks(x).view(b, n_a, t).contiguous().transpose(1, 2).sum(dim=1)
+			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2).sum(dim=1)
 			returns = self.return_mix_network(rewards, final_x.mean(dim=1)).reshape(b, 1)
 
 
