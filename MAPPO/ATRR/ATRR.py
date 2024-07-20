@@ -293,7 +293,7 @@ class Time_Agent_Transformer(nn.Module):
 			i += 1
 
 			# keep current context
-			x = x + state_action_embedding
+			# x = x + state_action_embedding
 
 			if self.agent_attn:
 				# odd numbers have agent attention
@@ -304,7 +304,7 @@ class Time_Agent_Transformer(nn.Module):
 				i += 1
 
 				# keep current context
-				x = x + state_action_embedding
+				# x = x + state_action_embedding
 
 
 			x_intermediate.append(x)
