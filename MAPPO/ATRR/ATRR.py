@@ -209,7 +209,7 @@ class ReturnMixNetwork(nn.Module):
 		q_values = q_values.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(total_obs)
 		# w1 = F.softmax(torch.where(agent_masks.bool().to(total_obs.device).reshape(-1, self.num_agents), w1.reshape(-1, self.num_agents), -1e9), dim=-1).reshape(-1, self.num_agents, 1)
-		w1 = F.relu(w1.reshape(-1, self.num_agents, 1) * agent_masks.to(total_obs.device))
+		w1 = F.relu(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(total_obs.device))
 
 		x = torch.bmm(q_values, w1)
 
