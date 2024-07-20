@@ -449,7 +449,8 @@ class Time_Agent_Transformer(nn.Module):
 			state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
 			returns = self.return_mix_network(rewards, state, agent_masks).reshape(b, t, 1)
 			# correction
-			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
+			# rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device)
+			rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
 
