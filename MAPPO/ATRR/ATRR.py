@@ -196,12 +196,6 @@ class Time_Agent_Transformer(nn.Module):
 			init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
 			)
 
-		self.final_obs_embedding = nn.Sequential(
-			init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=True),
-			nn.GELU(),
-			# init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=False),
-			)
-
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 
 
@@ -283,7 +277,6 @@ class Time_Agent_Transformer(nn.Module):
 
 		states = torch.cat([ally_obs_embedding, enemy_obs_embedding.repeat(1, self.n_agents, 1, 1)], dim=-1)
 		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, self.comp_emb*3)
-		x = self.final_obs_embedding(x) 
 		state_action_embedding = x.clone()
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
@@ -341,7 +334,7 @@ class Time_Agent_Transformer(nn.Module):
 			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, 3*self.depth*self.comp_emb).long() # subtracting 1 for indexing purposes
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).mean(dim=1, keepdims=True)
 			# rewards = self.rblocks(all_x.reshape(b*n_a*t, -1), final_x.reshape(b, 1, -1).repeat(1, n_a*t, 1).reshape(b*n_a*t, -1)).reshape(b, n_a, t).transpose(1, 2) * agent_masks.to(self.device)
-			rewards = F.softmax(torch.where(agent_masks.to(self.device).bool(), self.rblocks(torch.cat([all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)], dim=-1)).transpose(1, 2).squeeze(-1), -1e9), dim=-1) * agent_masks.to(self.device) * episodic_reward.reshape(b, 1, 1)
+			rewards = F.softmax(torch.where(agent_masks.bool().to(self.device), self.rblocks(torch.cat([all_x, final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)], dim=-1)).transpose(1, 2).squeeze(-1), -1e9), dim=-1) * agent_masks.to(self.device) * episodic_reward.reshape(b, 1, 1)
 			# rewards = self.rblocks(all_x * final_x.reshape(b, 1, 1, -1).repeat(1, self.n_agents, t, 1)).squeeze(-1).transpose(1, 2) * agent_masks.to(self.device) * episodic_reward.reshape(b, 1, 1)
 			# all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			# all_x = self.projection(all_x)
