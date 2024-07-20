@@ -191,53 +191,28 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.ally_obs_compress_input = nn.Sequential(
 			init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
-			# nn.GELU(),
 			)
 		self.enemy_obs_compress_input = nn.Sequential(
 			init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
-			# nn.GELU(),
 			)
-		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
 
-		# self.final_obs_embedding = nn.Sequential(
-		# 	init_(nn.Linear(2*self.comp_emb, self.comp_emb), activate=True),
-		# 	nn.GELU(),
-		# 	init_(nn.Linear(self.comp_emb, self.comp_emb), activate=False),
-		# 	)
-
-		# self.agent_one_hot_ids = torch.eye(n_agents)
-		# self.enemy_one_hot_ids = torch.eye(n_enemies)
-		# self.one_hot_actions = torch.eye(n_agents, n_actions)
+		self.final_obs_embedding = nn.Sequential(
+			init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(3*self.comp_emb, 3*self.comp_emb), activate=False),
+			)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
-
-		# self.return_embedding = init_(nn.Linear(1, 16), activate=False)
-
-		# self.position_embedding = nn.Embedding(seq_length, 16*3)
-		# Create a matrix of shape (max_len, d_model) -- relative position embedding
-		# self.position_embedding = torch.zeros(seq_length, self.comp_emb).float()
-		# position = torch.arange(0, seq_length).float().unsqueeze(1)
-		# div_term = torch.exp(torch.arange(0, self.comp_emb, 2).float() * -(torch.log(torch.tensor(10000.0)) / self.comp_emb))
-
-		# self.position_embedding[:, 0::2] = torch.sin(position * div_term)
-		# self.position_embedding[:, 1::2] = torch.cos(position * div_term)
-		# self.position_embedding = self.position_embedding.to(self.device)
-
-		# self.agent_embedding = nn.Embedding(n_agents, 16)
-		# self.enemy_embedding = nn.Embedding(n_enemies, self.comp_emb)
-		# self.enemy_layer_norm = nn.LayerNorm(self.comp_emb)
-
-		# self.state_embedding_norm = nn.LayerNorm(3*self.comp_emb//2)
 
 
 		tblocks = []
 		for i in range(depth):
 			tblocks.append(
-				TransformerBlock(emb=self.comp_emb*3, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+				TransformerBlock(emb=3*self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 
 			if agent:
 				tblocks.append(
-					TransformerBlock_Agent(emb=self.comp_emb*3, heads=heads, seq_length=seq_length, n_agents=n_agents,
+					TransformerBlock_Agent(emb=3*self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 					mask=False, dropout=dropout, wide=wide)
 					)
 
@@ -271,8 +246,8 @@ class Time_Agent_Transformer(nn.Module):
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
-			nn.Tanh(),
-			nn.ReLU(),
+			nn.Sigmoid(),
+			# nn.ReLU(),
 			)
 
 		# self.projection = nn.Sequential(
@@ -304,13 +279,12 @@ class Time_Agent_Transformer(nn.Module):
 
 		enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdims=True)
 		
-		# agent_embedding = self.agent_embedding(torch.arange(self.n_agents).to(self.device))[None, None, :, :].expand(b, t, n_a, 16).permute(0, 2, 1, 3)
 		ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
 
-		# position_embedding = self.position_embedding(torch.arange(self.seq_length).to(self.device))[None, None, :, :].expand(b, n_a, t, 16*3)
-		
 		states = torch.cat([ally_obs_embedding, enemy_obs_embedding.repeat(1, self.n_agents, 1, 1)], dim=-1)
 		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, self.comp_emb*3)
+		x = self.final_obs_embedding(x) 
+		state_action_embedding = x.clone()
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
@@ -325,6 +299,9 @@ class Time_Agent_Transformer(nn.Module):
 
 			i += 1
 
+			# keep current context
+			x = x + state_action_embedding
+
 			if self.agent_attn:
 				# odd numbers have agent attention
 				x = self.tblocks[i](x, masks=agent_masks)
@@ -332,6 +309,9 @@ class Time_Agent_Transformer(nn.Module):
 				agent_scores.append(self.tblocks[i].attention.attn_scores)
 
 				i += 1
+
+				# keep current context
+				x = x + state_action_embedding
 
 
 			x_intermediate.append(x)
