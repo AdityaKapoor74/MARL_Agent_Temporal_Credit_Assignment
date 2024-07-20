@@ -311,8 +311,8 @@ class Time_Agent_Transformer(nn.Module):
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
-			# nn.Sigmoid(),
-			nn.ReLU(),
+			nn.Sigmoid(),
+			# nn.ReLU(),
 			)
 
 		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
@@ -442,7 +442,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# rewards = self.rblocks(x).view(b, 1).contiguous()
 
-			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device)
+			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# returns = self.return_mix_network(rewards.sum(dim=1), final_x.mean(dim=1)).reshape(b, 1)
 			# correction
 			# rewards = rewards * self.return_mix_network.w1.detach().transpose(1, 2)
