@@ -36,7 +36,7 @@ class ShapelyAttention(nn.Module):
 		shapley_reward = []
 
 		for i in range(self.sample_num):
-			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) * agent_temporal_mask.reshape(b, t, n_a, 1) * agent_temporal_mask.reshape(b, t, 1, n_a)
+			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) * agent_temporal_mask.reshape(b*t, n_a, 1) * agent_temporal_mask.reshape(b*t, 1, n_a)
 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
 			shapley_reward.append(marginal_reward)
 
@@ -130,7 +130,7 @@ class STAS_ML(nn.Module):
 		mask = torch.triu(torch.bmm(mask.reshape(b*n_a, t).unsqueeze(-1), mask.reshape(b*n_a, t).unsqueeze(1)))
 		return mask
 
-	def forward(self, ally_states, enemy_states, actions, episode_length):
+	def forward(self, ally_states, enemy_states, actions, episode_length, agent_temporal_mask):
 		b, n_a, t, e = ally_states.size()
 
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
@@ -143,7 +143,7 @@ class STAS_ML(nn.Module):
 		for layer in self.layers:
 			x, _ = layer[0](x, time_mask)
 			x = x.reshape(b, n_a, t, -1)
-			x = layer[1](x, time_mask)
+			x = layer[1](x, agent_temporal_mask)
 			x = x.reshape(b*n_a, t, -1).squeeze()
 			shapley_rewards.append(x)
 

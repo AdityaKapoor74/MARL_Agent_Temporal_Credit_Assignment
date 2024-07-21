@@ -518,6 +518,7 @@ class PPOAgent:
 						actions_batch.long().permute(0, 2, 1).to(self.device), 
 						# episode_len_batch.long().to(self.device),
 						(agent_masks_batch.sum(dim=1)-1).long().to(self.device),
+						agent_masks_batch.to(self.device),
 						)
 
 					rewards = rewards.transpose(1, 2)
@@ -624,6 +625,7 @@ class PPOAgent:
 				actions_batch.long().permute(0, 2, 1).to(self.device), 
 				# episode_len_batch.long().to(self.device),
 				(agent_masks_batch.sum(dim=1)-1).long().to(self.device),
+				agent_masks_batch.to(self.device),
 				)
 
 			rewards = rewards.transpose(1, 2) * agent_masks_batch.to(self.device)
