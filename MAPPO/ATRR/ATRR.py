@@ -226,6 +226,7 @@ class ReturnMixNetwork(nn.Module):
 		x = torch.bmm(q_values, w1) * b1
 
 		self.w1 = w1
+		self.b1 = b1
 
 		return x
 
@@ -463,7 +464,7 @@ class Time_Agent_Transformer(nn.Module):
 			# state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
 			returns = self.return_mix_network(rewards, all_x.sum(dim=1)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5)+final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# correction
-			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) * episodic_reward.to(self.device).reshape(b, 1, 1)
+			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * self.return_mix_network.b1.detach().reshape(b, t, 1) * agent_masks.to(self.device) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
