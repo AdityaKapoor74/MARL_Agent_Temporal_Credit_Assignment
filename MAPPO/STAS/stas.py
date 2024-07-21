@@ -22,7 +22,7 @@ class ShapelyAttention(nn.Module):
 
 		return mask.to(self.device)
 
-	def forward(self, input):
+	def forward(self, input, agent_temporal_mask):
 		"""
 		:param input: A (batch, number of agents, sequence length, emb dimension) tensor of input sequences.
 		:return: deltas, the encoding of time-adjacent states and actions along the agents. (batch, number of agents, sequence length, action dimension).
@@ -36,7 +36,7 @@ class ShapelyAttention(nn.Module):
 		shapley_reward = []
 
 		for i in range(self.sample_num):
-			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1)
+			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) * agent_temporal_mask.reshape(b, t, n_a, 1) * agent_temporal_mask.reshape(b, t, 1, n_a)
 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
 			shapley_reward.append(marginal_reward)
 
@@ -116,8 +116,6 @@ class STAS_ML(nn.Module):
 			self.action_emb = nn.Embedding(n_actions+1, emb_dim)
 
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
-		self.agent_embedding = nn.Embedding(n_agents, emb_dim)
-		# self.enemy_embedding = nn.Embedding(n_enemies, emb_dim)
 
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
@@ -145,7 +143,7 @@ class STAS_ML(nn.Module):
 		for layer in self.layers:
 			x, _ = layer[0](x, time_mask)
 			x = x.reshape(b, n_a, t, -1)
-			x = layer[1](x)
+			x = layer[1](x, time_mask)
 			x = x.reshape(b*n_a, t, -1).squeeze()
 			shapley_rewards.append(x)
 
