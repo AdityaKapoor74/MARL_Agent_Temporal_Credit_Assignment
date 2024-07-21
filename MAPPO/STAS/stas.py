@@ -36,7 +36,7 @@ class ShapelyAttention(nn.Module):
 		shapley_reward = []
 
 		for i in range(self.sample_num):
-			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) * agent_temporal_mask.reshape(b*t, n_a, 1) * agent_temporal_mask.reshape(b*t, 1, n_a)
+			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) #* agent_temporal_mask.reshape(b*t, n_a, 1) * agent_temporal_mask.reshape(b*t, 1, n_a)
 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
 			shapley_reward.append(marginal_reward)
 
@@ -143,7 +143,7 @@ class STAS_ML(nn.Module):
 		for layer in self.layers:
 			x, _ = layer[0](x, time_mask)
 			x = x.reshape(b, n_a, t, -1)
-			x = layer[1](x, agent_temporal_mask)
+			x = layer[1](x, agent_temporal_mask=None)
 			x = x.reshape(b*n_a, t, -1).squeeze()
 			shapley_rewards.append(x)
 
