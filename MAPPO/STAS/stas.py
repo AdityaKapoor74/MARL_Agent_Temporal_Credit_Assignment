@@ -136,8 +136,8 @@ class STAS_ML(nn.Module):
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
 		x = self.ally_state_emb(ally_states) + self.enemy_state_emb(enemy_states).mean(dim=1, keepdims=True).repeat(1, n_a, 1, 1) + self.action_emb(actions).squeeze() + positions
 
-		# time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
-		time_mask = self.get_time_mask(episode_length)
+		time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
+		# time_mask = self.get_time_mask(episode_length)
 		x = x.reshape(b*n_a, t, -1).squeeze()
 		shapley_rewards = []
 		for layer in self.layers:

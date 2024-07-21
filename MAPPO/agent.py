@@ -516,8 +516,8 @@ class PPOAgent:
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						actions_batch.long().permute(0, 2, 1).to(self.device), 
-						# episode_len_batch.long().to(self.device),
-						(agent_masks_batch.sum(dim=1)-1).long().to(self.device),
+						episode_len_batch.long().to(self.device),
+						# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
 						agent_masks_batch.to(self.device),
 						)
 
@@ -623,8 +623,8 @@ class PPOAgent:
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.long().permute(0, 2, 1).to(self.device), 
-				# episode_len_batch.long().to(self.device),
-				(agent_masks_batch.sum(dim=1)-1).long().to(self.device),
+				episode_len_batch.long().to(self.device),
+				# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
 				agent_masks_batch.to(self.device),
 				)
 
