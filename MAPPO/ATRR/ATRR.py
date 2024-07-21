@@ -183,6 +183,13 @@ class ReturnMixNetwork(nn.Module):
 			init_(nn.Linear(total_obs_dim, self.num_agents), activate=False),
 			)
 
+		self.hyper_b1 = nn.Sequential(
+			# init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(hidden_dim, 1))
+			init_(nn.Linear(total_obs_dim, 1), activate=False),
+			)
+
 	def forward(self, q_values, total_obs, agent_masks):
 		# q_values = q_values.reshape(-1, 1, self.num_agents)
 		# w1 = torch.abs(self.hyper_w1(total_obs))
@@ -207,13 +214,16 @@ class ReturnMixNetwork(nn.Module):
 
 		# self.w1 = w1
 
+		b, t, _ = total_obs.shape
 		q_values = q_values.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(total_obs)
 		# w1 = F.softmax(torch.where(agent_masks.bool().to(total_obs.device).reshape(-1, self.num_agents), w1.reshape(-1, self.num_agents), -1e9), dim=-1).reshape(-1, self.num_agents, 1)
 		w1 = torch.abs(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(total_obs.device))
 		# w1 = torch.abs(w1.reshape(-1, 1, 1).repeat(1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(total_obs.device))
+		b1 = torch.abs(self.hyper_b1(total_obs))
+		b1 = F.softmax(torch.where((agent_masks.sum(dim=-1)>0).to(total_obs.device).bool(), b1.reshape(b, t), -1e9), dim=-1).reshape(-1, 1, 1)
 
-		x = torch.bmm(q_values, w1)
+		x = torch.bmm(q_values, w1) * b1
 
 		self.w1 = w1
 
