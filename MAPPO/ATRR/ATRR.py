@@ -177,10 +177,10 @@ class ReturnMixNetwork(nn.Module):
 		# 	)
 
 		self.hyper_w1 = nn.Sequential(
-			# init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(hidden_dim, 1))
-			init_(nn.Linear(total_obs_dim, 1), activate=False),
+			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(hidden_dim, 1))
+			# init_(nn.Linear(total_obs_dim, 1), activate=False),
 			)
 
 		# self.hyper_b1 = nn.Sequential(
