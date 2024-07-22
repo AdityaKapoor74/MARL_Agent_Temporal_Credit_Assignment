@@ -326,7 +326,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			init_(nn.Linear(self.comp_emb*depth, n_actions), activate=False)
 			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -419,7 +419,7 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		state_prediction = self.dynamics_model(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1).mean(dim=1))
+		action_prediction = self.dynamics_model(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1))
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
@@ -485,14 +485,14 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards = F.softmax(torch.where(agent_masks.to(self.device).bool(), self.rblocks(all_x).view(b, n_a, t).transpose(1, 2), -1e9), dim=-1)
 			# state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
 			# returns = self.return_mix_network(rewards, all_x.sum(dim=1)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5)+final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
-			# returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
-			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			# returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			# correction
 			# rewards = returns.detach()
 			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
-		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
+		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction
 
 
 

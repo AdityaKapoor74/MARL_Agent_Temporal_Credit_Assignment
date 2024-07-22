@@ -394,6 +394,7 @@ class PPOAgent:
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index, :, :]).float().unsqueeze(0)
 		else:
 			# state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
 			ally_state_batch = torch.from_numpy(self.buffer.ally_states).float()
@@ -404,6 +405,7 @@ class PPOAgent:
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long()
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1)
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs).float()
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
@@ -430,7 +432,7 @@ class PPOAgent:
 
 				with torch.no_grad():
 					returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
-					temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction = self.reward_model(
+					temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
 						# state_batch.permute(0, 2, 1, 3).to(self.device), 
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -493,6 +495,10 @@ class PPOAgent:
 						# print(agent_episodic_contribution)
 						# print("agent_temporal_contribution")
 						# print(agent_temporal_contribution)
+
+						# gen_policy_probs = Categorical(action_prediction)
+						# gen_policy_logprobs = gen_policy_probs.log_prob(actions_batch.to(self.device))
+						# ratios = torch.exp((logprobs_batch.to(self.device) - gen_policy_probs.to(self.device)))
 
 						print("rewards")
 						print(rewards[0])
@@ -577,7 +583,7 @@ class PPOAgent:
 
 		elif "ATRR" in self.experiment_type:
 			
-			returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction = self.reward_model(
+			returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
 				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -603,7 +609,7 @@ class PPOAgent:
 				b, t, _, e = ally_obs_batch.shape
 				state_target = torch.cat([ally_obs_batch.reshape(b, t, -1), enemy_obs_batch.reshape(b, t, -1)], dim=-1).to(self.device)
 				# reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ 5e-2*(F.mse_loss(state_prediction, state_target, reduction='none') * team_mask_batch.unsqueeze(-1).to(self.device)).sum() / team_mask_batch.sum() #+ 1e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
-				reward_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
+				reward_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ 5e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
 				# reward_loss = torch.mean(torch.log(torch.cosh(rewards.squeeze(-1) - episodic_reward_batch.to(self.device))))
 				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:
