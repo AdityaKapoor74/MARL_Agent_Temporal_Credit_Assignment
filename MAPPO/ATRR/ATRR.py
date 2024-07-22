@@ -484,7 +484,8 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards = F.softmax(torch.where(agent_masks.to(self.device).bool(), self.rblocks(all_x).view(b, n_a, t).transpose(1, 2), -1e9), dim=-1)
 			# state = torch.cat([all_x.mean(dim=1), final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)
 			# returns = self.return_mix_network(rewards, all_x.sum(dim=1)/(agent_masks.sum(dim=-1).unsqueeze(-1)+1e-5)+final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
-			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			# returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			# correction
 			rewards = returns.detach()
 			# rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * self.return_mix_network.b1.detach().reshape(b, t, 1) * agent_masks.to(self.device) #* episodic_reward.to(self.device).reshape(b, 1, 1)
