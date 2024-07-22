@@ -177,10 +177,10 @@ class ReturnMixNetwork(nn.Module):
 		# 	)
 
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, 1))
-			# init_(nn.Linear(total_obs_dim, 1), activate=False),
+			# init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(hidden_dim, 1))
+			init_(nn.Linear(total_obs_dim, 1), activate=False),
 			)
 
 		# self.hyper_b1 = nn.Sequential(
@@ -231,9 +231,9 @@ class ReturnMixNetwork(nn.Module):
 		expected_rewards = expected_rewards.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(all_agent_intermediate_final_state_action.reshape(-1, e))
 
-		w1 = torch.abs(w1.reshape(-1, self.num_agents) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device))
-		std = torch.normal(torch.zeros_like(expected_rewards.squeeze(1)), torch.ones_like(expected_rewards.squeeze(1))).to(all_agent_state_action.device)
-		x = (expected_rewards.squeeze(1) + std*w1) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		w1 = torch.abs(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		# std = torch.normal(torch.zeros_like(expected_rewards.squeeze(1)), torch.ones_like(expected_rewards.squeeze(1))).to(all_agent_state_action.device)
+		# x = (expected_rewards.squeeze(1) + std*w1) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 
 		# w1 = F.softmax(torch.where(agent_masks.bool().to(all_agent_state_action.device).reshape(-1, self.num_agents), w1.reshape(-1, self.num_agents), -1e9), dim=-1).reshape(-1, self.num_agents, 1)
 		
@@ -244,7 +244,7 @@ class ReturnMixNetwork(nn.Module):
 		# b1 = self.hyper_b1(multi_agent_intermediate_final_state_action.reshape(-1, e))
 		# b1 = F.softmax(torch.where((agent_masks.sum(dim=-1)>0).to(all_agent_state_action.device).bool(), b1.reshape(b, t), -1e9), dim=-1).reshape(-1, 1, 1)
 
-		# x = torch.bmm(expected_rewards, w1) * b1
+		x = torch.bmm(expected_rewards, w1) * b1
 
 		# self.w1 = w1
 		# self.b1 = b1
@@ -306,11 +306,11 @@ class Time_Agent_Transformer(nn.Module):
 		tblocks = []
 		for i in range(depth):
 			tblocks.append(
-				TransformerBlock(emb=3*self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
+				TransformerBlock(emb=self.comp_emb, heads=heads, seq_length=seq_length, mask=True, dropout=dropout, wide=wide))
 
 			if agent:
 				tblocks.append(
-					TransformerBlock_Agent(emb=3*self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
+					TransformerBlock_Agent(emb=self.comp_emb, heads=heads, seq_length=seq_length, n_agents=n_agents,
 					mask=False, dropout=dropout, wide=wide)
 					)
 
@@ -326,7 +326,7 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*3*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			init_(nn.Linear(self.comp_emb*depth, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
 			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -337,7 +337,7 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*3*depth, 1), activate=False),
+			init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
 			# init_(nn.Linear(self.comp_emb*3*depth*2, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
@@ -348,7 +348,7 @@ class Time_Agent_Transformer(nn.Module):
 			nn.ReLU(),
 			)
 
-		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*3*depth)
+		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
 		# self.projection = nn.Sequential(
 		# 	init_(nn.Linear(self.comp_emb*3*depth, self.comp_emb), activate=True),
@@ -377,12 +377,13 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, _ = ally_obs.size()
 		_, n_e, _, _ = enemy_obs.size()
 
-		enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdims=True)
+		enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdim=True)
 		
 		ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
 
-		states = torch.cat([ally_obs_embedding, enemy_obs_embedding.repeat(1, self.n_agents, 1, 1)], dim=-1)
-		x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, self.comp_emb*3)
+		# states = torch.cat([ally_obs_embedding, enemy_obs_embedding.repeat(1, self.n_agents, 1, 1)], dim=-1)
+		# x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, self.comp_emb*3)
+		x = (ally_obs_embedding+enemy_obs_embedding+self.action_embedding(actions.long())).view(b*n_a, t, self.comp_emb)
 		state_action_embedding = x.clone()
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
@@ -469,7 +470,7 @@ class Time_Agent_Transformer(nn.Module):
 			# x = torch.gather(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1), 2, indiv_agent_episode_len).squeeze(2)
 			
 			# rewards = self.rblocks(x).view(b, 1, n_a).contiguous()
-			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*3*self.depth).long() # subtracting 1 for indexing purposes
+			indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
 
