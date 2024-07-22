@@ -263,7 +263,7 @@ class TransformerBlock(nn.Module):
 	def __init__(self, emb, heads, mask, seq_length, ff_hidden_mult=4, dropout=0.0, wide=True):
 		super().__init__()
 
-		self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length)
+		# self.pos_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=seq_length)
 
 		self.attention = SelfAttentionWide(emb, heads=heads, mask=mask) if wide \
 					else SelfAttentionNarrow(emb, heads=heads, mask=mask)
@@ -282,7 +282,7 @@ class TransformerBlock(nn.Module):
 
 	def forward(self, x, masks=None, temporal_only=False):
 		b, t, e = x.shape
-		x = x + self.pos_embedding(torch.arange(t, device=x.device))[None, :, :].expand(b, t, e)
+		# x = x + self.pos_embedding(torch.arange(t, device=x.device))[None, :, :].expand(b, t, e)
 
 		attended = self.attention(x, masks, temporal_only=temporal_only)
 
@@ -307,7 +307,7 @@ class TransformerBlock_Agent(nn.Module):
 
 		self.n_a = n_agents
 
-		self.agent_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=self.n_a)
+		# self.agent_embedding = nn.Embedding(embedding_dim=emb, num_embeddings=self.n_a)
 
 		self.attention = SelfAttentionWide(emb, heads=heads, mask=mask) if wide \
 					else SelfAttentionNarrow(emb, heads=heads, mask=mask)
@@ -329,7 +329,7 @@ class TransformerBlock_Agent(nn.Module):
 		_, t, e = x.size()
 
 		x = x.view(-1, self.n_a, t, e).transpose(1, 2).contiguous().view(-1, self.n_a, e)
-		x = x + self.agent_embedding(torch.arange(self.n_a, device=x.device))[None, :, :].expand(x.shape[0], self.n_a, e)
+		# x = x + self.agent_embedding(torch.arange(self.n_a, device=x.device))[None, :, :].expand(x.shape[0], self.n_a, e)
 
 		attended = self.attention(x, masks, agent=True)
 
