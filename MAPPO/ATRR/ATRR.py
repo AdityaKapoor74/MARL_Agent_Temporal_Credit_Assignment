@@ -237,7 +237,7 @@ class ReturnMixNetwork(nn.Module):
 
 		# w1 = F.softmax(torch.where(agent_masks.bool().to(all_agent_state_action.device).reshape(-1, self.num_agents), w1.reshape(-1, self.num_agents), -1e9), dim=-1).reshape(-1, self.num_agents, 1)
 		
-		w1 = torch.abs(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(total_obs.device))
+		w1 = torch.abs(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(all_agent_intermediate_final_state_action.device))
 		# w1 = torch.abs(w1.reshape(-1, 1, 1).repeat(1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(total_obs.device))
 		# b1 = torch.abs(self.hyper_b1(total_obs))
 		# multi_agent_intermediate_final_state_action = all_agent_state_action.sum(dim=1)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5) + final_multi_agent_state_action
