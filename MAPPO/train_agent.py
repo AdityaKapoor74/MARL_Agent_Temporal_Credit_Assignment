@@ -396,8 +396,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
+		experiment_type = "STAS_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
+		experiment_name = "MAPPO_STAS_agent_temporal_attn_weights"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -439,13 +439,13 @@ if __name__ == '__main__':
 
 				# REWARD MODEL
 				"use_reward_model": True,
-				"reward_n_heads": 1, # 3
+				"reward_n_heads": 3, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
-				"reward_linear_compression_dim": 32, # 16 for ATRR_agent_temporal
+				"version": "agent_temporal", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"reward_linear_compression_dim": 64, # 16 for ATRR_agent_temporal
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
