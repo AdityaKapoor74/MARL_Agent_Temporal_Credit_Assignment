@@ -380,7 +380,7 @@ class Time_Agent_Transformer(nn.Module):
 		b, n_a, t, _ = ally_obs.size()
 		_, n_e, _, _ = enemy_obs.size()\
 
-		position_embedding = self.pos_embedding(torch.arange(t, device=self.device))[None, None, :, :].expand(b, n_a, t, e)
+		position_embedding = self.position_embedding(torch.arange(t, device=self.device))[None, None, :, :].expand(b, n_a, t, e)
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents, device=self.device))[None, :, None, :].expand(b, n_a, t, e)
 
 		enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdim=True)
