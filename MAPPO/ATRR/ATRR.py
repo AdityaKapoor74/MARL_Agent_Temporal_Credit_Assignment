@@ -244,9 +244,9 @@ class ReturnMixNetwork(nn.Module):
 		# b1 = self.hyper_b1(multi_agent_intermediate_final_state_action.reshape(-1, e))
 		# b1 = F.softmax(torch.where((agent_masks.sum(dim=-1)>0).to(all_agent_state_action.device).bool(), b1.reshape(b, t), -1e9), dim=-1).reshape(-1, 1, 1)
 
-		x = torch.bmm(expected_rewards, w1) * b1
+		x = torch.bmm(expected_rewards, w1) #* b1
 
-		# self.w1 = w1
+		self.w1 = w1
 		# self.b1 = b1
 
 		return x
@@ -488,8 +488,8 @@ class Time_Agent_Transformer(nn.Module):
 			# returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			# correction
-			rewards = returns.detach()
-			# rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * self.return_mix_network.b1.detach().reshape(b, t, 1) * agent_masks.to(self.device) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			# rewards = returns.detach()
+			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
 		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, state_prediction #action_prediction
