@@ -235,16 +235,19 @@ class PPOAgent:
 			if "AREL" in self.experiment_type:
 				from AREL import AREL
 				self.reward_model = AREL.Time_Agent_Transformer(
-					emb=dictionary["reward_model_obs_shape"]+self.num_actions,
+					ally_obs_shape=self.ally_observation_shape,
+					enemy_obs_shape=self.enemy_observation_shape,
+					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
+					n_enemies=self.num_enemies,
+					n_actions=self.num_actions,
 					agent=dictionary["reward_agent_attn"], 
 					dropout=dictionary["reward_dropout"], 
 					wide=dictionary["reward_attn_net_wide"], 
 					version=dictionary["version"], 
-					norm_rewards=dictionary["norm_rewards"],
 					linear_compression_dim=dictionary["reward_linear_compression_dim"],
 					device=self.device,
 					).to(self.device)
@@ -385,7 +388,6 @@ class PPOAgent:
 	def reward_model_output(self, eval_reward_model=False):
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
-			# state_batch = torch.from_numpy(self.buffer.reward_model_obs[latest_sample_index]).float().unsqueeze(0)
 			ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0)
 			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0)
 			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
@@ -396,7 +398,6 @@ class PPOAgent:
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
 			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index, :, :]).float().unsqueeze(0)
 		else:
-			# state_batch = torch.from_numpy(self.buffer.reward_model_obs).float()
 			ally_state_batch = torch.from_numpy(self.buffer.ally_states).float()
 			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float()
 			actions_batch = torch.from_numpy(self.buffer.actions).float()
@@ -409,30 +410,23 @@ class PPOAgent:
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
-				state_actions_batch = torch.cat([state_batch, one_hot_actions_batch], dim=-1)
-
 				with torch.no_grad():
-					reward_episode_wise, reward_time_wise, _, _, agent_weights, _ = self.reward_model(
-						state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+					rewards, temporal_weights, agent_weights,\
+					temporal_scores, agent_scores = self.reward_model(
+						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
+						actions_batch.permute(0, 2, 1).to(self.device), 
+						episodic_reward_batch.to(self.device),
 						team_masks=team_mask_batch.to(self.device),
-						agent_masks=agent_masks_batch.to(self.device)
+						agent_masks=agent_masks_batch.to(self.device),
 						)
-
-				reward_batch = reward_time_wise.cpu()
-
-				if self.experiment_type == "AREL_agent":
-					reward_batch = reward_batch.unsqueeze(-1) * agent_weights.cpu()
-				else:
-					reward_batch = reward_batch.unsqueeze(-1).repeat(1, 1, self.num_agents)
-
-				return reward_batch
 
 
 			elif "ATRR" in self.experiment_type:
 
 				with torch.no_grad():
-					returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block,\
-					temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
+					returns, rewards, temporal_weights, agent_weights,\
+					temporal_scores, agent_scores, action_prediction = self.reward_model(
 						# state_batch.permute(0, 2, 1, 3).to(self.device), 
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -526,7 +520,6 @@ class PPOAgent:
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						actions_batch.long().permute(0, 2, 1).to(self.device), 
 						episode_len_batch.long().to(self.device),
-						# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
 						agent_masks_batch.to(self.device),
 						)
 
@@ -540,7 +533,6 @@ class PPOAgent:
 		# sample episodes from replay buffer
 		ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
-		# reward_model_obs_batch = torch.from_numpy(reward_model_obs_batch).float()
 		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
 		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
@@ -555,22 +547,19 @@ class PPOAgent:
 			shape = episodic_reward_batch.shape
 			episodic_reward_batch = self.reward_normalizer(episodic_reward_batch.view(-1), None).view(shape)
 
-		# if self.norm_rewards:
-		# 	shape = episodic_reward_batch.shape
-		# 	self.reward_normalizer.update(episodic_reward_batch.view(-1))
-			
-		# 	episodic_reward_batch = self.reward_normalizer.normalize(episodic_reward_batch.view(-1)).view(shape)
-
+		
 		if "AREL" in self.experiment_type:
-			state_actions_batch = torch.cat([reward_model_obs_batch, one_hot_actions_batch], dim=-1)  # state_actions_batch.size = (b, t, n_agents, e)
-			reward_episode_wise, reward_time_wise, _, _, _, _ = self.reward_model(
-				state_actions_batch.permute(0, 2, 1, 3).to(self.device),
+			rewards, temporal_weights, agent_weights, temporal_scores, agent_scores = self.reward_model(
+				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
+				actions_batch.permute(0, 2, 1).to(self.device), 
+				episodic_reward_batch.to(self.device),
 				team_masks=team_mask_batch.to(self.device),
-				agent_masks=agent_masks_batch.to(self.device)
+				agent_masks=agent_masks_batch.to(self.device),
 				)
 
 
-			shape = reward_time_wise.shape
+			# shape = reward_time_wise.shape
 			# reward_copy = copy.deepcopy(reward_time_wise.detach())
 			# reward_copy[team_mask_batch.view(*shape) == 0.0] = 0.0 
 			# reward_mean = (reward_copy.sum(dim=-1)/team_mask_batch.to(self.device).sum(dim=-1)).unsqueeze(-1)
@@ -582,11 +571,11 @@ class PPOAgent:
 			# reward_var = reward_var.sum() / team_mask_batch.sum()
 
 			reward_var = torch.tensor([-1])
-			reward_loss = F.huber_loss((reward_time_wise*team_mask_batch.view(*shape).to(self.device)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
+			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
 		elif "ATRR" in self.experiment_type:
 			
-			returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction = self.reward_model(
+			returns, rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 

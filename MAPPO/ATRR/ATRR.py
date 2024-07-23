@@ -433,7 +433,7 @@ class Time_Agent_Transformer(nn.Module):
 		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.depth, b, self.heads, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.depth, b, self.heads, n_a, t, t) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-1) * agent_masks.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 
-		temporal_weights_final_temporal_block, temporal_scores_final_temporal_block = None, None
+		
 		if self.version == "temporal" or self.version == "temporal_v2":
 			x = x.reshape(b, n_a, t, -1).permute(0, 2, 1, 3).sum(dim=-2)
 			rewards = self.rblocks(x).view(b, t).contiguous() * team_masks.to(x.device)
@@ -498,7 +498,7 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = rewards * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
-		return returns, rewards, temporal_weights, agent_weights, temporal_weights_final_temporal_block, temporal_scores, agent_scores, temporal_scores_final_temporal_block, action_prediction
+		return returns, rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 
