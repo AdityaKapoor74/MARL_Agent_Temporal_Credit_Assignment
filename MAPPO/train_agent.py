@@ -323,7 +323,7 @@ class MAPPO:
 					b, t, n_a = self.agents.buffer.rewards.shape
 					episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
 					self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
-					self.agents.buffer.rewards *= (1-self.agents.buffer.agent_dones[:, :-1, :])
+					self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
 					self.agents.update(episode)
 				elif self.use_reward_model and episode > self.warm_up_period:
 					# finetune
