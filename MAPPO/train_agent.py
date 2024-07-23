@@ -397,7 +397,7 @@ if __name__ == '__main__':
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
 		experiment_type = "uniform_team_redistribution" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_temporal_team"
+		experiment_name = "MAPPO_uniform_team_redistribution"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
