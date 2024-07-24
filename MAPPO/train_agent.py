@@ -396,8 +396,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "10m_vs_11m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_AREL"
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
+		experiment_name = "MAPPO_temporal_team"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -438,7 +438,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
@@ -475,7 +475,7 @@ if __name__ == '__main__':
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
 				"grad_clip_critic_v": 0.5,
-				"value_clip": 0.2,
+				"value_clip": 0.05,
 				"enable_hard_attention": False,
 				"target_calc_style": "GAE", # GAE, N_steps
 				"n_steps": 5,
@@ -492,7 +492,7 @@ if __name__ == '__main__':
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
-				"policy_clip": 0.2,
+				"policy_clip": 0.05,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1e-2, #8e-3
