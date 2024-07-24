@@ -341,7 +341,7 @@ class MAPPO:
 					if "AREL" in self.experiment_type:
 						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
-						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0, 0.0
+						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 					
 					for i in range(self.reward_model_update_epochs):
 						sample = self.agents.reward_model_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
