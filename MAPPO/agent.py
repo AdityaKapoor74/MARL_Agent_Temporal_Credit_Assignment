@@ -435,6 +435,7 @@ class PPOAgent:
 						episodic_reward_batch.to(self.device),
 						team_masks=team_mask_batch.to(self.device),
 						agent_masks=agent_masks_batch.to(self.device),
+						logprobs=logprobs_batch.to(self.device),
 						# episode_len=episode_len_batch.to(self.device),
 						)
 
@@ -490,14 +491,19 @@ class PPOAgent:
 						# print("agent_temporal_contribution")
 						# print(agent_temporal_contribution)
 
-						b, t, n_a = logprobs_batch.shape
-						# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
-						gen_policy_probs = Categorical(F.softmax(action_prediction, dim=-1).transpose(1, 2))
-						gen_policy_logprobs = gen_policy_probs.log_prob(actions_batch.to(self.device))
-						importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs_batch[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks_batch.to(self.device)
 
-						print(rewards.shape, importance_sampling.shape)
-						rewards = rewards * importance_sampling
+
+
+
+						# CURRENT WORK 
+						# b, t, n_a = logprobs_batch.shape
+						# # we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
+						# gen_policy_probs = Categorical(F.softmax(action_prediction, dim=-1).transpose(1, 2))
+						# gen_policy_logprobs = gen_policy_probs.log_prob(actions_batch.to(self.device))
+						# importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs_batch[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks_batch.to(self.device)
+
+						# print(rewards.shape, importance_sampling.shape)
+						# rewards = rewards * importance_sampling
 
 						print("rewards")
 						print(rewards[0])
