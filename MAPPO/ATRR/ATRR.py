@@ -330,11 +330,9 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.dynamics_model = nn.Sequential(
 			init_(nn.Linear(self.comp_emb*depth, n_actions), activate=False)
-			# init_(nn.Linear(16*4*depth, self.comp_emb), activate=True),
+			# init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
 			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, ally_obs_shape*n_agents+enemy_obs_shape*n_enemies), activate=False)
+			# init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 			)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
@@ -387,9 +385,11 @@ class Time_Agent_Transformer(nn.Module):
 		
 		ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
 
+		action_embedding = self.action_embedding(actions.long())
+
 		# states = torch.cat([ally_obs_embedding, enemy_obs_embedding.repeat(1, self.n_agents, 1, 1)], dim=-1)
 		# x = (torch.cat([states, self.action_embedding(actions.long())], dim=-1)).view(b*n_a, t, self.comp_emb*3)
-		x = (ally_obs_embedding+enemy_obs_embedding+self.action_embedding(actions.long())+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
+		x = (ally_obs_embedding+enemy_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
 		state_action_embedding = x.clone()
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
