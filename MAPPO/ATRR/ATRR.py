@@ -500,12 +500,14 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
-			if logprobs is not None:
-				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
-				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
-				importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks.to(self.device)
-			else:
-				importance_sampling = torch.ones(b, t, n_a).to(self.device)
+			# if logprobs is not None:
+			# 	gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
+			# 	gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+			# 	importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks.to(self.device)
+			# else:
+			# 	importance_sampling = torch.ones(b, t, n_a).to(self.device)
+			importance_sampling = torch.ones(b, t, n_a).to(self.device)
+			
 			agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a)*importance_sampling, -1e9)
 			temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
 			agent_contri = F.softmax(agent_reward_contri, dim=-1)
