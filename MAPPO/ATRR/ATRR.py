@@ -496,12 +496,12 @@ class Time_Agent_Transformer(nn.Module):
 			# correction
 			# rewards = returns.detach()
 			
-			rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
+			# rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			
-			# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
-			# temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
-			# agent_contri = F.softmax(agent_reward_contri, dim=-1)
-			# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
+			agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
+			temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
+			agent_contri = F.softmax(agent_reward_contri, dim=-1)
+			rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
 			
 			# rewards = returns * F.softmax(torch.where(agent_masks.to(self.device).bool(), self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9), dim=-1)
 
