@@ -502,7 +502,7 @@ class Time_Agent_Transformer(nn.Module):
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			if logprobs is not None:
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
-				gen_policy_logprobs = gen_policy_probs.log_prob(actions.to(self.device))
+				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks.to(self.device)
 			else:
 				importance_sampling = torch.ones(b, t, n_a).to(self.device)
