@@ -593,11 +593,7 @@ class PPOAgent:
 			# agent_weights = agent_weights.cpu().mean(dim=0)
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
-			
-			if temporal_weights_final_temporal_block is not None:
-				entropy_final_temporal_block = (-torch.sum(temporal_weights_final_temporal_block * torch.log(torch.clamp(temporal_weights_final_temporal_block, 1e-10, 1.0)))/team_mask_batch.shape[0]).item()
-			else:
-				entropy_final_temporal_block = None
+
 
 			if self.version == "agent_temporal_attn_weights":
 				b, t, _, e = ally_obs_batch.shape
@@ -649,7 +645,7 @@ class PPOAgent:
 		if "AREL" in self.experiment_type:
 			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
 		elif "ATRR" in self.experiment_type:
-			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), entropy_final_temporal_block, grad_norm_value_reward.item()
+			return reward_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
 		elif "STAS" in self.experiment_type:
 			return reward_loss.item(), grad_norm_value_reward.item()
 

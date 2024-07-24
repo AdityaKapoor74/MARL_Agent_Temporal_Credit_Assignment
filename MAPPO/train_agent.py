@@ -341,7 +341,7 @@ class MAPPO:
 					if "AREL" in self.experiment_type:
 						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
-						entropy_temporal_weights_batch, entropy_agent_weights_batch, entropy_final_temporal_block_batch = 0.0, 0.0, 0.0
+						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0, 0.0
 					
 					for i in range(self.reward_model_update_epochs):
 						sample = self.agents.reward_model_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
@@ -349,11 +349,9 @@ class MAPPO:
 							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							reward_var_batch += (reward_var/self.reward_model_update_epochs)
 						elif "ATRR" in self.experiment_type:
-							reward_loss, entropy_temporal_weights, entropy_agent_weights, entropy_final_temporal_block, grad_norm_value_reward = self.agents.update_reward_model(sample)
+							reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
-							if entropy_final_temporal_block is not None:
-								entropy_final_temporal_block_batch += (entropy_final_temporal_block/self.reward_model_update_epochs)
 						elif "STAS" in self.experiment_type:
 							reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
 
@@ -372,9 +370,7 @@ class MAPPO:
 						elif "ATRR" in self.experiment_type:
 							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
-							if entropy_agent_weights is not None:
-								self.comet_ml.log_metric('Entropy_Final_Temporal_Weights', entropy_final_temporal_block_batch, episode)
-
+							
 			if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
