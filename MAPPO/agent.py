@@ -609,10 +609,6 @@ class PPOAgent:
 				# constraint_loss_1 = (((torch.ones((batch, timesteps)).to(self.device) - weights.sum(dim=-1))**2) * team_mask_batch.to(self.device)).sum() / team_mask_batch.to(self.device).sum()
 				# reward_loss += constraint_loss_1
 
-
-			if temporal_scores_final_temporal_block is not None:
-				reward_loss += self.temporal_score_coefficient * (temporal_scores_final_temporal_block**2).sum()
-
 		elif "STAS" in self.experiment_type:
 			
 			rewards = self.reward_model(
