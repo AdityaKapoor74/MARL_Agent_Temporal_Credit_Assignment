@@ -480,15 +480,14 @@ class Time_Agent_Transformer(nn.Module):
 				importance_sampling = torch.ones(b, t, n_a).to(self.device) * agent_masks.to(self.device)
 			
 
-			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
-
+			# returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
 			# temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
 			# agent_contri = F.softmax(agent_reward_contri, dim=-1)
 			# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri #* importance_sampling
-			
 			# rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) #* importance_sampling # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			
+			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			rewards_ = returns.detach()
 
 		return returns, rewards_, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
