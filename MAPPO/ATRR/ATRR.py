@@ -477,7 +477,7 @@ class Time_Agent_Transformer(nn.Module):
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
 
-			returns = self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, t, n_a 1)], dim=-1)).view(b, t, n_a).contiguous()
+			returns = self.rblocks(torch.cat((all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, t, n_a 1)), dim=-1)).view(b, t, n_a).contiguous()
 			rewards_ = returns.detach()
 
 			'''
