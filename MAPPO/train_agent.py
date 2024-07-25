@@ -391,9 +391,9 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
-		env_name = "3s5z" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_temporal_team"
+		env_name = "10m_vs_11m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
+		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -434,7 +434,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
@@ -491,8 +491,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 5e-3, #8e-3
-				"entropy_pen_final": 5e-3,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
