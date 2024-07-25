@@ -472,26 +472,25 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = torch.abs(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
-			# if logprobs is not None:
-			# 	gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
-			# 	gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
-			# 	importance_sampling = torch.exp((logprobs.to(self.device) - gen_policy_logprobs.to(self.device))) * agent_masks.to(self.device)
-			# else:
-			# 	importance_sampling = torch.ones(b, t, n_a).to(self.device) * agent_masks.to(self.device)
-			importance_sampling = torch.ones(b, t, n_a).to(self.device) * agent_masks.to(self.device)
+			if logprobs is not None:
+				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
+				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+				importance_sampling = torch.exp((logprobs.to(self.device) - gen_policy_logprobs.to(self.device))) * agent_masks.to(self.device)
+			else:
+				importance_sampling = torch.ones(b, t, n_a).to(self.device) * agent_masks.to(self.device)
 			
 
-			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			
 			# use episodic reward and hypernet generated weights for redistribution
-			agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
-			temporal_reward_contri = torch.where((agent_masks.sum(dim=-1, keepdim=True)>0).to(self.device).bool(), (rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a)).sum(dim=-1, keepdim=True), -1e9)
-			temporal_contri = F.softmax(temporal_reward_contri, dim=1)
-			agent_contri = F.softmax(agent_reward_contri, dim=-1)
-			rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
+			# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
+			# temporal_reward_contri = torch.where((agent_masks.sum(dim=-1, keepdim=True)>0).to(self.device).bool(), (rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a)).sum(dim=-1, keepdim=True), -1e9)
+			# temporal_contri = F.softmax(temporal_reward_contri, dim=1)
+			# agent_contri = F.softmax(agent_reward_contri, dim=-1)
+			# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
 			
 			# use hypernet generated weights for scaling expected rewards of a given state-action tuple
-			# rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) #* importance_sampling # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
+			rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) * importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			
 			# returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 			# rewards_ = returns.detach()
