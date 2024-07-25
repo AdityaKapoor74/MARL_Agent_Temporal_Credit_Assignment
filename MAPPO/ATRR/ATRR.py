@@ -232,9 +232,9 @@ class ReturnMixNetwork(nn.Module):
 		expected_rewards = expected_rewards.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(all_agent_intermediate_final_state_action.reshape(-1, e))
 
-		w1 = w1.reshape(-1, self.num_agents) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		w1 = F.softplus(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		std = torch.normal(torch.zeros_like(expected_rewards.squeeze(1)), torch.ones_like(expected_rewards.squeeze(1))).to(all_agent_state_action.device)
-		x = F.relu(expected_rewards.squeeze(1) + (std*torch.exp(w1))) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		x = F.relu(expected_rewards.squeeze(1) + (std*w1)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		
 		# scaling the expected reward
 		# w1 = torch.abs(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(all_agent_intermediate_final_state_action.device))
