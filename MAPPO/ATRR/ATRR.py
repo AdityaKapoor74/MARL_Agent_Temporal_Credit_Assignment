@@ -469,7 +469,7 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = returns.detach()
 
 			
-			rewards = torch.abs(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+			rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			if logprobs is not None:
