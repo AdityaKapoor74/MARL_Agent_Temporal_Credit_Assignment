@@ -490,10 +490,6 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
 			
 			# use hypernet generated weights for scaling expected rewards of a given state-action tuple
-			print("importance sampling")
-			print(importance_sampling)
-			print("product of importance sampling")
-			print(importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1))
 			rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) * importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1) # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
 			
 			# returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
