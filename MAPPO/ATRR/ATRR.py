@@ -330,10 +330,10 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*depth, n_actions), activate=False)
-			# init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, n_actions), activate=False)
+			# init_(nn.Linear(self.comp_emb*depth*2, n_actions), activate=False)
+			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 			)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
@@ -426,7 +426,11 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		action_prediction = self.dynamics_model(torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1))
+		state_embeddings = (state_action_embedding.view(b, n_a, t, self.comp_emb) - action_embedding).reshape(b, n_a, t, 1, self.comp_emb).sum(dim=1, keepdim=True).repeat(1, self.num_agents, 1, self.depth, 1).reshape(b, n_a, t, -1) / (agent_masks.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
+		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.depth*self.comp_emb)
+		past_state_action_embeddings = torch.stack([first_past_state_action_embedding.to(self.device), torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[:, :, :-1, :]])
+		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
+		action_prediction = self.dynamics_model(state_past_state_action_embeddings)
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
@@ -507,7 +511,7 @@ class Time_Agent_Transformer(nn.Module):
 			# else:
 			# 	importance_sampling = torch.ones(b, t, n_a).to(self.device)
 			# importance_sampling = torch.ones(b, t, n_a).to(self.device)
-			
+
 			# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a)*importance_sampling, -1e9)
 			# temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
 			# agent_contri = F.softmax(agent_reward_contri, dim=-1)
