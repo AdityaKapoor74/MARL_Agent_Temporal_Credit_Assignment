@@ -347,7 +347,7 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, ally_obs, enemy_obs, actions, episodic_reward, team_masks=None, agent_masks=None, logprobs=None):
+	def forward(self, ally_obs, enemy_obs, actions, episodic_reward, team_masks=None, agent_masks=None, logprobs=None, train=False):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
@@ -474,14 +474,15 @@ class Time_Agent_Transformer(nn.Module):
 			rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
-			if logprobs is not None:
+			if train is False:
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).clamp(min=1e-5, max=10.0))
-			else:
+			elif train is True:
 				# importance_sampling = torch.ones(b, 1, 1).to(self.device)
-				importance_sampling = torch.ones(b, t, n_a).to(self.device)
+				# importance_sampling = torch.ones(b, t, n_a).to(self.device)
+				importance_sampling = torch.exp(((gen_policy_logprobs.to(self.device) - logprobs.to(self.device)) * agent_masks.to(self.device)).clamp(min=1e-5, max=10.0))
 			
 
 			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
