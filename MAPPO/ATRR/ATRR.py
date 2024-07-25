@@ -482,6 +482,8 @@ class Time_Agent_Transformer(nn.Module):
 			elif train is True:
 				# importance_sampling = torch.ones(b, 1, 1).to(self.device)
 				# importance_sampling = torch.ones(b, t, n_a).to(self.device)
+				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
+				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				importance_sampling = torch.exp(((gen_policy_logprobs.to(self.device) - logprobs.to(self.device)) * agent_masks.to(self.device)).clamp(min=1e-5, max=10.0))
 			
 
