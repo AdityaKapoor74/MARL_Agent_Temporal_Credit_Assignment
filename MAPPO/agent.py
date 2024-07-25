@@ -583,7 +583,7 @@ class PPOAgent:
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.permute(0, 2, 1).to(self.device), 
 				episodic_reward_batch.to(self.device),
-				logprobs=logprobs_batch.to(self.device),
+				# logprobs=logprobs_batch.to(self.device),
 				team_masks=team_mask_batch.to(self.device),
 				agent_masks=agent_masks_batch.to(self.device),
 				)
