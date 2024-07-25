@@ -484,7 +484,8 @@ class Time_Agent_Transformer(nn.Module):
 			
 			# use episodic reward and hypernet generated weights for redistribution
 			agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
-			temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
+			temporal_reward_contri = torch.where((agent_masks.sum(dim=-1, keepdim=True)>0).to(self.device).bool(), (rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a)).sum(dim=-1, keepdim=True), -1e9)
+			temporal_contri = F.softmax(temporal_reward_contri, dim=1)
 			agent_contri = F.softmax(agent_reward_contri, dim=-1)
 			rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
 			
