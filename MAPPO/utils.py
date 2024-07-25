@@ -111,7 +111,7 @@ class RewardReplayMemory:
 		ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
 		enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
-		logprobs_batch = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
+		logprobs_batch = np.take(self.buffer['logprobs'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
