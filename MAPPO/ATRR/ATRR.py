@@ -339,11 +339,11 @@ class Time_Agent_Transformer(nn.Module):
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			# init_(nn.Linear(self.comp_emb*depth*2, 1), activate=False),
-			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(self.comp_emb, 1)),
-			nn.ReLU(),
+			init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
+			# init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(self.comp_emb, 1)),
+			# nn.ReLU(),
 			)
 
 		# self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
@@ -473,19 +473,22 @@ class Time_Agent_Transformer(nn.Module):
 			all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 			final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
 
-			returns = self.rblocks(torch.cat((all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)), dim=-1)).view(b, t, n_a).contiguous()
-			rewards_ = returns.detach()
+			# returns = self.rblocks(torch.cat((all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)), dim=-1)).view(b, t, n_a).contiguous()
+			# rewards_ = returns.detach()
 
-			'''
+			
 			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) #* episodic_reward.to(self.device).reshape(b, 1, 1)
-			returns = self.return_mix_network(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			if logprobs is not None:
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				importance_sampling = torch.exp((logprobs.to(self.device) - gen_policy_logprobs.to(self.device))) * agent_masks.to(self.device)
 			else:
-				importance_sampling = torch.ones(b, t, n_a).to(self.device)
+				importance_sampling = torch.ones(b, t, n_a).to(self.device) * agent_masks.to(self.device)
+			
+
+			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 
 			# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach()*self.return_mix_network.w1.detach().reshape(b, t, n_a), -1e9)
 			# temporal_contri = F.softmax(agent_reward_contri.sum(dim=-1, keepdim=True), dim=1)
@@ -493,7 +496,7 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri #* importance_sampling
 			
 			rewards_ = rewards.detach() * self.return_mix_network.w1.detach().reshape(b, t, n_a) * agent_masks.to(self.device) #* importance_sampling # * self.return_mix_network.b1.detach().reshape(b, t, 1) * episodic_reward.to(self.device).reshape(b, 1, 1)
-			'''
+			
 
 		return returns, rewards_, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
