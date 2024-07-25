@@ -232,9 +232,9 @@ class ReturnMixNetwork(nn.Module):
 		expected_rewards = expected_rewards.reshape(-1, 1, self.num_agents)
 		w1 = self.hyper_w1(all_agent_intermediate_final_state_action.reshape(-1, e))
 
-		# w1 = F.softplus(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		# w1 = torch.abs(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		# std = torch.normal(torch.zeros_like(expected_rewards.squeeze(1)), torch.ones_like(expected_rewards.squeeze(1))).to(all_agent_state_action.device)
-		# x = F.relu(expected_rewards.squeeze(1) + (std*w1)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		# x = torch.abs(expected_rewards.squeeze(1) + (std*w1)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		
 		# scaling the expected reward
 		w1 = torch.abs(w1.reshape(-1, self.num_agents, 1) * agent_masks.reshape(-1, self.num_agents, 1).to(all_agent_intermediate_final_state_action.device))
@@ -335,7 +335,7 @@ class Time_Agent_Transformer(nn.Module):
 			# init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
 			# nn.GELU(),
 			# init_(nn.Linear(self.comp_emb, 1)),
-			nn.ReLU(),
+			# nn.ReLU(),
 			)
 
 		self.return_mix_network = ReturnMixNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
@@ -469,7 +469,7 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = returns.detach()
 
 			
-			rewards = self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) #* episodic_reward.to(self.device).reshape(b, 1, 1)
+			rewards = torch.abs(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			if logprobs is not None:
