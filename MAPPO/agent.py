@@ -391,22 +391,20 @@ class PPOAgent:
 			ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0)
 			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0)
 			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
-			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions[latest_sample_index]).float().unsqueeze(0)
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index]).float().unsqueeze(0)
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
-			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index, :, :]).float().unsqueeze(0)
 		else:
 			ally_state_batch = torch.from_numpy(self.buffer.ally_states).float()
 			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float()
 			actions_batch = torch.from_numpy(self.buffer.actions).float()
-			one_hot_actions_batch = torch.from_numpy(self.buffer.one_hot_actions).float()
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs).float()
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long()
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1)
-			logprobs_batch = torch.from_numpy(self.buffer.logprobs).float()
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
@@ -427,16 +425,13 @@ class PPOAgent:
 				with torch.no_grad():
 					returns, rewards, temporal_weights, agent_weights,\
 					temporal_scores, agent_scores, action_prediction = self.reward_model(
-						# state_batch.permute(0, 2, 1, 3).to(self.device), 
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 						actions_batch.permute(0, 2, 1).to(self.device), 
 						episodic_reward_batch.to(self.device),
 						team_masks=team_mask_batch.to(self.device),
 						agent_masks=agent_masks_batch.to(self.device),
 						logprobs=logprobs_batch.to(self.device),
-						# episode_len=episode_len_batch.to(self.device),
 						)
 
 					print("*"*20)
@@ -539,12 +534,12 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		ally_obs_batch, enemy_obs_batch, actions_batch, logprobs_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
 		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
 		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
-		one_hot_actions_batch = torch.from_numpy(one_hot_actions_batch).float() # same as current one_hot_actions
+		logprobs_batch = torch.from_numpy(logprobs_batch).float() # same as current one_hot_actions
 		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
@@ -584,15 +579,13 @@ class PPOAgent:
 		elif "ATRR" in self.experiment_type:
 			
 			returns, rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
-				# reward_model_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				# one_hot_actions_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.permute(0, 2, 1).to(self.device), 
 				episodic_reward_batch.to(self.device),
+				logprobs=logprobs_batch.to(self.device),
 				team_masks=team_mask_batch.to(self.device),
 				agent_masks=agent_masks_batch.to(self.device),
-				# episode_len=episode_len_batch.to(self.device),
 				)
 
 			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)

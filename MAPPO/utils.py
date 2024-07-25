@@ -78,7 +78,7 @@ class RewardReplayMemory:
 		self.buffer['ally_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.ally_obs_shape), dtype=np.float32)
 		self.buffer['enemy_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_enemies, self.enemy_obs_shape), dtype=np.float32)
 		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
-		self.buffer['one_hot_actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape), dtype=np.float32)
+		self.buffer['logprobs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['reward'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
 		self.buffer['done'] = np.ones((self.capacity, self.max_episode_len), dtype=np.float32)
 		self.buffer['indiv_dones'] = np.ones((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
@@ -86,12 +86,12 @@ class RewardReplayMemory:
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, ally_obs, enemy_obs, actions, one_hot_actions, reward, done, indiv_dones):
+	def push(self, ally_obs, enemy_obs, actions, logprobs, reward, done, indiv_dones):
 		# self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
 		self.buffer['ally_obs'][self.episode][self.t] = ally_obs
 		self.buffer['enemy_obs'][self.episode][self.t] = enemy_obs
 		self.buffer['actions'][self.episode][self.t] = actions
-		self.buffer['one_hot_actions'][self.episode][self.t] = one_hot_actions
+		self.buffer['logprobs'][self.episode][self.t] = logprobs
 		self.buffer['reward'][self.episode][self.t] = reward
 		self.buffer['done'][self.episode][self.t] = done
 		self.buffer['indiv_dones'][self.episode][self.t] = indiv_dones
@@ -111,13 +111,13 @@ class RewardReplayMemory:
 		ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
 		enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
-		one_hot_actions_batch = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
+		logprobs_batch = np.take(self.buffer['one_hot_actions'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		return ally_obs_batch, enemy_obs_batch, actions_batch, one_hot_actions_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return ally_obs_batch, enemy_obs_batch, actions_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):
