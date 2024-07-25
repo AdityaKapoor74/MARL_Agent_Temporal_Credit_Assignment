@@ -428,7 +428,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		state_embeddings = (state_action_embedding.view(b, n_a, t, self.comp_emb) - action_embedding).reshape(b, n_a, t, 1, self.comp_emb).sum(dim=1, keepdim=True).repeat(1, n_a, 1, self.depth, 1).reshape(b, n_a, t, -1) / (agent_masks.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.depth*self.comp_emb)
-		past_state_action_embeddings = torch.stack([first_past_state_action_embedding.to(self.device), torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[:, :, :-1, :]])
+		past_state_action_embeddings = torch.stack([first_past_state_action_embedding.to(self.device), torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)[:, :, :-1, :]], dim=-2)
 		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
 		action_prediction = self.dynamics_model(state_past_state_action_embeddings)
 
