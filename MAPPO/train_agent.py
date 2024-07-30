@@ -416,10 +416,10 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": False,
+				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
 				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
