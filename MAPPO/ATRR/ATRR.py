@@ -478,7 +478,7 @@ class Time_Agent_Transformer(nn.Module):
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
-				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).clamp(min=1e-5, max=1.0))
+				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))).clamp(min=1e-5, max=1.0)
 				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)
 				print("importance_sampling")
 				print(importance_sampling)
