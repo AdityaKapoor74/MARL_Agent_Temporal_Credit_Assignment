@@ -322,19 +322,19 @@ class Time_Agent_Transformer(nn.Module):
 		# 	)
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*depth*2, n_actions), activate=False)
-			# init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, n_actions), activate=False)
+			# init_(nn.Linear(self.comp_emb*depth*2, n_actions), activate=False)
+			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 			)
 		
 		# self.pre_final_norm = nn.LayerNorm(self.comp_emb*depth)
 
 		self.rblocks = nn.Sequential(
-			init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			# init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
-			# nn.GELU(),
-			# init_(nn.Linear(self.comp_emb, 1)),
+			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
+			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			nn.GELU(),
+			init_(nn.Linear(self.comp_emb, 1)),
 			# nn.ReLU(),
 			)
 
