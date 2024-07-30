@@ -391,7 +391,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
-		env_name = "3s5z" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
 		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
 		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
 		algorithm_type = "MAPPO"
@@ -416,13 +416,13 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
-				"max_time_steps": 100, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
+				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
@@ -491,8 +491,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 6e-3, #8e-3
-				"entropy_pen_final": 6e-3,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
