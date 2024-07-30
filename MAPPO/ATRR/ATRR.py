@@ -470,8 +470,8 @@ class Time_Agent_Transformer(nn.Module):
 			# returns = self.rblocks(torch.cat((all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)), dim=-1)).view(b, t, n_a).contiguous()
 			# rewards_ = returns.detach()
 
-			
-			rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+			# this kind of relu will ensure that different neurons fire for positive and negative values of the reward -- if the episodic reward is negative set "N" neurons would fire whereas if it is positive set "N' " would fire
+			rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			if train is False:
