@@ -484,10 +484,11 @@ class Time_Agent_Transformer(nn.Module):
 				print(importance_sampling)
 			elif train is True:
 				# importance_sampling = torch.ones(b, 1, 1).to(self.device)
-				importance_sampling = torch.ones(b, t, n_a).to(self.device)
-				# gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
-				# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
-				# importance_sampstate_embeddingsling = torch.exp(((gen_policy_logprobs.to(self.device) - logprobs.to(self.device)) * agent_masks.to(self.device)).clamp(min=1e-5, max=10.0))
+				# importance_sampling = torch.ones(b, t, n_a).to(self.device)
+				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
+				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
+				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=10.0)
 			
 
 			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
