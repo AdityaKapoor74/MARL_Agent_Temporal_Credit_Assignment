@@ -479,7 +479,10 @@ class Time_Agent_Transformer(nn.Module):
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
-				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=1.0)
+				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-1, max=1.0)
+				print((agent_masks.sum(dim=-1)>0).unsqueeze(-1).float().shape)
+				print(importance_sampling.shape)
+				importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5))*(agent_masks.sum(dim=-1)>0).unsqueeze(-1).float()
 				print("importance_sampling")
 				print(importance_sampling)
 			elif train is True:
@@ -488,7 +491,8 @@ class Time_Agent_Transformer(nn.Module):
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
-				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=1.0)
+				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-1, max=1.0)
+				importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5))*(agent_masks.sum(dim=-1)>0).unsqueeze(-1).float()
 			
 
 			returns = self.return_mix_network(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) #* importance_sampling.reshape(b, -1).prod(dim=-1).reshape(b, 1, 1) #* episodic_reward.to(self.device).reshape(b, 1, 1)
