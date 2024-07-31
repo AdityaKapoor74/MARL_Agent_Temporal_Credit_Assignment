@@ -406,7 +406,7 @@ class Time_Agent_Transformer(nn.Module):
 			if i == len(self.tblocks):
 				break
 
-		first_state_embedding = (state_action_embedding.view(b, n_a, t, self.comp_emb) - action_embedding).reshape(b, n_a, t, 1, self.comp_emb)[:, :, 0, :, :].unsqueeze(2).repeat(1, 1, 1, self.depth, 1).reshape(b, n_a, 1, -1)
+		first_state_embedding = (state_action_embedding.view(b, n_a, t, self.comp_emb) - action_embedding).reshape(b, n_a, t, 1, self.comp_emb)[:, :, 0, :, :].unsqueeze(2).sum(dim=1, keepdim=True).repeat(1, n_a, 1, self.depth, 1).reshape(b, n_a, 1, -1)
 		state_embeddings = (state_action_embedding.view(b, n_a, t, self.comp_emb) - action_embedding).reshape(b, n_a, t, 1, self.comp_emb).sum(dim=1, keepdim=True).repeat(1, n_a, 1, self.depth, 1).reshape(b, n_a, t, -1) / (agent_masks.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
 		state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.depth*self.comp_emb)
@@ -479,9 +479,7 @@ class Time_Agent_Transformer(nn.Module):
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
-				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-1, max=1.0)
-				print((agent_masks.sum(dim=-1)>0).unsqueeze(-1).float().shape)
-				print(importance_sampling.shape)
+				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=10.0)
 				importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5))*(agent_masks.sum(dim=-1)>0).unsqueeze(-1).float()
 				print("importance_sampling")
 				print(importance_sampling)
@@ -491,7 +489,7 @@ class Time_Agent_Transformer(nn.Module):
 				gen_policy_probs = Categorical(F.softmax(action_prediction.detach(), dim=-1).transpose(1, 2))
 				gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 				importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
-				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-1, max=1.0)
+				importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=10.0)
 				importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5))*(agent_masks.sum(dim=-1)>0).unsqueeze(-1).float()
 			
 

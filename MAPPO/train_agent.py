@@ -342,6 +342,7 @@ class MAPPO:
 						reward_var_batch = 0.0
 					elif "ATRR" in self.experiment_type:
 						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+						reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 					
 					for i in range(self.reward_model_update_epochs):
 						sample = self.agents.reward_model_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
@@ -349,9 +350,11 @@ class MAPPO:
 							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							reward_var_batch += (reward_var/self.reward_model_update_epochs)
 						elif "ATRR" in self.experiment_type:
-							reward_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
+							reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
+							reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
+							dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
 						elif "STAS" in self.experiment_type:
 							reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
 
@@ -370,6 +373,9 @@ class MAPPO:
 						elif "ATRR" in self.experiment_type:
 							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
+
+							self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, episode)
+							self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, episode)
 							
 			if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
 				np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
@@ -445,6 +451,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
+				"dynamic_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
