@@ -475,7 +475,7 @@ class Time_Agent_Transformer(nn.Module):
 
 			# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 			# if train is False:
-			gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
+			gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 			gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 			# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 			importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
