@@ -448,7 +448,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 				"reward_linear_compression_dim": 64, # 16 for ATRR_agent_temporal
-				"reward_batch_size": 10, # 128
+				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
