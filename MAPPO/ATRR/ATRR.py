@@ -481,7 +481,7 @@ class Time_Agent_Transformer(nn.Module):
 			importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
 			importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=10.0)
 			# importance_sampling[:, 0] = 1.0
-			# importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5)).repeat(1, 1, n_a) * agent_masks.to(self.device)
+			importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5)).repeat(1, 1, n_a) * agent_masks.to(self.device)
 			print("importance_sampling")
 			print(importance_sampling)
 			# elif train is True:
