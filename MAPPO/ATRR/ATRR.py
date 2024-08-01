@@ -471,7 +471,7 @@ class Time_Agent_Transformer(nn.Module):
 			# rewards_ = returns.detach()
 
 			# this kind of relu will ensure that different neurons fire for positive and negative values of the reward -- if the episodic reward is negative set "N" neurons would fire whereas if it is positive set "N' " would fire
-			rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+			rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, n_a, t)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
 			returns = rewards
 			rewards_ = rewards.detach()
 
