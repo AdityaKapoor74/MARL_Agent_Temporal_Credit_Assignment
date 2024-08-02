@@ -158,7 +158,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.rblocks = nn.Sequential(
 			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
+			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, 1)),
 			)
