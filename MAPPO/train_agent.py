@@ -451,7 +451,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 1.0,
+				"dynamic_loss_coeffecient": 0.0,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
