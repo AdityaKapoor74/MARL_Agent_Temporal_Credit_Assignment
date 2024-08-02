@@ -229,6 +229,9 @@ class PPOAgent:
 				num_enemies=self.num_enemies,
 				ally_obs_shape=self.ally_observation_shape,
 				enemy_obs_shape=self.enemy_observation_shape,
+				local_obs_shape=self.local_observation_shape,
+				rnn_num_layers_actor=self.rnn_num_layers_actor,
+				actor_hidden_state=self.rnn_hidden_actor,
 				action_shape = self.num_actions,
 				device = self.device,
 				)
@@ -535,12 +538,16 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		ally_obs_batch, enemy_obs_batch, actions_batch, logprobs_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
 		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
 		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
+		local_obs_batch = torch.from_numpy(local_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
-		logprobs_batch = torch.from_numpy(logprobs_batch).float() # same as current one_hot_actions
+		last_actions_batch = torch.from_numpy(last_actions_batch)
+		action_masks_batch = torch.from_numpy(action_masks_batch)
+		hidden_state_actor_batch = torch.from_numpy(hidden_state_actor_batch).float()
+		logprobs_old_batch = torch.from_numpy(logprobs_old_batch).float() 
 		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
@@ -578,6 +585,20 @@ class PPOAgent:
 			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
 		elif "ATRR" in self.experiment_type:
+			with torch.no_grad():
+				b, t, n_a, _ = local_obs_batch.shape
+				rnn_num_layers = hidden_state_actor_batch.shape[2]
+				dists_batch, _ = self.policy_network(
+						local_obs_batch.to(self.device).reshape(b*t, 1, n_a, -1),
+						last_actions_batch.to(self.device).reshape(b*t, 1, n_a),
+						hidden_state_actor_batch.to(self.device).reshape(b*t, 1, rnn_num_layers, n_a, -1),
+						action_masks_batch.to(self.device).reshape(b*t, 1, n_a, -1).bool(),
+						)
+
+				dists_batch = dists_batch.reshape(b, t, n_a, -1)
+
+				probs_batch = Categorical(dists_batch)
+				logprobs_batch = probs_batch.log_prob(actions_batch.to(self.device))
 			
 			returns, rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
