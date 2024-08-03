@@ -276,7 +276,7 @@ class Time_Agent_Transformer(nn.Module):
 		# print("importance_sampling")
 		# print(importance_sampling)
 		importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks).reshape(b, t, 1) * team_masks.unsqueeze(-1).to(self.device)
-		importance_sampling_ratio = (importance_sampling_ratio / (importance_sampling_ratio*team_masks.unsqueeze(-1).to(self.device)).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
+		# importance_sampling_ratio = (importance_sampling_ratio / (importance_sampling_ratio*team_masks.unsqueeze(-1).to(self.device)).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
 		# rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * importance_sampling_ratio
 		# print(importance_sampling_ratio)
