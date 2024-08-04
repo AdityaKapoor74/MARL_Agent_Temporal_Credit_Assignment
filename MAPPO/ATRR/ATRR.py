@@ -282,6 +282,7 @@ class Time_Agent_Transformer(nn.Module):
 		# print(importance_sampling.reshape(b, -1))
 
 		# using attention weights to redistribute rewards
+		indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
 		temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
 		agent_weights_final = agent_weights.mean(dim=0).detach().sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5)
 		# renormalizing
