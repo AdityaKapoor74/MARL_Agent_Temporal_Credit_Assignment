@@ -158,7 +158,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.rblocks = nn.Sequential(
 			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, 1)),
 			)
@@ -265,22 +265,33 @@ class Time_Agent_Transformer(nn.Module):
 
 		
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
-		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
-		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
-		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
-		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
-		importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-3, max=10.0)
-		importance_sampling = importance_sampling * team_masks.unsqueeze(-1).to(self.device)
-		# normalizing
-		# importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
-		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
-		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
-		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
-		rewards_ = returns.detach() * importance_sampling.detach()
+		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
+		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		# # importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
+		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
+		# importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-3, max=10.0)
+		# importance_sampling = importance_sampling * team_masks.unsqueeze(-1).to(self.device)
+		# # normalizing
+		# # importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
+		# reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+		# reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
+		# returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
+		# rewards_ = returns.detach() * importance_sampling.detach()
 
-		print("importance_sampling")
-		print(importance_sampling.reshape(b, -1))
+		# print("importance_sampling")
+		# print(importance_sampling.reshape(b, -1))
 
+		# using attention weights to redistribute rewards
+		temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+		agent_weights_final = agent_weights.mean(dim=0).detach().sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5)
+		# renormalizing
+		agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+		multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
+		# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
+		# # renormalizing
+		# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+		returns = self.rblocks(final_x.mean(dim=1, keepdim=True))
+		rewards_ = returns.detach().unsqueeze(-1) * multi_agent_temporal_weights.detach() * agent_weights_final.detach()
 
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
 		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
