@@ -44,12 +44,18 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 
 	def forward(self, importance_sampling_ratio, all_agent_state_action, agent_masks):
 		b, n_a, t, e = all_agent_state_action.shape
-		importance_sampling_ratio = importance_sampling_ratio.reshape(-1, self.num_agents)
-		w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
+		# importance_sampling_ratio = importance_sampling_ratio.reshape(-1, self.num_agents)
+		# w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
+
+		# # scaling the expected importance sampling ratio
+		# w1 = torch.abs(w1.reshape(-1, self.num_agents)) #* agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
+		# x = (w1 * importance_sampling_ratio).prod(dim=-1, keepdim=True)#.clamp(min=1e-1, max=10.0)
+
+		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t)
+		w1 = torch.abs(self.hyper_w1(all_agent_state_action.transpose(1, 2).mean(dim=-2).reshape(b, t, e)))
 
 		# scaling the expected importance sampling ratio
-		w1 = torch.abs(w1.reshape(-1, self.num_agents)) #* agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
-		x = (w1 * importance_sampling_ratio).prod(dim=-1, keepdim=True)#.clamp(min=1e-1, max=10.0)
+		x = w1.squeeze(-1) * importance_sampling_ratio
 
 		return x
 
@@ -158,14 +164,14 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.rblocks = nn.Sequential(
 			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
+			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, 1)),
 			)
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		# self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -281,18 +287,36 @@ class Time_Agent_Transformer(nn.Module):
 		# print("importance_sampling")
 		# print(importance_sampling.reshape(b, -1))
 
+		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome and importance sampling ratio
+		gen_policy_probs = Categorical(F.softmax(action_prediction.transpose(1, 2), dim=-1))
+		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
+		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
+		importance_sampling = torch.prod(importance_sampling, dim=2)#.clamp(min=1e-3, max=10.0)
+		importance_sampling = importance_sampling * team_masks.to(self.device)
+		# normalizing
+		# importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
+		expected_importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks)
+		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
+		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
+		rewards_ = returns.detach() * expected_importance_sampling_ratio.unsqueeze(-1).detach()
+
+		# print("importance_sampling")
+		# print(importance_sampling.reshape(b, -1))
+
 		# using attention weights to redistribute rewards
-		indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-		temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
-		agent_weights_final = agent_weights.mean(dim=0).detach().sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5)
-		# renormalizing
-		agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
-		# multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1, keepdim=True)
-		multi_agent_temporal_weights = (temporal_weights_final.sum(dim=-1) / (agent_masks.sum(dim=-1)+1e-5)).unsqueeze(-1)
-		# renormalizing
-		multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=1, keepdim=True) + 1e-5)
-		returns = self.rblocks(final_x)
-		rewards_ = returns.detach().transpose(1, 2) * temporal_weights_final #* multi_agent_temporal_weights.detach() * agent_weights_final.detach()
+		# indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
+		# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
+		# agent_weights_final = agent_weights.mean(dim=0).detach().sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5)
+		# # renormalizing
+		# agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
+		# # multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1, keepdim=True)
+		# multi_agent_temporal_weights = (temporal_weights_final.sum(dim=-1) / (agent_masks.sum(dim=-1)+1e-5)).unsqueeze(-1)
+		# # renormalizing
+		# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=1, keepdim=True) + 1e-5)
+		# returns = self.rblocks(final_x)
+		# rewards_ = returns.detach().transpose(1, 2) * temporal_weights_final #* multi_agent_temporal_weights.detach() * agent_weights_final.detach()
 
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
 		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
@@ -321,7 +345,7 @@ class Time_Agent_Transformer(nn.Module):
 		# returns = self.reward_hyper_net(rewards * importance_sampling, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, n_a) #* episodic_reward.to(self.device).reshape(b, 1, 1)
 		# rewards_ = returns.detach()
 
-		return returns, rewards_, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
+		return returns, rewards_, expected_importance_sampling_ratio, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 
