@@ -291,7 +291,7 @@ class Time_Agent_Transformer(nn.Module):
 		multi_agent_temporal_weights = (temporal_weights_final.sum(dim=-1) / (agent_masks.sum(dim=-1)+1e-5)).unsqueeze(-1)
 		# renormalizing
 		multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=1, keepdim=True) + 1e-5)
-		returns = self.rblocks(final_x)
+		returns = self.rblocks(final_x.unsqueeze(-2))
 		rewards_ = returns.detach() * temporal_weights_final #* multi_agent_temporal_weights.detach() * agent_weights_final.detach()
 
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
