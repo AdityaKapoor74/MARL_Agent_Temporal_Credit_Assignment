@@ -265,18 +265,21 @@ class Time_Agent_Transformer(nn.Module):
 
 		
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
-		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
+		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
 		importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-3, max=10.0)
 		importance_sampling = importance_sampling * team_masks.unsqueeze(-1).to(self.device)
 		# normalizing
-		importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
+		# importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
 		rewards_ = returns.detach() * importance_sampling.detach()
+
+		print("importance_sampling")
+		print(importance_sampling.reshape(b, -1))
 
 
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
