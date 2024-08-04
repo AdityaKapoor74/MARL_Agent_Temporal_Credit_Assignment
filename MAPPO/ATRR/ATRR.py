@@ -286,10 +286,10 @@ class Time_Agent_Transformer(nn.Module):
 		agent_weights_final = agent_weights.mean(dim=0).detach().sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5)
 		# renormalizing
 		agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
-		multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
+		multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1, keepdim=True)
 		# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
-		# # renormalizing
-		# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
+		# renormalizing
+		multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=1, keepdim=True) + 1e-5)
 		returns = self.rblocks(final_x.mean(dim=1, keepdim=True))
 		rewards_ = returns.detach().unsqueeze(-1) * multi_agent_temporal_weights.detach() * agent_weights_final.detach()
 
