@@ -269,6 +269,8 @@ class Time_Agent_Transformer(nn.Module):
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
+		# normalizing
+		importance_sampling = (importance_sampling / (importance_sampling * agent_masks.to(self.device)).sum(dim=1, keepdim=True)) * agent_masks.to(self.device)
 		# importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True).clamp(min=1e-1, max=10.0)
 		# we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
 		# importance_sampling[:, 0] = 1.0
@@ -277,7 +279,7 @@ class Time_Agent_Transformer(nn.Module):
 		# print(importance_sampling)
 		importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks).reshape(b, t, 1) * team_masks.unsqueeze(-1).to(self.device)
 		# print(importance_sampling_ratio)
-		importance_sampling_ratio = (importance_sampling_ratio / (importance_sampling_ratio*team_masks.unsqueeze(-1).to(self.device)).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
+		# importance_sampling_ratio = (importance_sampling_ratio / (importance_sampling_ratio*team_masks.unsqueeze(-1).to(self.device)).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
 		# rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
