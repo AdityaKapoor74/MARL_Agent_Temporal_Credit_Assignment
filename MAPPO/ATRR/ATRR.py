@@ -270,7 +270,7 @@ class Time_Agent_Transformer(nn.Module):
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
 		importance_sampling = torch.prod(importance_sampling, dim=2, keepdim=True)#.clamp(min=1e-3, max=10.0)
-		importance_sampling = importance_sampling * team_masks.to(self.device)
+		importance_sampling = importance_sampling * team_masks.unsqueeze(-1).to(self.device)
 		# normalizing
 		importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.to(self.device)
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
