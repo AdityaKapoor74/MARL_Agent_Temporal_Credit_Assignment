@@ -165,7 +165,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		# self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -277,7 +277,7 @@ class Time_Agent_Transformer(nn.Module):
 		# importance_sampling = (importance_sampling / (torch.sum(importance_sampling * (agent_masks.sum(dim=-1)>0).unsqueeze(-1).float(), dim=1, keepdim=True) + 1e-5)).repeat(1, 1, n_a) * agent_masks.to(self.device)
 		# print("importance_sampling")
 		# print(importance_sampling)
-		importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks).reshape(b, t, 1) * team_masks.unsqueeze(-1).to(self.device)
+		# importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks).reshape(b, t, 1) * team_masks.unsqueeze(-1).to(self.device)
 		# print(importance_sampling_ratio)
 		# importance_sampling_ratio = (importance_sampling_ratio / (importance_sampling_ratio*team_masks.unsqueeze(-1).to(self.device)).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
 		# rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
@@ -289,7 +289,7 @@ class Time_Agent_Transformer(nn.Module):
 		# print(importance_sampling_ratio)
 		# returns = self.reward_hyper_net(rewards, all_x, final_x.mean(dim=1).unsqueeze(1).repeat(1, t, 1), agent_masks).reshape(b, t, 1) * importance_sampling_ratio
 		# rewards_ = rewards.detach() * self.reward_hyper_net.w1.detach().reshape(b, t, n_a) * importance_sampling_ratio.detach() * agent_masks.to(self.device)
-		rewards_ = returns.detach() * importance_sampling_ratio.detach()
+		rewards_ = returns.detach() * importance_sampling.detach()
 
 
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2) / 10.0, dim=-1))
