@@ -51,11 +51,11 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 		# w1 = torch.abs(w1.reshape(-1, self.num_agents)) #* agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		# x = (w1 * importance_sampling_ratio).prod(dim=-1, keepdim=True)#.clamp(min=1e-1, max=10.0)
 
-		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t)
+		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t)#.clamp(1e-5, 10.0)
 		w1 = torch.abs(self.hyper_w1(all_agent_state_action.transpose(1, 2).mean(dim=-2).reshape(b, t, e)))
 
 		# scaling the expected importance sampling ratio
-		x = (w1.squeeze(-1) * importance_sampling_ratio).clamp(1-2, 2.0)
+		x = (w1.squeeze(-1) * importance_sampling_ratio)#.clamp(1e-5, 2.0)
 
 		return x
 
@@ -288,7 +288,7 @@ class Time_Agent_Transformer(nn.Module):
 		# print(importance_sampling.reshape(b, -1))
 
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome and importance sampling ratio
-		gen_policy_probs = Categorical(F.softmax(action_prediction.transpose(1, 2), dim=-1))
+		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 		importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)

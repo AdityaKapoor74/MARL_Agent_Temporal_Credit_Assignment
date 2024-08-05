@@ -612,14 +612,13 @@ class PPOAgent:
 				)
 
 			target_importance_sampling = torch.exp(((logprobs_batch.to(self.device) - logprobs_old_batch.to(self.device)) * agent_masks_batch.to(self.device)))
-			target_importance_sampling = torch.prod(target_importance_sampling, dim=2).clamp(min=1e-2, max=5.0)
+			target_importance_sampling = torch.prod(target_importance_sampling, dim=2)#.clamp(min=1e-2, max=5.0)
 			target_importance_sampling = target_importance_sampling * team_mask_batch.to(self.device)
 
 			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 			# agent_weights = agent_weights.cpu().mean(dim=0)
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
-
 
 			if self.version == "agent_temporal_attn_weights":
 				b, t, _, e = ally_obs_batch.shape
