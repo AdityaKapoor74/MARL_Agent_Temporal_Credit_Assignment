@@ -612,7 +612,7 @@ class PPOAgent:
 				)
 
 			target_importance_sampling = torch.exp(((logprobs_batch.to(self.device) - logprobs_old_batch.to(self.device)) * agent_masks_batch.to(self.device)))
-			target_importance_sampling = torch.prod(target_importance_sampling, dim=2)#.clamp(min=1e-2, max=5.0)
+			target_importance_sampling = torch.prod(target_importance_sampling, dim=2).clamp(min=1e-5, max=10.0)
 			target_importance_sampling = target_importance_sampling * team_mask_batch.to(self.device)
 
 			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)

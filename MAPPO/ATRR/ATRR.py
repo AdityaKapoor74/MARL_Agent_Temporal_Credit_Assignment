@@ -51,7 +51,7 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 		# w1 = torch.abs(w1.reshape(-1, self.num_agents)) #* agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
 		# x = (w1 * importance_sampling_ratio).prod(dim=-1, keepdim=True)#.clamp(min=1e-1, max=10.0)
 
-		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t)#.clamp(1e-5, 10.0)
+		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t).clamp(1e-5, 10.0)
 		w1 = torch.abs(self.hyper_w1(all_agent_state_action.transpose(1, 2).mean(dim=-2).reshape(b, t, e)))
 
 		# scaling the expected importance sampling ratio
