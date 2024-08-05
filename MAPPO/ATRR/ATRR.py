@@ -296,11 +296,11 @@ class Time_Agent_Transformer(nn.Module):
 		importance_sampling = importance_sampling * team_masks.to(self.device)
 		# normalizing
 		# importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
-		expected_importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks) * team_masks.to(self.device)
+		# expected_importance_sampling_ratio = self.importance_sampling_hyper_net(importance_sampling, all_x, agent_masks) * team_masks.to(self.device)
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
-		rewards_ = returns.detach() #* expected_importance_sampling_ratio.unsqueeze(-1).detach() * agent_masks.to(self.device)
+		rewards_ = returns.detach() * importance_sampling #* expected_importance_sampling_ratio.unsqueeze(-1).detach() * agent_masks.to(self.device)
 
 		# print("importance_sampling")
 		# print(importance_sampling.reshape(b, -1))
