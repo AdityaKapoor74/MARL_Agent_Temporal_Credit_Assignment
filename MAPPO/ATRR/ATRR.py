@@ -36,10 +36,10 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 		self.hidden_dim = hidden_dim
 
 		self.hyper_w1 = nn.Sequential(
-			init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
-			nn.GELU(),
-			init_(nn.Linear(hidden_dim, 1))
-			# init_(nn.Linear(total_obs_dim, 1), activate=False),
+			# init_(nn.Linear(total_obs_dim, hidden_dim), activate=True),
+			# nn.GELU(),
+			# init_(nn.Linear(hidden_dim, 1))
+			init_(nn.Linear(total_obs_dim, 1), activate=False),
 			)
 
 	def forward(self, importance_sampling_ratio, all_agent_state_action, agent_masks):
@@ -173,7 +173,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		# self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -290,17 +290,17 @@ class Time_Agent_Transformer(nn.Module):
 		# print(importance_sampling.reshape(b, -1))
 
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome and importance sampling ratio
-		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
-		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
+		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)).reshape(b, -1).sum(dim=-1).clamp(min=1e-5, max=10.0)).reshape(b, 1, 1)
 		# importance_sampling = torch.exp(((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)))#.clamp(min=1e-1, max=10.0)
 		# importance_sampling = torch.prod(importance_sampling, dim=2)#.clamp(min=1e-3, max=10.0)
 		# importance_sampling = importance_sampling * team_masks.to(self.device)
 		# normalizing
 		# importance_sampling = (importance_sampling / (importance_sampling).sum(dim=1, keepdim=True)) * team_masks.unsqueeze(-1).to(self.device)
-		log_importance_sampling = (logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)
-		expected_importance_sampling_ratio = self.importance_sampling_hyper_net(log_importance_sampling, all_x, agent_masks) * team_masks.to(self.device)
-		# expected_importance_sampling_ratio = None
+		# log_importance_sampling = (logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)
+		# expected_importance_sampling_ratio = self.importance_sampling_hyper_net(log_importance_sampling, all_x, agent_masks) * team_masks.to(self.device)
+		expected_importance_sampling_ratio = None
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		# reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
