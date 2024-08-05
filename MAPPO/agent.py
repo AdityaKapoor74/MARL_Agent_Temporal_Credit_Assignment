@@ -488,9 +488,6 @@ class PPOAgent:
 						# print(agent_temporal_contribution)
 
 
-
-
-
 						# CURRENT WORK 
 						# b, t, n_a = logprobs_batch.shape
 						# # we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
