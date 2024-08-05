@@ -52,7 +52,7 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 		# x = (w1 * importance_sampling_ratio).prod(dim=-1, keepdim=True)#.clamp(min=1e-1, max=10.0)
 
 		importance_sampling_ratio = importance_sampling_ratio.reshape(b, t).clamp(1e-5, 10.0)
-		w1 = torch.abs(self.hyper_w1(all_agent_state_action.transpose(1, 2).mean(dim=-2).reshape(b, t, e)))
+		w1 = torch.abs(self.hyper_w1((all_agent_state_action.transpose(1, 2)*agent_masks.unsqueeze(-1)).sum(dim=-2)/(agent_masks.sum(dim=-1, keepdim=True)+1e-5).reshape(b, t, e)))
 
 		# scaling the expected importance sampling ratio
 		x = (w1.squeeze(-1) * importance_sampling_ratio)#.clamp(1e-5, 2.0)
@@ -300,7 +300,7 @@ class Time_Agent_Transformer(nn.Module):
 		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
-		rewards_ = returns.detach() #* expected_importance_sampling_ratio.unsqueeze(-1).detach()
+		rewards_ = returns.detach() * expected_importance_sampling_ratio.unsqueeze(-1).detach()
 
 		# print("importance_sampling")
 		# print(importance_sampling.reshape(b, -1))
