@@ -267,9 +267,9 @@ class Time_Agent_Transformer(nn.Module):
 
 		# this kind of relu will ensure that different neurons fire for positive and negative values of the reward -- if the episodic reward is negative set "N" neurons would fire whereas if it is positive set "N' " would fire
 		# direct reward prediction but conditioned on final embedding
-		# rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		# returns = rewards
-		# rewards_ = rewards.detach()
+		rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+		returns = rewards
+		rewards_ = rewards.detach()
 
 		
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
@@ -301,10 +301,10 @@ class Time_Agent_Transformer(nn.Module):
 		# log_importance_sampling = (logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device)
 		# expected_importance_sampling_ratio = self.importance_sampling_hyper_net(log_importance_sampling, all_x, agent_masks) * team_masks.to(self.device)
 		expected_importance_sampling_ratio = None
-		reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+		# reward_sign = torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		# reward_sign = torch.where(reward_sign==0.0, reward_sign, 1.0)
-		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
-		rewards_ = returns.detach() #* expected_importance_sampling_ratio.unsqueeze(-1).detach() * agent_masks.to(self.device) #  * importance_sampling.unsqueeze(-1)
+		# returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * reward_sign)
+		# rewards_ = returns.detach() #* expected_importance_sampling_ratio.unsqueeze(-1).detach() * agent_masks.to(self.device) #  * importance_sampling.unsqueeze(-1)
 
 		# print("importance_sampling")
 		# print(importance_sampling.reshape(b, -1))
