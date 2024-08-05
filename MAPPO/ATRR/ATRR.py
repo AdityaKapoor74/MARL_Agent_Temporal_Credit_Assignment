@@ -282,7 +282,7 @@ class Time_Agent_Transformer(nn.Module):
 		# use hypernet for importance sampling
 		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
 		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks)
-		rewards_ = returns.detach() * importance_sampling.detach()
+		rewards_ = returns.detach() * importance_sampling.reshape(b, t, 1).detach()
 
 
 		# use episodic reward and hypernet generated weights for redistribution
