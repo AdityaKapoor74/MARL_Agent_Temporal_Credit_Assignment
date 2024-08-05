@@ -165,7 +165,7 @@ class Time_Agent_Transformer(nn.Module):
 			init_(nn.Linear(self.comp_emb, 1)),
 			)
 
-		self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
 		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 					   
@@ -268,19 +268,23 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-
 		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# directly using importance weights
-		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		importance_sampling = importance_sampling.sum(dim=-1, keepdim=True)
+		# importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
+		# importance_sampling = importance_sampling.sum(dim=-1, keepdim=True)
 		# not normalizing
 		# importance_sampling = torch.exp(importance_sampling)
 		# normalizing
-		importance_sampling = torch.where(team_masks.unsqueeze(-1).bool().to(self.device), importance_sampling, self.mask_value)
-		importance_sampling = F.softmax(importance_sampling, dim=1)
-		rewards_ = returns.detach() * importance_sampling.detach()
+		# importance_sampling = torch.where(team_masks.unsqueeze(-1).bool().to(self.device), importance_sampling, self.mask_value)
+		# importance_sampling = F.softmax(importance_sampling, dim=1)
+		# rewards_ = returns.detach() * importance_sampling.detach()
 		# use hypernet for importance sampling
+		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
+		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks)
+		rewards_ = returns.detach() * importance_sampling.detach()
+
+
 		# use episodic reward and hypernet generated weights for redistribution
 		# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach() * importance_sampling * self.reward_hyper_net.w1.detach().reshape(b, t, n_a), -1e9)
 		# temporal_reward_contri = torch.where((agent_masks.sum(dim=-1, keepdim=True)>0).to(self.device).bool(), (rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a)).sum(dim=-1, keepdim=True), -1e9)
@@ -288,7 +292,7 @@ class Time_Agent_Transformer(nn.Module):
 		# agent_contri = F.softmax(agent_reward_contri, dim=-1)
 		# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
 
-		return returns, rewards_, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
+		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 
