@@ -54,9 +54,6 @@ class RewardReplayMemory:
 		ally_obs_shape,
 		enemy_obs_shape,
 		# global_obs_shape,
-		local_obs_shape,
-		rnn_num_layers_actor,
-		actor_hidden_state,
 		action_shape,
 		device,
 		):
@@ -73,9 +70,6 @@ class RewardReplayMemory:
 		# self.reward_model_obs_shape = reward_model_obs_shape
 		self.ally_obs_shape = ally_obs_shape
 		self.enemy_obs_shape = enemy_obs_shape
-		self.local_obs_shape = local_obs_shape
-		self.rnn_num_layers_actor = rnn_num_layers_actor
-		self.actor_hidden_state = actor_hidden_state
 		self.action_shape = action_shape
 		self.device = device
 
@@ -89,21 +83,14 @@ class RewardReplayMemory:
 		self.buffer['done'] = np.ones((self.capacity, self.max_episode_len), dtype=np.float32)
 		self.buffer['indiv_dones'] = np.ones((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 
-		self.buffer['local_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.local_obs_shape))
-		self.buffer['hidden_state_actor'] = np.zeros((self.capacity, self.max_episode_len, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
-		self.buffer['action_masks'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape))
-
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, ally_obs, enemy_obs, local_obs, actions, action_masks, hidden_state_actor, logprobs, reward, done, indiv_dones):
+	def push(self, ally_obs, enemy_obs, actions, logprobs, reward, done, indiv_dones):
 		# self.buffer['reward_model_obs'][self.episode][self.t] = reward_model_obs
 		self.buffer['ally_obs'][self.episode][self.t] = ally_obs
 		self.buffer['enemy_obs'][self.episode][self.t] = enemy_obs
-		self.buffer['local_obs'][self.episode][self.t] = local_obs
 		self.buffer['actions'][self.episode][self.t] = actions
-		self.buffer['action_masks'][self.episode][self.t] = action_masks
-		self.buffer['hidden_state_actor'][self.episode][self.t] = hidden_state_actor
 		self.buffer['logprobs'][self.episode][self.t] = logprobs
 		self.buffer['reward'][self.episode][self.t] = reward
 		self.buffer['done'][self.episode][self.t] = done
@@ -123,20 +110,14 @@ class RewardReplayMemory:
 		# reward_model_obs_batch = np.take(self.buffer['reward_model_obs'], batch_indices, axis=0)
 		ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
 		enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
-		local_obs_batch = np.take(self.buffer['local_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
-		action_masks_batch = np.take(self.buffer['action_masks'], batch_indices, axis=0)
-		hidden_state_actor_batch = np.take(self.buffer['hidden_state_actor'], batch_indices, axis=0)
 		logprobs_batch = np.take(self.buffer['logprobs'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		first_last_actions = np.zeros((num_episodes, 1, self.num_agents), dtype=int) + self.action_shape
-		last_actions_batch = np.concatenate((first_last_actions, actions_batch[:, 1:, :]), axis=1)
-
-		return ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		return ally_obs_batch, enemy_obs_batch, actions_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):
@@ -333,7 +314,7 @@ class RolloutBuffer:
 		local_obs = torch.from_numpy(self.local_obs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.local_obs_shape)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape).reshape(-1, self.data_chunk_length, self.num_agents, self.local_obs_shape)
 		hidden_state_actor = torch.from_numpy(self.hidden_state_actor).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state)[:, rand_time][rand_batch, :][:, :, 0, :, :, :].permute(2, 0, 1, 3, 4).reshape(self.rnn_num_layers_actor, -1, self.actor_hidden_state)
 		logprobs = torch.from_numpy(self.logprobs).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
-		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, 1:, :]), axis=1)).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
+		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		actions = torch.from_numpy(self.actions).long().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
 		action_masks = torch.from_numpy(self.action_masks).bool().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents, self.num_actions)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents, self.num_actions)
 		agent_masks = 1-torch.from_numpy(self.indiv_dones[:, :-1]).float().reshape(self.num_episodes, data_chunks, self.data_chunk_length, self.num_agents)[:, rand_time][rand_batch, :].reshape(-1, self.data_chunk_length, self.num_agents)
@@ -345,6 +326,7 @@ class RolloutBuffer:
 
 		return ally_states, enemy_states, hidden_state_v, global_obs, local_obs, hidden_state_actor, logprobs, \
 		last_actions, actions, action_masks, agent_masks, team_masks, values, target_values, advantage
+
 
 	def calculate_targets(self, episode, v_value_norm=None):
 		
