@@ -229,9 +229,6 @@ class PPOAgent:
 				num_enemies=self.num_enemies,
 				ally_obs_shape=self.ally_observation_shape,
 				enemy_obs_shape=self.enemy_observation_shape,
-				local_obs_shape=self.local_observation_shape,
-				rnn_num_layers_actor=self.rnn_num_layers_actor,
-				actor_hidden_state=self.rnn_hidden_actor,
 				action_shape = self.num_actions,
 				device = self.device,
 				)
@@ -427,7 +424,7 @@ class PPOAgent:
 			elif "ATRR" in self.experiment_type:
 
 				with torch.no_grad():
-					returns, rewards, expected_importance_sampling_ratio, temporal_weights, agent_weights,\
+					returns, rewards, temporal_weights, agent_weights,\
 					temporal_scores, agent_scores, action_prediction = self.reward_model(
 						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
 						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
@@ -538,16 +535,12 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		ally_obs_batch, enemy_obs_batch, actions_batch, logprobs_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
 		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
 		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
-		local_obs_batch = torch.from_numpy(local_obs_batch).float()
 		actions_batch = torch.from_numpy(actions_batch)
-		last_actions_batch = torch.from_numpy(last_actions_batch)
-		action_masks_batch = torch.from_numpy(action_masks_batch)
-		hidden_state_actor_batch = torch.from_numpy(hidden_state_actor_batch).float()
-		logprobs_old_batch = torch.from_numpy(logprobs_old_batch).float() 
+		logprobs_batch = torch.from_numpy(logprobs_batch).float() # same as current one_hot_actions
 		reward_batch = torch.from_numpy(reward_batch).float()
 		episodic_reward_batch = reward_batch.sum(dim=1)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float()
@@ -585,22 +578,8 @@ class PPOAgent:
 			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
 		elif "ATRR" in self.experiment_type:
-			with torch.no_grad():
-				b, t, n_a, _ = local_obs_batch.shape
-				rnn_num_layers = hidden_state_actor_batch.shape[2]
-				dists_batch, _ = self.policy_network(
-						local_obs_batch.to(self.device).reshape(b*t, 1, n_a, -1),
-						last_actions_batch.to(self.device).reshape(b*t, 1, n_a),
-						hidden_state_actor_batch.to(self.device).reshape(b*t, 1, rnn_num_layers, n_a, -1),
-						action_masks_batch.to(self.device).reshape(b*t, 1, n_a, -1).bool(),
-						)
-
-				dists_batch = dists_batch.reshape(b, t, n_a, -1)
-
-				probs_batch = Categorical(dists_batch)
-				logprobs_batch = probs_batch.log_prob(actions_batch.to(self.device))
 			
-			returns, rewards, expected_importance_sampling_ratio, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+			returns, rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
 				actions_batch.permute(0, 2, 1).to(self.device), 
@@ -611,27 +590,18 @@ class PPOAgent:
 				train=True,
 				)
 
-			target_importance_sampling = torch.exp(((logprobs_batch.to(self.device) - logprobs_old_batch.to(self.device)) * agent_masks_batch.to(self.device)))
-			target_importance_sampling = torch.prod(target_importance_sampling, dim=2).clamp(min=1e-5, max=10.0)
-			target_importance_sampling = target_importance_sampling * team_mask_batch.to(self.device)
-
-			# print("target importance sampling")
-			# print(target_importance_sampling)
-
-			# print("expected_importance_sampling_ratio")
-			# print(expected_importance_sampling_ratio)
-
 			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
 			# agent_weights = agent_weights.cpu().mean(dim=0)
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
+
 
 			if self.version == "agent_temporal_attn_weights":
 				b, t, _, e = ally_obs_batch.shape
 				# reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ 5e-2*(F.mse_loss(state_prediction, state_target, reduction='none') * team_mask_batch.unsqueeze(-1).to(self.device)).sum() / team_mask_batch.sum() #+ 1e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
 				reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
 				dynamic_loss = (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
-				reward_loss = reward_prediction_loss + self.dynamic_loss_coeffecient * dynamic_loss #+ 5e-2 * F.huber_loss(expected_importance_sampling_ratio, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
+				reward_loss = reward_prediction_loss + self.dynamic_loss_coeffecient * dynamic_loss
 				# reward_loss = torch.mean(torch.log(torch.cosh(rewards.squeeze(-1) - episodic_reward_batch.to(self.device))))
 				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			else:

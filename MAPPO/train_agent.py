@@ -252,7 +252,7 @@ class MAPPO:
 
 				if self.use_reward_model:
 					self.agents.reward_model_buffer.push(
-						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
+						ally_states, enemy_states, actions, action_logprob, rewards_to_send, dones, indiv_dones
 						)
 
 					ally_states, enemy_states = next_ally_states, next_enemy_states
@@ -451,7 +451,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
+				"dynamic_loss_coeffecient": 0.0,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
