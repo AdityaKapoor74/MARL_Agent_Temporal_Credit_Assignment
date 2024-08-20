@@ -536,7 +536,7 @@ class PPOAgent:
 				expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
 			else:
 				expected_logprob_prediction_loss = 0.0
-			reward_loss = reward_prediction_loss + dynamic_loss + expected_logprob_prediction_loss
+			reward_loss = reward_prediction_loss + dynamic_loss #+ expected_logprob_prediction_loss
 			
 		elif "STAS" in self.experiment_type:
 			
