@@ -67,6 +67,7 @@ class PPOAgent:
 		self.reward_n_heads = dictionary["reward_n_heads"]
 		self.norm_rewards = dictionary["norm_rewards"]
 		self.dynamic_loss_coeffecient = dictionary["dynamic_loss_coeffecient"]
+		self.expected_logprob_prediction_loss_coeffecient = dictionary["expected_logprob_prediction_loss_coeffecient"]
 		self.temporal_score_coefficient = dictionary["temporal_score_coefficient"]
 		self.agent_score_coefficient = dictionary["agent_score_coefficient"]
 		self.reward_depth = dictionary["reward_depth"]
@@ -437,84 +438,6 @@ class PPOAgent:
 						logprobs=logprobs_batch.to(self.device),
 						)
 
-					print("*"*20)
-					print("actions")
-					print(actions_batch[0])
-					# print("rewards")
-					# print(rewards[0])
-
-					if self.experiment_type == "ATRR_temporal_attn_weights":
-						b, t, n_a, _ = state_batch.shape
-						
-						temporal_weights_final = F.softmax(torch.where(team_mask_batch.bool(), (temporal_scores[-1].mean(dim=1).sum(dim=1)/(agent_masks_batch.sum(dim=-1).reshape(b, t, 1)+1e-5)).diagonal(dim1=-2, dim2=-1), self.mask_value), dim=-1)
-						rewards = (episodic_reward_batch.unsqueeze(-1) * temporal_weights_final.detach()).unsqueeze(-1).repeat(1, 1, n_a)
-					
-
-					elif self.experiment_type == "ATRR_agent_temporal_attn_weights":
-						# b, t, n_a, _ = ally_state_batch.shape
-							
-						# # use temporal and agent attention networks to distribute rewards
-						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
-
-						# agent_weights_final = agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)/(agent_masks_batch.sum(dim=-1, keepdim=True)+1e-5)
-						# # # renormalizing
-						# agent_weights_final = agent_weights_final / (agent_weights_final.sum(dim=-1, keepdim=True)+1e-5)
-						
-						# # # multi_agent_temporal_weights = (temporal_weights_final*agent_weights_final).sum(dim=-1)
-						# multi_agent_temporal_weights = temporal_weights_final.sum(dim=-1) / (agent_masks_batch.sum(dim=-1)+1e-5)
-						# # # renormalizing
-						# multi_agent_temporal_weights = multi_agent_temporal_weights / (multi_agent_temporal_weights.sum(dim=-1, keepdim=True) + 1e-5)
-						# temporal_rewards = multi_agent_temporal_weights * episodic_reward_batch.unsqueeze(-1)
-						# agent_temporal_rewards = temporal_rewards.unsqueeze(-1) * agent_weights_final
-						# rewards = agent_temporal_rewards
-
-						# assuming predict episodic reward for each agent
-						# indiv_agent_episode_len = (agent_masks_batch.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, t).long() # subtracting 1 for indexing purposes
-						# temporal_weights_final = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, indiv_agent_episode_len).squeeze(2).transpose(1, 2)
-						# rewards = rewards.detach().cpu() * temporal_weights_final
-
-						# use agent attention network to distribute rewards
-						# agent_temporal_contribution_weights = torch.gather(temporal_weights.mean(dim=0).detach().cpu().reshape(b, n_a, t, t), 2, (team_mask_batch.sum(dim=-1)-1).reshape(b, 1, 1, 1).repeat(1, n_a, 1, t).long()).squeeze(2).transpose(1, 2)
-						# agent_episodic_contribution = (agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)*agent_temporal_contribution_weights).sum(dim=1) / (agent_weights.mean(dim=0).detach().cpu().sum(dim=-2)*agent_temporal_contribution_weights).sum(dim=1).sum(dim=-1, keepdims=True)
-						# agent_episodic_rewards = rewards.cpu() # agent_episodic_contribution * episodic_reward_batch.unsqueeze(-1)
-						# agent_temporal_contribution = torch.where(agent_masks_batch.bool(), (agent_weights.mean(dim=0).detach().cpu()).sum(dim=-2)*agent_temporal_contribution_weights, 0.0)
-						# agent_temporal_contribution = agent_temporal_contribution / (agent_temporal_contribution.sum(dim=1, keepdims=True)+1e-5)
-						# agent_temporal_contribution = F.softmax(torch.where(agent_masks_batch.bool(), agent_weights.mean(dim=0).detach().cpu().sum(dim=-2), -1e9), dim=1)
-						# agent_temporal_rewards = agent_temporal_contribution * agent_episodic_rewards#.unsqueeze(1)
-						# rewards = agent_temporal_rewards
-
-						# print("agent_episodic_contribution")
-						# print(agent_episodic_contribution)
-						# print("agent_temporal_contribution")
-						# print(agent_temporal_contribution)
-
-
-						# CURRENT WORK 
-						# b, t, n_a = logprobs_batch.shape
-						# # we don't learn to predict the first action in the sequence so we assume that importance sampling for it is 1
-						# gen_policy_probs = Categorical(F.softmax(action_prediction, dim=-1).transpose(1, 2))
-						# gen_policy_logprobs = gen_policy_probs.log_prob(actions_batch.to(self.device))
-						# importance_sampling = torch.cat([torch.ones(b, 1, n_a).to(self.device), torch.exp((logprobs_batch[:, 1:, :].to(self.device) - gen_policy_logprobs[:, :-1, :].to(self.device)))], dim=1) * agent_masks_batch.to(self.device)
-
-						# print(rewards.shape, importance_sampling.shape)
-						# rewards = rewards * importance_sampling
-
-						print("rewards")
-						print(rewards[0])
-						
-						# rewards = rewards.transpose(1, 2).cpu() * temporal_weights_final
-
-					
-					if self.experiment_type == "ATRR_temporal":
-						rewards = rewards.unsqueeze(-1).repeat(1, 1, self.num_agents)
-
-					if self.experiment_type == "ATRR_temporal_v2":
-						mask_value = torch.tensor(torch.finfo(torch.float).min, dtype=torch.float)
-						# void weightage to timesteps after multi-agent system death
-						temporal_weightage = F.softmax(torch.where(team_mask_batch.bool().unsqueeze(-1).repeat(1, 1, self.num_agents), rewards.cpu(), mask_value), dim=-2) # batch, timesteps, num_agents
-						rewards = episodic_reward_batch.reshape(-1, 1, 1) * temporal_weightage
-
 			elif "STAS" in self.experiment_type:
 
 				with torch.no_grad():
@@ -602,27 +525,19 @@ class PPOAgent:
 			target_importance_sampling = torch.exp(target_importance_sampling)
 			target_importance_sampling = target_importance_sampling * team_mask_batch.to(self.device)
 
-			# temporal_weights = temporal_weights.cpu().mean(dim=0).sum(dim=1) / (agent_masks_batch.permute(0, 2, 1).sum(dim=1).unsqueeze(-1)+1e-5)
-			# agent_weights = agent_weights.cpu().mean(dim=0)
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 
 
-			if self.version == "agent_temporal_attn_weights":
-				b, t, _, e = ally_obs_batch.shape
-				# reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ 5e-2*(F.mse_loss(state_prediction, state_target, reduction='none') * team_mask_batch.unsqueeze(-1).to(self.device)).sum() / team_mask_batch.sum() #+ 1e-2*(self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5) #+ 1e-4 * entropy_temporal_weights + 1e-4 * entropy_agent_weights
-				reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
-				dynamic_loss = (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
-				reward_loss = reward_prediction_loss + self.dynamic_loss_coeffecient * dynamic_loss + 5e-2 * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
-				# reward_loss = torch.mean(torch.log(torch.cosh(rewards.squeeze(-1) - episodic_reward_batch.to(self.device))))
-				# reward_loss = F.huber_loss(rewards.squeeze(-1).sum(dim=-1), episodic_reward_batch.to(self.device))
+			b, t, _, e = ally_obs_batch.shape
+			reward_prediction_loss = self.dynamic_loss_coeffecient * F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
+			dynamic_loss = (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
+			if expected_importance_sampling is not None:
+				expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
 			else:
-				batch, timesteps = ally_obs_batch.shape[:2]
-				reward_loss = F.huber_loss(rewards.reshape(batch, -1).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.temporal_score_coefficient * (temporal_scores**2).sum() + self.agent_score_coefficient * (agent_scores**2).sum()
-				# weights = rewards / (episodic_reward_batch.reshape(batch, 1, 1).to(self.device)+1e-5)
-				# constraint_loss_1 = (((torch.ones((batch, timesteps)).to(self.device) - weights.sum(dim=-1))**2) * team_mask_batch.to(self.device)).sum() / team_mask_batch.to(self.device).sum()
-				# reward_loss += constraint_loss_1
-
+				expected_logprob_prediction_loss = 0.0
+			reward_loss = reward_prediction_loss + dynamic_loss + expected_logprob_prediction_loss
+			
 		elif "STAS" in self.experiment_type:
 			
 			rewards = self.reward_model(

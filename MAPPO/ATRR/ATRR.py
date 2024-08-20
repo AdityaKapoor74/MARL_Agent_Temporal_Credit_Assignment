@@ -152,15 +152,13 @@ class Time_Agent_Transformer(nn.Module):
 		self.tblocks = nn.Sequential(*tblocks)
 
 		self.dynamics_model = nn.Sequential(
-			# init_(nn.Linear(self.comp_emb*depth*2, n_actions), activate=False)
 			init_(nn.Linear(self.comp_emb*(depth+1), self.comp_emb), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, n_actions), activate=False)
 			)
 
 		self.rblocks = nn.Sequential(
-			# init_(nn.Linear(self.comp_emb*depth, 1), activate=False),
-			init_(nn.Linear(self.comp_emb*depth*2, self.comp_emb), activate=True),
+			init_(nn.Linear(self.comp_emb*depth, self.comp_emb), activate=True),
 			nn.GELU(),
 			init_(nn.Linear(self.comp_emb, 1)),
 			)
@@ -250,47 +248,20 @@ class Time_Agent_Transformer(nn.Module):
 		
 		indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.comp_emb*self.depth).long() # subtracting 1 for indexing purposes
 		all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
-		final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)#.mean(dim=1)
+		final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)
 
-
-		# this kind of relu will ensure that different neurons fire for positive and negative values of the reward -- if the episodic reward is negative set "N" neurons would fire whereas if it is positive set "N' " would fire
-		# direct reward prediction
-		# rewards = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		# returns = rewards
-		# rewards_ = rewards.detach()
-
-		# this kind of relu will ensure that different neurons fire for positive and negative values of the reward -- if the episodic reward is negative set "N" neurons would fire whereas if it is positive set "N' " would fire
-		# direct reward prediction but conditioned on final embedding
-		rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		returns = rewards
-		rewards_ = rewards.detach()
-
+		returns = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+		rewards_ = returns.detach()
+		importance_sampling = None
 		
-		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
-		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
-		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
-		# directly using importance weights
+		# # expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
+		# returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
+		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		# # use hypernet for importance sampling
 		# importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		# importance_sampling = importance_sampling.sum(dim=-1, keepdim=True)
-		# not normalizing
-		# importance_sampling = torch.exp(importance_sampling)
-		# normalizing
-		# importance_sampling = torch.where(team_masks.unsqueeze(-1).bool().to(self.device), importance_sampling, self.mask_value)
-		# importance_sampling = F.softmax(importance_sampling, dim=1)
-		# rewards_ = returns.detach() * importance_sampling.detach()
-		# use hypernet for importance sampling
-		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks).reshape(b, t)
-		rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
-
-
-		# use episodic reward and hypernet generated weights for redistribution
-		# agent_reward_contri = torch.where(agent_masks.to(self.device).bool(), rewards.detach() * importance_sampling * self.reward_hyper_net.w1.detach().reshape(b, t, n_a), -1e9)
-		# temporal_reward_contri = torch.where((agent_masks.sum(dim=-1, keepdim=True)>0).to(self.device).bool(), (rewards.detach() * importance_sampling * self.return_mix_network.w1.detach().reshape(b, t, n_a)).sum(dim=-1, keepdim=True), -1e9)
-		# temporal_contri = F.softmax(temporal_reward_contri, dim=1)
-		# agent_contri = F.softmax(agent_reward_contri, dim=-1)
-		# rewards_ = episodic_reward.reshape(b, 1, 1) * temporal_contri * agent_contri
+		# importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks).reshape(b, t)
+		# rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
 
 		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 

@@ -393,13 +393,13 @@ if __name__ == '__main__':
 	torch.set_printoptions(profile="full")
 	torch.autograd.set_detect_anomaly(True)
 
-	for i in range(1, 6):
+	for i in range(1, 2):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "ATRR_agent_temporal_attn_weights" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_ATRR_agent_temporal_attn_weights"
+		experiment_type = "ATRR_agent_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
+		experiment_name = "MAPPO_reward_prediction_wo_final_state_embedding" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -452,6 +452,7 @@ if __name__ == '__main__':
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
+				"expected_logprob_prediction_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
