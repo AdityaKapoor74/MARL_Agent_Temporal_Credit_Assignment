@@ -165,7 +165,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		# self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -261,8 +261,8 @@ class Time_Agent_Transformer(nn.Module):
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# # use hypernet for importance sampling
 		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		# importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks).reshape(b, t)
-		rewards_ = returns.detach() * importance_sampling#.unsqueeze(-1).detach()
+		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks).reshape(b, t)
+		rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
 
 		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 

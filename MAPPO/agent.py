@@ -532,11 +532,11 @@ class PPOAgent:
 			b, t, _, e = ally_obs_batch.shape
 			reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
-			# if expected_importance_sampling is not None:
-			# 	expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
-			# else:
-			# 	expected_logprob_prediction_loss = 0.0
-			reward_loss = reward_prediction_loss + dynamic_loss #+ expected_logprob_prediction_loss
+			if expected_importance_sampling is not None:
+				expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
+			else:
+				expected_logprob_prediction_loss = 0.0
+			reward_loss = reward_prediction_loss + dynamic_loss + expected_logprob_prediction_loss
 			
 		elif "STAS" in self.experiment_type:
 			
