@@ -46,7 +46,7 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 		b, n_a, t, e = all_agent_state_action.shape
 		# importance_sampling_ratio = importance_sampling_ratio.reshape(-1, self.num_agents)
 		# w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
-		w1 = self.hyper_w1(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1).transpose(1, 2).reshape(-1, e))
+		w1 = self.hyper_w1(torch.cat([all_agent_state_action, final_state_action_embedding.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1).transpose(1, 2).reshape(-1, e))
 
 		# scaling the expected importance sampling ratio
 		w1 = torch.abs(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
