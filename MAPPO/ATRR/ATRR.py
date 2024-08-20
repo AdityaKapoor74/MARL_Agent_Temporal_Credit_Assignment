@@ -42,7 +42,7 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 			# init_(nn.Linear(total_obs_dim, 1), activate=False),
 			)
 
-	def forward(self, importance_sampling_ratio, all_agent_state_action, agent_masks):
+	def forward(self, importance_sampling_ratio, all_agent_state_action, final_state_action_embedding, agent_masks):
 		b, n_a, t, e = all_agent_state_action.shape
 		# importance_sampling_ratio = importance_sampling_ratio.reshape(-1, self.num_agents)
 		# w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
