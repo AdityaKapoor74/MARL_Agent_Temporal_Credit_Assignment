@@ -42,10 +42,11 @@ class ImportanceSamplingHyperNetwork(nn.Module):
 			# init_(nn.Linear(total_obs_dim, 1), activate=False),
 			)
 
-	def forward(self, importance_sampling_ratio, all_agent_state_action, agent_masks):
+	def forward(self, importance_sampling_ratio, all_agent_state_action, final_state_action_embedding, agent_masks):
 		b, n_a, t, e = all_agent_state_action.shape
 		# importance_sampling_ratio = importance_sampling_ratio.reshape(-1, self.num_agents)
-		w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
+		# w1 = self.hyper_w1(all_agent_state_action.transpose(1, 2).reshape(-1, e))
+		w1 = self.hyper_w1(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1).transpose(1, 2).reshape(-1, e))
 
 		# scaling the expected importance sampling ratio
 		w1 = torch.abs(w1.reshape(-1, self.num_agents)) * agent_masks.reshape(-1, self.num_agents).to(all_agent_state_action.device)
@@ -165,7 +166,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
+		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth*2)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -261,7 +262,7 @@ class Time_Agent_Transformer(nn.Module):
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		# # use hypernet for importance sampling
 		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, agent_masks).reshape(b, t)
+		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x, final_x, agent_masks).reshape(b, t)
 		rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
 
 		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
