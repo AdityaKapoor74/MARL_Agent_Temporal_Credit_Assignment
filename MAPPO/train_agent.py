@@ -236,7 +236,7 @@ class MAPPO:
 
 				if self.experiment_type == "temporal_team":
 					rewards_to_send = [rewards]*self.num_agents
-				elif self.experiment_type == "episodic_team" or self.experiment_type == "uniform_team_redistribution" or "AREL" in self.experiment_type or "ATRR" in self.experiment_type or "STAS" in self.experiment_type:
+				elif self.experiment_type == "episodic_team" or self.experiment_type == "uniform_team_redistribution" or "AREL" in self.experiment_type or "TAR^2" in self.experiment_type or "STAS" in self.experiment_type:
 					episodic_team_reward = episodic_team_reward+rewards
 					if all(next_indiv_dones) or step == self.max_time_steps:
 						rewards_to_send = episodic_team_reward
@@ -340,7 +340,7 @@ class MAPPO:
 					reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 					if "AREL" in self.experiment_type:
 						reward_var_batch = 0.0
-					elif "ATRR" in self.experiment_type:
+					elif "TAR^2" in self.experiment_type:
 						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 						reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 					
@@ -349,7 +349,7 @@ class MAPPO:
 						if "AREL" in self.experiment_type:
 							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							reward_var_batch += (reward_var/self.reward_model_update_epochs)
-						elif "ATRR" in self.experiment_type:
+						elif "TAR^2" in self.experiment_type:
 							reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
@@ -370,7 +370,7 @@ class MAPPO:
 
 						if "AREL" in self.experiment_type:
 							self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
-						elif "ATRR" in self.experiment_type:
+						elif "TAR^2" in self.experiment_type:
 							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
 							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
 
@@ -393,13 +393,13 @@ if __name__ == '__main__':
 	torch.set_printoptions(profile="full")
 	torch.autograd.set_detect_anomaly(True)
 
-	for i in range(1, 2):
+	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
 		env_name = "5m_vs_6m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
-		experiment_type = "ATRR_agent_temporal" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, ATRR_temporal ~ AREL, ATRR_temporal_v2, ATRR_temporal_attn_weights, ATRR_agent, ATRR_agent_temporal_attn_weights, STAS_agent_temporal
-		experiment_name = "MAPPO_reward_prediction_w_final_state_embedding_w_ExpHypNet_IS_w_final_state_embedding" # default setting: reward prediction loss + dynamic loss
+		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -447,7 +447,7 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
-				"reward_linear_compression_dim": 64, # 16 for ATRR_agent_temporal
+				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,

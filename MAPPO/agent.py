@@ -256,9 +256,9 @@ class PPOAgent:
 					device=self.device,
 					).to(self.device)
 
-			elif "ATRR" in self.experiment_type:
-				from ATRR import ATRR
-				self.reward_model = ATRR.Time_Agent_Transformer(
+			elif "TAR^2" in self.experiment_type:
+				from TARR import TARR
+				self.reward_model = TARR.Time_Agent_Transformer(
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape,
 					action_shape=self.num_actions, 
@@ -424,7 +424,7 @@ class PPOAgent:
 						)
 
 
-			elif "ATRR" in self.experiment_type:
+			elif "TAR^2" in self.experiment_type:
 
 				with torch.no_grad():
 					returns, rewards, expected_importance_sampling, temporal_weights, agent_weights,\
@@ -492,7 +492,7 @@ class PPOAgent:
 			reward_var = torch.tensor([-1])
 			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
-		elif "ATRR" in self.experiment_type:
+		elif "TAR^2" in self.experiment_type:
 
 			with torch.no_grad():
 				b, t, n_a, _ = local_obs_batch.shape
@@ -569,7 +569,7 @@ class PPOAgent:
 
 		if "AREL" in self.experiment_type:
 			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
-		elif "ATRR" in self.experiment_type:
+		elif "TAR^2" in self.experiment_type:
 			return reward_loss.item(), reward_prediction_loss.item(), dynamic_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
 		elif "STAS" in self.experiment_type:
 			return reward_loss.item(), grad_norm_value_reward.item()
