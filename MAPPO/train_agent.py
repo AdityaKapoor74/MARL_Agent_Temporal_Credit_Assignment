@@ -397,7 +397,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob
-		env_name = "10m_vs_11m" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		env_name = "3s5z" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
 		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
@@ -428,7 +428,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
-				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
+				"max_time_steps": 100, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
