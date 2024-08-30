@@ -93,9 +93,10 @@ class Time_Agent_Transformer(nn.Module):
 
 	def __init__(
 		self,
-		# obs_shape, 
+		environment,
 		ally_obs_shape, 
 		enemy_obs_shape, 
+		obs_shape,
 		action_shape,
 		heads, 
 		depth, 
@@ -106,18 +107,17 @@ class Time_Agent_Transformer(nn.Module):
 		agent=True, 
 		dropout=0.0, 
 		wide=True,  
-		version="temporal", # temporal, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
 		linear_compression_dim=128,
 		device=None
 		):
 		super().__init__()
 
+		self.environment = environment
+
 		self.n_agents = n_agents
-		self.version = version
 		self.device = device
 		self.depth = depth
 
-		# self.obs_shape = obs_shape
 		self.action_shape = action_shape
 		self.seq_length = seq_length
 		self.comp_emb = linear_compression_dim
@@ -126,12 +126,17 @@ class Time_Agent_Transformer(nn.Module):
 		self.depth = depth
 		self.agent_attn = agent
 
-		self.ally_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
-			)
-		self.enemy_obs_compress_input = nn.Sequential(
-			init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
-			)
+		if "StarCraft" in self.environment:
+			self.ally_obs_compress_input = nn.Sequential(
+				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
+				)
+			self.enemy_obs_compress_input = nn.Sequential(
+				init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
+				)
+		elif "GFootball" in self.environment:
+			self.obs_compress_input = nn.Sequential(
+				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
+				)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
 
@@ -175,7 +180,7 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, ally_obs, enemy_obs, actions, episodic_reward, team_masks=None, agent_masks=None, logprobs=None, train=False):
+	def forward(self, ally_obs, enemy_obs, obs, actions, episodic_reward, team_masks=None, agent_masks=None, logprobs=None, train=False):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
@@ -183,20 +188,24 @@ class Time_Agent_Transformer(nn.Module):
 		"""
 		# tokens = self.token_embedding(x)
 		
-		
-		b, n_a, t, _ = ally_obs.size()
-		_, n_e, _, _ = enemy_obs.size()\
+		if "StarCraft" in self.environment:
+			b, n_a, t, _ = ally_obs.size()
+			_, n_e, _, _ = enemy_obs.size()
+			enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdim=True)
+			ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
+		elif "GFootball" in self.environment:
+			b, n_a, t, _ = obs.size()
+			obs_embedding = self.obs_compress_input(obs)
 
 		position_embedding = self.position_embedding(torch.arange(t, device=self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents, device=self.device))[None, :, None, :].expand(b, n_a, t, self.comp_emb)
-
-		enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdim=True)
-		
-		ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
-
 		action_embedding = self.action_embedding(actions.long())
 
-		x = (ally_obs_embedding+enemy_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
+		if "StarCraft" in self.environment:
+			x = (ally_obs_embedding+enemy_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
+		elif "GFootball" in self.environment:
+			x = (obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
+
 		state_action_embedding = x.clone()
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []

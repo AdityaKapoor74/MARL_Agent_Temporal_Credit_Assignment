@@ -160,13 +160,16 @@ class MAPPO:
 				mask_actions = np.array(info["avail_actions"], dtype=int)
 				ally_states = np.array(info["ally_states"])
 				enemy_states = np.array(info["enemy_states"])
-
 				global_obs = None
+			elif "GFootball" in self.environment:
+				global_obs = local_obs = self.env.reset()
+				global_obs = np.array(global_obs)
+				mask_actions = np.ones([self.num_agents, self.num_actions])
+				ally_states, enemy_states = None, None
 			else:
 				local_obs = self.env.reset()
 				global_obs = self.env.get_state()
 				mask_actions = np.ones([self.num_agents, self.num_actions])
-
 				ally_states, enemy_states = None, None
 			
 
@@ -230,6 +233,15 @@ class MAPPO:
 					indiv_rewards = rewards
 					rewards = indiv_rewards[0]
 
+				elif "GFootball" in self.environment:
+					next_ally_states, next_enemy_states = None, None
+					next_global_obs = next_local_obs
+					next_indiv_dones = next_dones
+					next_dones = all(next_indiv_dones)
+					indiv_rewards = rewards[0]*self.num_agents
+					rewards = indiv_rewards[0]
+					next_mask_actions = np.ones([self.num_agents, self.num_actions])
+				
 				
 				episode_reward += np.sum(rewards)
 				episode_indiv_rewards = [r+indiv_rewards[i] for i, r in enumerate(episode_indiv_rewards)]
@@ -252,7 +264,7 @@ class MAPPO:
 
 				if self.use_reward_model:
 					self.agents.reward_model_buffer.push(
-						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
+						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
 						)
 
 					ally_states, enemy_states = next_ally_states, next_enemy_states
@@ -292,7 +304,7 @@ class MAPPO:
 							self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
 							self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
 							self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
-						elif "Alice_and_Bob" in self.environment:
+						elif self.environment in ["Alice_and_Bob", "GFootball"]:
 							self.comet_ml.log_metric('Agents Done', dones, episode)
 						
 					break
@@ -396,8 +408,8 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ Alice_and_Bob
-		env_name = "3s5z" # 5m_vs_6m/ 10m_vs_11m/ 3s5z/ Alice_and_Bob
+		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
 		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
@@ -427,8 +439,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)
-				"max_time_steps": 100, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)
+				"max_episodes": 120000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
+				"max_time_steps": 200, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"parallel_training": False,
 				"scheduler_need": False,
@@ -436,7 +448,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 200, # 2000
+				"warm_up_period": 200, # 200
 
 
 				# REWARD MODEL
@@ -446,7 +458,7 @@ if __name__ == '__main__':
 				"reward_agent_attn": True,
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
-				"version": "agent_temporal_attn_weights", # temporal, temporal_v2, agent_temporal, temporal_attn_weights, agent_temporal_attn_weights
+				"version": "temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
 				"reward_batch_size": 64, # 128
 				"reward_lr": 5e-4,
@@ -459,8 +471,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 100, # 200
-				"reward_model_update_epochs": 200, # 400
+				"update_reward_model_freq": 100, # 100
+				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
 
 
@@ -521,7 +533,7 @@ if __name__ == '__main__':
 			dictionary["num_agents"] = env.n_agents
 			dictionary["num_enemies"] = env.n_enemies
 			dictionary["num_actions"] = env.action_space[0].n
-		else:
+		elif "Alice_and_Bob" in dictionary["environment"]:
 			sys.path.append("../../../environments/alice_and_bob/") # local
 			sys.path.append("../../environments/alice_and_bob/") # remote
 			from alice_and_bob import *
@@ -531,7 +543,136 @@ if __name__ == '__main__':
 			dictionary["local_observation_shape"] = env.obs_dim
 			dictionary["global_observation_shape"] = env.state_dim
 			dictionary["num_actions"] = env.n_action
+		elif "GFootball" in dictionary["environment"]:
+			import random
 
+			import gfootball.env as football_env
+			from gym import spaces
+			import numpy as np
+
+
+			class FootballEnv(object):
+				'''Wrapper to make Google Research Football environment compatible'''
+
+				def __init__(self, ):
+					self.scenario_name = env_name
+
+					if self.scenario_name == "academy_3_vs_1_with_keeper":
+						'''
+						num_env_steps=25000000
+						episode_length=200
+						'''
+						self.num_agents = 3
+					elif self.scenario_name in ["academy_counterattack_easy", "academy_counterattack_hard"]:
+						'''
+						num_env_steps=25000000
+						episode_length=200
+						'''
+						self.num_agents = 4
+					elif self.scenario_name == "academy_corner":
+						'''
+						num_env_steps=50000000
+						episode_length=1000
+						'''
+						self.num_agents = 10
+					elif self.scenario_name in ["academy_run_and_pass_with_keeper", "academy_run_pass_and_shoot_with_keeper"]:
+						'''
+						num_env_steps=25000000
+						episode_length=200
+						'''
+						self.num_agents = 2
+
+					self.env = football_env.create_environment(
+					  env_name=self.scenario_name,
+					  stacked=False,
+					  representation="simple115v2",
+					  rewards="scoring,checkpoints",
+					  number_of_left_players_agent_controls=self.num_agents,
+					  number_of_right_players_agent_controls=0,
+					  channel_dimensions=(96, 72),
+					  render=(False and False)
+					)
+						
+					self.max_steps = self.env.unwrapped.observation()[0]["steps_left"]
+					self.remove_redundancy = False
+					self.zero_feature = False
+					self.share_reward = True
+					self.action_space = []
+					self.observation_space = []
+					self.share_observation_space = []
+
+					if self.num_agents == 1:
+						self.action_space.append(self.env.action_space)
+						self.observation_space.append(self.env.observation_space)
+						self.share_observation_space.append(self.env.observation_space)
+					else:
+						for idx in range(self.num_agents):
+							self.action_space.append(spaces.Discrete(
+								n=self.env.action_space[idx].n
+							))
+							self.observation_space.append(spaces.Box(
+								low=self.env.observation_space.low[idx],
+								high=self.env.observation_space.high[idx],
+								shape=self.env.observation_space.shape[1:],
+								dtype=self.env.observation_space.dtype
+							))
+							self.share_observation_space.append(spaces.Box(
+								low=self.env.observation_space.low[idx],
+								high=self.env.observation_space.high[idx],
+								shape=self.env.observation_space.shape[1:],
+								dtype=self.env.observation_space.dtype
+							))
+
+
+				def reset(self):
+					obs = self.env.reset()
+					obs = self._obs_wrapper(obs)
+					return obs
+
+				def step(self, action):
+					obs, reward, done, info = self.env.step(action)
+					obs = self._obs_wrapper(obs)
+					reward = reward.reshape(self.num_agents, 1)
+					if self.share_reward:
+						global_reward = np.sum(reward)
+						reward = [[global_reward]] * self.num_agents
+
+					done = np.array([done] * self.num_agents)
+					info = self._info_wrapper(info)
+					return obs, reward, done, info
+
+				def seed(self, seed=None):
+					if seed is None:
+						random.seed(1)
+					else:
+						random.seed(seed)
+
+				def close(self):
+					self.env.close()
+
+				def _obs_wrapper(self, obs):
+					if self.num_agents == 1:
+						return obs[np.newaxis, :]
+					else:
+						return obs
+
+				def _info_wrapper(self, info):
+					state = self.env.unwrapped.observation()
+					info.update(state[0])
+					info["max_steps"] = self.max_steps
+					info["active"] = np.array([state[i]["active"] for i in range(self.num_agents)])
+					info["designated"] = np.array([state[i]["designated"] for i in range(self.num_agents)])
+					info["sticky_actions"] = np.stack([state[i]["sticky_actions"] for i in range(self.num_agents)])
+					return info
+
+
+			env = FootballEnv()
+
+			dictionary["num_agents"] = env.num_agents
+			dictionary["local_observation_shape"] = env.observation_space[0].shape[0]
+			dictionary["global_observation_shape"] = env.observation_space[0].shape[0]
+			dictionary["num_actions"] = env.action_space[0].n
+			
 
 		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()

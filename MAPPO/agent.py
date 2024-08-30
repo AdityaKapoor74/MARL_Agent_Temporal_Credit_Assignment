@@ -48,7 +48,7 @@ class PPOAgent:
 			self.enemy_observation_shape = dictionary["enemy_observation_shape"]
 
 			self.global_observation_shape = None
-		elif "Alice_and_Bob" in self.environment:
+		elif self.environment in ["Alice_and_Bob", "GFootball"]:
 			self.global_observation_shape = dictionary["global_observation_shape"]
 
 			self.ally_observation_shape = None
@@ -59,7 +59,6 @@ class PPOAgent:
 
 		# Reward Model Setup
 		self.use_reward_model = dictionary["use_reward_model"]
-		self.version = dictionary["version"]
 		self.reward_lr = dictionary["reward_lr"]
 		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
@@ -223,6 +222,7 @@ class PPOAgent:
 		
 		if self.use_reward_model:
 			self.reward_model_buffer = RewardReplayMemory(
+				environment = dictionary["environment"],
 				capacity = dictionary["replay_buffer_size"],
 				max_episode_len = self.max_time_steps,
 				num_agents = self.num_agents,
@@ -230,6 +230,7 @@ class PPOAgent:
 				ally_obs_shape=self.ally_observation_shape,
 				enemy_obs_shape=self.enemy_observation_shape,
 				local_obs_shape=self.local_observation_shape,
+				global_obs_shape=self.global_observation_shape,
 				rnn_num_layers_actor=self.rnn_num_layers_actor,
 				actor_hidden_state=self.rnn_hidden_actor,
 				action_shape = self.num_actions,
@@ -259,8 +260,10 @@ class PPOAgent:
 			elif "TAR^2" in self.experiment_type:
 				from TARR import TARR
 				self.reward_model = TARR.Time_Agent_Transformer(
+					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape,
+					obs_shape=self.global_observation_shape,
 					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
@@ -270,8 +273,7 @@ class PPOAgent:
 					n_actions=self.num_actions,
 					agent=dictionary["reward_agent_attn"], 
 					dropout=dictionary["reward_dropout"], 
-					wide=dictionary["reward_attn_net_wide"], 
-					version=dictionary["version"], 
+					wide=dictionary["reward_attn_net_wide"],
 					linear_compression_dim=dictionary["reward_linear_compression_dim"],
 					device=self.device,
 					).to(self.device)
@@ -356,7 +358,7 @@ class PPOAgent:
 			if "StarCraft" in self.environment:
 				state_allies = torch.FloatTensor(state_allies).unsqueeze(0).unsqueeze(0).to(self.device)
 				state_enemies = torch.FloatTensor(state_enemies).unsqueeze(0).unsqueeze(0).to(self.device)
-			elif "Alice_and_Bob" in self.environment:
+			elif self.environment in ["Alice_and_Bob", "GFootball"]:
 				global_obs = torch.FloatTensor(global_obs).unsqueeze(0).unsqueeze(0).to(self.device)
 			local_obs = torch.FloatTensor(local_obs).unsqueeze(0).unsqueeze(0).to(self.device)
 			actions = torch.FloatTensor(actions).unsqueeze(0).unsqueeze(0).to(self.device)
@@ -392,35 +394,45 @@ class PPOAgent:
 	def reward_model_output(self, eval_reward_model=False):
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
-			ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0)
-			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0)
-			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).float().unsqueeze(0)
-			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index]).float().unsqueeze(0)
-			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0)
-			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0)
-			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0)
-			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0)
+			if "StarCraft" in self.environment:
+				state_batch = None
+				ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
+				enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
+			elif "GFootball" in self.environment:
+				ally_state_batch, enemy_state_batch = None, None
+				state_batch = torch.from_numpy(self.buffer.global_obs[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
+			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).long().unsqueeze(0).permute(0, 2, 1).to(self.device)
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs[latest_sample_index]).float().unsqueeze(0).to(self.device)
+			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0).to(self.device)
+			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0).to(self.device)
+			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0).to(self.device)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0).to(self.device)
 		else:
-			ally_state_batch = torch.from_numpy(self.buffer.ally_states).float()
-			enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float()
-			actions_batch = torch.from_numpy(self.buffer.actions).float()
-			logprobs_batch = torch.from_numpy(self.buffer.logprobs).float()
-			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float()
-			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
-			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long()
-			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1)
+			if "StarCraft" in self.environment:	
+				state_batch = None
+				ally_state_batch = torch.from_numpy(self.buffer.ally_states).float().permute(0, 2, 1, 3).to(self.device)
+				enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float().permute(0, 2, 1, 3).to(self.device)
+			elif "GFootball" in self.environment:
+				ally_state_batch, enemy_state_batch = None, None
+				state_batch = torch.from_numpy(self.buffer.global_obs).float().permute(0, 2, 1, 3).to(self.device)
+			actions_batch = torch.from_numpy(self.buffer.actions).long().permute(0, 2, 1).to(self.device)
+			logprobs_batch = torch.from_numpy(self.buffer.logprobs).float().to(self.device)
+			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float().to(self.device)
+			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float().to(self.device)
+			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long().to(self.device)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1).to(self.device)
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights,\
 					temporal_scores, agent_scores = self.reward_model(
-						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						actions_batch.permute(0, 2, 1).to(self.device), 
-						episodic_reward_batch.to(self.device),
-						team_masks=team_mask_batch.to(self.device),
-						agent_masks=agent_masks_batch.to(self.device),
+						ally_state_batch, 
+						enemy_state_batch, 
+						actions_batch, 
+						episodic_reward_batch,
+						team_masks=team_mask_batch,
+						agent_masks=agent_masks_batch,
 						)
 
 
@@ -429,24 +441,25 @@ class PPOAgent:
 				with torch.no_grad():
 					returns, rewards, expected_importance_sampling, temporal_weights, agent_weights,\
 					temporal_scores, agent_scores, action_prediction = self.reward_model(
-						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						actions_batch.permute(0, 2, 1).to(self.device), 
-						episodic_reward_batch.to(self.device),
-						team_masks=team_mask_batch.to(self.device),
-						agent_masks=agent_masks_batch.to(self.device),
-						logprobs=logprobs_batch.to(self.device),
+						ally_state_batch, 
+						enemy_state_batch, 
+						state_batch,
+						actions_batch, 
+						episodic_reward_batch,
+						team_masks=team_mask_batch,
+						agent_masks=agent_masks_batch,
+						logprobs=logprobs_batch,
 						)
 
 			elif "STAS" in self.experiment_type:
 
 				with torch.no_grad():
 					rewards = self.reward_model( 
-						ally_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						enemy_state_batch.permute(0, 2, 1, 3).to(self.device), 
-						actions_batch.long().permute(0, 2, 1).to(self.device), 
-						episode_len_batch.long().to(self.device),
-						agent_masks_batch.to(self.device),
+						ally_state_batch, 
+						enemy_state_batch, 
+						actions_batch, 
+						episode_len_batch,
+						agent_masks_batch,
 						)
 
 					rewards = rewards.transpose(1, 2)
@@ -457,21 +470,29 @@ class PPOAgent:
 
 	def update_reward_model(self, sample):
 		# sample episodes from replay buffer
-		ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		if "StarCraft" in self.environment:
+			ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+		elif "GFootball" in self.environment:
+			global_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		# convert numpy array to tensor
-		ally_obs_batch = torch.from_numpy(ally_obs_batch).float()
-		enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float()
-		local_obs_batch = torch.from_numpy(local_obs_batch).float()
-		actions_batch = torch.from_numpy(actions_batch)
-		last_actions_batch = torch.from_numpy(last_actions_batch)
-		action_masks_batch = torch.from_numpy(action_masks_batch)
-		hidden_state_actor_batch = torch.from_numpy(hidden_state_actor_batch).float()
-		logprobs_old_batch = torch.from_numpy(logprobs_old_batch).float() 
-		reward_batch = torch.from_numpy(reward_batch).float()
-		episodic_reward_batch = reward_batch.sum(dim=1)
-		team_mask_batch = torch.from_numpy(team_mask_batch).float()
-		agent_masks_batch = torch.from_numpy(agent_masks_batch).float()
-		episode_len_batch = torch.from_numpy(episode_len_batch).long()
+		if "StarCraft" in self.environment:
+			global_obs_batch = None
+			ally_obs_batch = torch.from_numpy(ally_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
+			enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
+		else:
+			ally_obs_batch, enemy_obs_batch = None, None
+			global_obs_batch = torch.from_numpy(global_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
+		local_obs_batch = torch.from_numpy(local_obs_batch).float().to(self.device)
+		actions_batch = torch.from_numpy(actions_batch).long().permute(0, 2, 1).to(self.device)
+		last_actions_batch = torch.from_numpy(last_actions_batch).long().to(self.device)
+		action_masks_batch = torch.from_numpy(action_masks_batch).to(self.device)
+		hidden_state_actor_batch = torch.from_numpy(hidden_state_actor_batch).float().to(self.device)
+		logprobs_old_batch = torch.from_numpy(logprobs_old_batch).float() .to(self.device)
+		reward_batch = torch.from_numpy(reward_batch).float().to(self.device)
+		episodic_reward_batch = reward_batch.sum(dim=1).to(self.device)
+		team_mask_batch = torch.from_numpy(team_mask_batch).float().to(self.device)
+		agent_masks_batch = torch.from_numpy(agent_masks_batch).float().to(self.device)
+		episode_len_batch = torch.from_numpy(episode_len_batch).long().to(self.device)
 
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
@@ -480,12 +501,12 @@ class PPOAgent:
 		
 		if "AREL" in self.experiment_type:
 			rewards, temporal_weights, agent_weights, temporal_scores, agent_scores = self.reward_model(
-				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				actions_batch.permute(0, 2, 1).to(self.device), 
-				episodic_reward_batch.to(self.device),
-				team_masks=team_mask_batch.to(self.device),
-				agent_masks=agent_masks_batch.to(self.device),
+				ally_obs_batch, 
+				enemy_obs_batch, 
+				actions_batch, 
+				episodic_reward_batch,
+				team_masks=team_mask_batch,
+				agent_masks=agent_masks_batch,
 				)
 
 
@@ -498,40 +519,43 @@ class PPOAgent:
 				b, t, n_a, _ = local_obs_batch.shape
 				rnn_num_layers = hidden_state_actor_batch.shape[2]
 				dists_batch, _ = self.policy_network(
-						local_obs_batch.to(self.device).reshape(b*t, 1, n_a, -1),
-						last_actions_batch.to(self.device).reshape(b*t, 1, n_a),
-						hidden_state_actor_batch.to(self.device).reshape(b*t, 1, rnn_num_layers, n_a, -1),
-						action_masks_batch.to(self.device).reshape(b*t, 1, n_a, -1).bool(),
+						local_obs_batch.reshape(b*t, 1, n_a, -1),
+						last_actions_batch.reshape(b*t, 1, n_a),
+						hidden_state_actor_batch.reshape(b*t, 1, rnn_num_layers, n_a, -1),
+						action_masks_batch.reshape(b*t, 1, n_a, -1).bool(),
 						)
 
 				dists_batch = dists_batch.reshape(b, t, n_a, -1)
 
 				probs_batch = Categorical(dists_batch)
-				logprobs_batch = probs_batch.log_prob(actions_batch.to(self.device))
+				logprobs_batch = probs_batch.log_prob(actions_batch.transpose(-1, -2))
 			
 			returns, rewards, expected_importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
-				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				actions_batch.permute(0, 2, 1).to(self.device), 
-				episodic_reward_batch.to(self.device),
-				logprobs=logprobs_batch.to(self.device),
-				team_masks=team_mask_batch.to(self.device),
-				agent_masks=agent_masks_batch.to(self.device),
+				ally_obs_batch, 
+				enemy_obs_batch, 
+				global_obs_batch,
+				actions_batch, 
+				episodic_reward_batch,
+				logprobs=logprobs_batch,
+				team_masks=team_mask_batch,
+				agent_masks=agent_masks_batch,
 				train=True,
 				)
 
-			target_importance_sampling = (logprobs_batch.to(self.device) - logprobs_old_batch.to(self.device)) * agent_masks_batch.to(self.device)
+			target_importance_sampling = (logprobs_batch - logprobs_old_batch) * agent_masks_batch
 			target_importance_sampling = target_importance_sampling.sum(dim=-1)
 			target_importance_sampling = torch.exp(target_importance_sampling)
-			target_importance_sampling = target_importance_sampling * team_mask_batch.to(self.device)
+			target_importance_sampling = target_importance_sampling * team_mask_batch
 
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 
-
-			b, t, _, e = ally_obs_batch.shape
-			reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
-			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1).to(self.device)) * agent_masks_batch.reshape(-1).to(self.device)).sum() / (agent_masks_batch.to(self.device).sum() + 1e-5)
+			if "StarCraft" in self.environment:
+				b, t, _, e = ally_obs_batch.shape
+			elif "GFootball" in self.environment:
+				b, t, _, e = global_obs_batch.shape
+			reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 			if expected_importance_sampling is not None:
 				expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
 			else:
@@ -541,17 +565,17 @@ class PPOAgent:
 		elif "STAS" in self.experiment_type:
 			
 			rewards = self.reward_model(
-				ally_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				enemy_obs_batch.permute(0, 2, 1, 3).to(self.device), 
-				actions_batch.long().permute(0, 2, 1).to(self.device), 
-				episode_len_batch.long().to(self.device),
+				ally_obs_batch, 
+				enemy_obs_batch, 
+				actions_batch, 
+				episode_len_batch,
 				# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
-				agent_masks_batch.to(self.device),
+				agent_masks_batch,
 				)
 
-			rewards = rewards.transpose(1, 2) * agent_masks_batch.to(self.device)
+			rewards = rewards.transpose(1, 2) * agent_masks_batch
 
-			reward_loss = F.mse_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch.to(self.device))
+			reward_loss = F.mse_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()

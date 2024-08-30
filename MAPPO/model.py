@@ -216,7 +216,7 @@ class V_network(nn.Module):
 		if self.centralized:
 			if "StarCraft" in self.environment:
 				input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
-			elif "Alice_and_Bob" in self.environment:
+			elif self.environment in ["Alice_and_Bob", "GFootball"]:
 				input_dim = global_observation_input_dim+self.num_agents+self.num_actions*self.num_agents
 		else:
 			input_dim = local_observation_input_dim
@@ -269,6 +269,16 @@ class V_network(nn.Module):
 			elif "Alice_and_Bob" in self.environment:
 				batch, timesteps,  _ = global_observations.shape
 				global_observations = global_observations.unsqueeze(-2).repeat(1, 1, self.num_agents, 1)
+				one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
+				one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
+				for i in range(self.num_agents):
+					one_hot_actions[:, :, i, i, :] = torch.zeros(batch, timesteps, self.num_actions).to(self.device)
+				one_hot_actions = one_hot_actions.reshape(batch, timesteps, self.num_agents, self.num_agents*self.num_actions)
+				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+				global_observations = torch.cat([agent_ids, global_observations, one_hot_actions], dim=-1)
+				final_state_embedding = self.embedding(global_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+			elif "GFootball" in self.environment:
+				batch, timesteps, _, _ = global_observations.shape
 				one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
 				one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
 				for i in range(self.num_agents):
