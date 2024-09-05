@@ -13,14 +13,12 @@ class PPOAgent:
 
 	def __init__(
 		self, 
-		env, 
 		dictionary,
 		comet_ml,
 		):
 
 		# Environment Setup
 		self.environment = dictionary["environment"]
-		self.env = env
 		self.env_name = dictionary["env"]
 		self.num_agents = dictionary["num_agents"]
 		self.num_actions = dictionary["num_actions"]
@@ -38,7 +36,7 @@ class PPOAgent:
 		else:
 			self.device = "cpu"
 
-		self.update_ppo_agent = dictionary["update_ppo_agent"]
+		self.ppo_eps_elapse_update_freq = dictionary["ppo_eps_elapse_update_freq"]
 		self.max_time_steps = dictionary["max_time_steps"]
 
 		# Model Setup
@@ -176,7 +174,7 @@ class PPOAgent:
 		self.buffer = RolloutBuffer(
 			environment=self.environment,
 			experiment_type=self.experiment_type,
-			num_episodes=self.update_ppo_agent, 
+			num_episodes=self.ppo_eps_elapse_update_freq, 
 			max_time_steps=self.max_time_steps, 
 			num_agents=self.num_agents, 
 			num_enemies=self.num_enemies,
@@ -351,7 +349,7 @@ class PPOAgent:
 		return lr
 
 	
-	def get_values(self, local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_dones, episode):
+	def get_values(self, critic, local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_dones):
 		with torch.no_grad():
 			indiv_masks = [1-d for d in indiv_dones]
 			indiv_masks = torch.FloatTensor(indiv_masks).unsqueeze(0).unsqueeze(0).to(self.device)
@@ -364,19 +362,21 @@ class PPOAgent:
 			actions = torch.FloatTensor(actions).unsqueeze(0).unsqueeze(0).to(self.device)
 			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).to(self.device)
 			
-			Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			# Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			Value, rnn_hidden_state_v = critic(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
 				
 			return Value.squeeze(0).cpu().numpy(), rnn_hidden_state_v.cpu().numpy()
 	
 	
-	def get_action(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
+	def get_action(self, actor, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
 		with torch.no_grad():
 			state_policy = torch.FloatTensor(state_policy).unsqueeze(0).unsqueeze(1).to(self.device)
 			last_actions = torch.LongTensor(last_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			hidden_state = torch.FloatTensor(hidden_state).to(self.device)
 
-			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			# dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			dists, hidden_state = actor(state_policy, last_actions, hidden_state, mask_actions)
 
 			if greedy:
 				actions = [dist.argmax().detach().cpu().item() for dist in dists.squeeze(0).squeeze(0)]

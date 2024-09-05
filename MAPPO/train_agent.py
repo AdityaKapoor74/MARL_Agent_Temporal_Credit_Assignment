@@ -51,7 +51,7 @@ class MAPPO:
 		self.max_episodes = dictionary["max_episodes"]
 		self.max_time_steps = dictionary["max_time_steps"]
 		self.experiment_type = dictionary["experiment_type"]
-		self.update_ppo_agent = dictionary["update_ppo_agent"]
+		self.ppo_eps_elapse_update_freq = dictionary["ppo_eps_elapse_update_freq"]
 
 		# RNN HIDDEN
 		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
@@ -71,7 +71,7 @@ class MAPPO:
 			self.comet_ml.log_parameters(dictionary)
 
 
-		self.agents = PPOAgent(self.env, dictionary, self.comet_ml)
+		self.agents = PPOAgent(dictionary, self.comet_ml)
 		# self.init_critic_hidden_state(np.zeros((1, self.num_agents, 256)))
 
 		if self.save_model:
@@ -330,7 +330,7 @@ class MAPPO:
 				torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'_V_epsiode'+str(episode)+'.pt')
 				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
 
-			if self.learn and not(episode%self.update_ppo_agent) and episode != 0:
+			if self.learn and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0:
 				if self.experiment_type == "uniform_team_redistribution":
 					b, t, n_a = self.agents.buffer.rewards.shape
 					episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
@@ -410,8 +410,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
-		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -423,7 +423,7 @@ if __name__ == '__main__':
 				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 5,
-				"update_ppo_agent": 10, # update ppo agent after every update_ppo_agent episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
 				"experiment_name": experiment_name,
 				"test_num": test_num,
@@ -452,7 +452,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": True,
+				"use_reward_model": False,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
