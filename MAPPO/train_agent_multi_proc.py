@@ -63,6 +63,58 @@ class MAPPO:
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
 
 
+		# Model Setup
+		if "StarCraft" in self.environment:
+			self.ally_observation_shape = dictionary["ally_observation_shape"]
+			self.num_enemies = dictionary["num_enemies"]
+			self.enemy_observation_shape = dictionary["enemy_observation_shape"]
+
+			self.global_observation_shape = None
+		elif self.environment in ["Alice_and_Bob", "GFootball"]:
+			self.global_observation_shape = dictionary["global_observation_shape"]
+
+			self.ally_observation_shape = None
+			self.num_enemies = None
+			self.enemy_observation_shape = None
+
+		self.local_observation_shape = dictionary["local_observation_shape"]
+
+		# Critic
+		self.use_recurrent_critic = dictionary["use_recurrent_critic"]
+		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
+		self.rnn_hidden_v = dictionary["rnn_hidden_v"]
+		self.v_comp_emb_shape = dictionary["v_comp_emb_shape"]
+		self.v_value_lr = dictionary["v_value_lr"]
+		self.v_weight_decay = dictionary["v_weight_decay"]
+		self.target_calc_style = dictionary["target_calc_style"]
+		self.n_steps = dictionary["n_steps"]
+		self.value_clip = dictionary["value_clip"]
+		self.enable_grad_clip_critic_v = dictionary["enable_grad_clip_critic_v"]
+		self.grad_clip_critic_v = dictionary["grad_clip_critic_v"]
+		self.norm_returns_v = dictionary["norm_returns_v"]
+		self.clamp_rewards = dictionary["clamp_rewards"]
+		self.clamp_rewards_value_min = dictionary["clamp_rewards_value_min"]
+		self.clamp_rewards_value_max = dictionary["clamp_rewards_value_max"]
+
+
+		# Actor
+		self.use_recurrent_policy = dictionary["use_recurrent_policy"]
+		self.data_chunk_length = dictionary["data_chunk_length"]
+		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
+		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
+		self.policy_lr = dictionary["policy_lr"]
+		self.policy_weight_decay = dictionary["policy_weight_decay"]
+		self.gamma = dictionary["gamma"]
+		self.entropy_pen = dictionary["entropy_pen"]
+		self.entropy_pen_decay = (dictionary["entropy_pen"] - dictionary["entropy_pen_final"])/dictionary["entropy_pen_steps"]
+		self.entropy_pen_final = dictionary["entropy_pen_final"]
+		self.gae_lambda = dictionary["gae_lambda"]
+		self.norm_adv = dictionary["norm_adv"]
+		self.policy_clip = dictionary["policy_clip"]
+		self.enable_grad_clip_actor = dictionary["enable_grad_clip_actor"]
+		self.grad_clip_actor = dictionary["grad_clip_actor"]
+
+
 		if self.use_reward_model:
 			self.reward_batch_size = dictionary["reward_batch_size"]
 			self.update_reward_model_freq = dictionary["update_reward_model_freq"]
@@ -154,12 +206,44 @@ class MAPPO:
 
 
 
-	def run_episode(self, queue, process_id, seed):
+	def run_episode(self, queue, process_id, seed, lock):
 
 		self.env[process_id].seed(seed)
 
-		actor = copy.deepcopy(self.agents.policy_network)
-		critic = copy.deepcopy(self.agents.critic_network_v)
+		from model import Policy, V_network
+
+		if dictionary["algorithm_type"] == "MAPPO":
+			centralized = True
+		else:
+			centralized = False
+
+		print("Critic network")
+		critic = V_network(
+			environment=self.environment,
+			use_recurrent_critic=self.use_recurrent_critic,
+			centralized=centralized,
+			local_observation_input_dim=self.local_observation_shape,
+			global_observation_input_dim=self.global_observation_shape,
+			ally_obs_input_dim=self.ally_observation_shape, 
+			enemy_obs_input_dim=self.enemy_observation_shape,
+			num_agents=self.num_agents, 
+			num_enemies=self.num_enemies, 
+			num_actions=self.num_actions, 
+			rnn_num_layers=self.rnn_num_layers_v,
+			comp_emb_shape=self.v_comp_emb_shape,
+			device=self.device, 
+			).to(self.device)
+
+		print("Policy network")
+		actor = Policy(
+			use_recurrent_policy=self.use_recurrent_policy,
+			obs_input_dim=self.local_observation_shape, 
+			num_agents=self.num_agents, 
+			num_actions=self.num_actions, 
+			rnn_num_layers=self.rnn_num_layers_actor,
+			rnn_hidden_actor=self.rnn_hidden_actor,
+			device=self.device
+			).to(self.device)
 
 		if "StarCraft" in self.environment:
 			local_obs, info = self.env[process_id].reset(return_info=True)
@@ -209,13 +293,24 @@ class MAPPO:
 				with torch.no_grad():
 					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(actor, local_obs, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
 			else:
+				# print("here")
+				# lock.acquire()
 				actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(actor, local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
+				# lock.release()
+				# print("I am here")
+
+				# actions = [np.random.randint(0, self.num_actions) for i in range(self.num_agents)]
+
 
 			one_hot_actions = np.zeros((self.num_agents, self.num_actions))
 			for i, act in enumerate(actions):
 				one_hot_actions[i][act] = 1
 
-			value, next_rnn_hidden_state_v = self.agents.get_values(critic, local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+			# action_logprob, next_rnn_hidden_state_actor = one_hot_actions, rnn_hidden_state_actor
+
+			# value, next_rnn_hidden_state_v = self.agents.get_values(critic, local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+
+			value, next_rnn_hidden_state_v = -1, rnn_hidden_state_v
 
 			next_local_obs, rewards, next_dones, info = self.env[process_id].step(actions)
 			next_local_obs = np.array(next_local_obs)
@@ -308,7 +403,8 @@ class MAPPO:
 			for process_id in range(num_processes):
 				print("STARTED PROCESS ID", process_id)
 				seed = np.random.randint(1000) # Random seed for each agent
-				p = mp.Process(target=self.run_episode, args=(queue, process_id, seed))
+				lock = mp.Lock()
+				p = mp.Process(target=self.run_episode, args=(queue, process_id, seed, lock))
 				processes.append(p)
 				p.daemon = True  # if the main process crashes, we should not cause things to hang
 				p.start()

@@ -349,7 +349,7 @@ class PPOAgent:
 		return lr
 
 	
-	def get_values(self, critic, local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_dones):
+	def get_values(self, local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_dones):
 		with torch.no_grad():
 			indiv_masks = [1-d for d in indiv_dones]
 			indiv_masks = torch.FloatTensor(indiv_masks).unsqueeze(0).unsqueeze(0).to(self.device)
@@ -362,21 +362,21 @@ class PPOAgent:
 			actions = torch.FloatTensor(actions).unsqueeze(0).unsqueeze(0).to(self.device)
 			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).to(self.device)
 			
-			# Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
-			Value, rnn_hidden_state_v = critic(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			# Value, rnn_hidden_state_v = critic(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
 				
 			return Value.squeeze(0).cpu().numpy(), rnn_hidden_state_v.cpu().numpy()
 	
 	
-	def get_action(self, actor, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
+	def get_action(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
 		with torch.no_grad():
 			state_policy = torch.FloatTensor(state_policy).unsqueeze(0).unsqueeze(1).to(self.device)
 			last_actions = torch.LongTensor(last_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			hidden_state = torch.FloatTensor(hidden_state).to(self.device)
 
-			# dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
-			dists, hidden_state = actor(state_policy, last_actions, hidden_state, mask_actions)
+			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			# dists, hidden_state = actor(state_policy, last_actions, hidden_state, mask_actions)
 
 			if greedy:
 				actions = [dist.argmax().detach().cpu().item() for dist in dists.squeeze(0).squeeze(0)]

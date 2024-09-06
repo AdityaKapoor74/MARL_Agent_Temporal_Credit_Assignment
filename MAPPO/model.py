@@ -165,9 +165,12 @@ class Policy(nn.Module):
 	def forward(self, local_observations, last_actions, hidden_state, mask_actions):
 
 		batch, timesteps, _, _ = local_observations.shape
+		print("1")
 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
 		last_action_embedding = self.action_embedding(last_actions.long())
+		print("2")
 		obs_embedding = self.obs_embedding(local_observations)
+		print("3")
 		final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
 
 		if self.use_recurrent_policy:
