@@ -207,7 +207,7 @@ class MAPPO:
 				for i, act in enumerate(actions):
 					one_hot_actions[i][act] = 1
 
-				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
+				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 				
 				next_local_obs, rewards, next_dones, info = self.env.step(actions)
 				next_local_obs = np.array(next_local_obs)
@@ -281,7 +281,7 @@ class MAPPO:
 						# add final time to buffer
 						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 					
-						value, _ = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones, episode)
+						value, _ = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 						
 						self.agents.buffer.end_episode(final_timestep, value, indiv_dones, dones)
 
