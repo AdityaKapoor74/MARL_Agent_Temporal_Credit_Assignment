@@ -238,6 +238,7 @@ def shareworker(remote, parent_remote, env_fn_wrapper, environment_name):
 				remote.close()
 				break
 			elif cmd == 'get_spaces':
+				print(type(remote))
 				remote.send(
 					(env.observation_space, env.action_space))
 			elif cmd == 'render_vulnerability':
