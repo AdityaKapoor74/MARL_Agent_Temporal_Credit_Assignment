@@ -430,7 +430,7 @@ class PPOAgent:
 				global_obs = torch.FloatTensor(global_obs).unsqueeze(1).to(self.device)
 			local_obs = torch.FloatTensor(local_obs).unsqueeze(1).to(self.device)
 			actions = torch.FloatTensor(actions).unsqueeze(1).to(self.device)
-			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).permute(1, 0, 2, 3).reshape(num_layers, num_workers*num_agents, hidden_dim)
+			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).permute(1, 0, 2, 3).reshape(num_layers, num_workers*num_agents, hidden_dim).to(self.device)
 			Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
 			return Value.cpu().numpy(), rnn_hidden_state_v.reshape(num_layers, num_workers, num_agents, hidden_dim).permute(1, 0, 2, 3).cpu().numpy()
 	

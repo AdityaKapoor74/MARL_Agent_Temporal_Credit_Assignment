@@ -27,6 +27,7 @@ class MAPPO:
 			self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 		else:
 			self.device = "cpu"
+		print(env)
 		self.env = ShareSubprocVecEnv(env, truncation_steps=dictionary["max_time_steps"], environment_name=dictionary["environment"])
 		self.environment = dictionary["environment"]
 		self.gif = dictionary["gif"]
