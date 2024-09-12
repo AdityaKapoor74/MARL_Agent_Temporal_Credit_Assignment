@@ -318,7 +318,6 @@ class ShareSubprocVecEnv(ShareVecEnv):
 		self.num_steps *= done_mask  # making num_steps = 0 for processes whose episodes are terminated.
 		combined_info = {}
 		for i, info in enumerate(infos):
-			print("i", i)
 			combined_info = self._add_info(combined_info, info, i)
 		return np.stack(obs), np.stack(rews), np.stack(dones), combined_info
 
