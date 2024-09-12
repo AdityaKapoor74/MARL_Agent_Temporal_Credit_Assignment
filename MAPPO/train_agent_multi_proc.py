@@ -410,13 +410,14 @@ class MAPPO:
 					assert info["did_reset"][worker_index]
 					self.num_episodes_done += 1
 					step = self.worker_step_counter[worker_index]
-					print(f"Worker {worker_index} done!")
+					# print(f"Worker {worker_index} done!")
 					if "_num_allies" in info: assert info["_num_allies"][worker_index] == False 
 					if "_num_enemies" in info: assert info["_num_enemies"][worker_index] == False 
 					print("*"*100)
 					print(
-						"EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(
+						"EPISODE: {} | BUFFER EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(
 							self.num_episodes_done,
+							np.max(self.agents.buffer.worker_episode_counter)+1,
 							np.round(episode_reward[worker_index], decimals=4),
 							step,
 							self.max_time_steps,
@@ -611,8 +612,8 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
-		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
+		environment = "StarCraft" # StarCraft/ Alice_and_Bob/ GFootball
+		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
 		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
@@ -627,8 +628,8 @@ if __name__ == '__main__':
 				"reward_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_network/',
 				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"n_epochs": 15,
-				"ppo_eps_elapse_update_freq": 50, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+				"n_epochs": 5,
+				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
 				"experiment_name": experiment_name,
 				"test_num": test_num,
@@ -644,8 +645,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 120000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
+				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -697,7 +698,7 @@ if __name__ == '__main__':
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
 				"grad_clip_critic_v": 0.5,
-				"value_clip": 0.05,
+				"value_clip": 0.2,
 				"enable_hard_attention": False,
 				"target_calc_style": "GAE", # GAE, N_steps
 				"n_steps": 5,
@@ -714,7 +715,7 @@ if __name__ == '__main__':
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
-				"policy_clip": 0.05,
+				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1e-2, #8e-3

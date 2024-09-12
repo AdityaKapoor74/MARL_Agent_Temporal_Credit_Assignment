@@ -226,9 +226,9 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		masks=None,
 		):
 
-		print("From reward push buffer")
-		print(f"Episode_counter: {self.worker_episode_counter}")
-		print(f"Timesteps: {self.time_steps}")
+		# print("From reward push buffer")
+		# print(f"Episode_counter: {self.worker_episode_counter}")
+		# print(f"Timesteps: {self.time_steps}")
 
 		assert states.shape[0] == self.num_workers
 		assert one_hot_actions.shape[0] == self.num_workers
@@ -257,7 +257,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 
 			if self.time_steps[worker_index] < self.max_time_steps-1:
 				self.time_steps[worker_index] += 1
-		print("")
+		# print("")
 
 
 	def end_episode(self, worker_indices):
@@ -270,11 +270,11 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 
 			self.time_steps[worker_index] = 0
 
-			print("From episode end reward buffer")
-			print(f"Ending episode for worker {worker_index}")
-			print(f"Episodes {self.worker_episode_counter}")
-			print(f"Time Steps: {self.time_steps}")
-			print("")
+			# print("From episode end reward buffer")
+			# print(f"Ending episode for worker {worker_index}")
+			# print(f"Episodes {self.worker_episode_counter}")
+			# print(f"Time Steps: {self.time_steps}")
+			# print("")
 
 
 	def sample_reward_model(self, num_episodes):
@@ -719,19 +719,19 @@ class RolloutBufferShared(RolloutBuffer):
 		assert indiv_dones.shape[0] == self.num_workers 
 		assert team_dones.shape[0] == self.num_workers 
 		
-		print("From push buffer")
-		print(f"Episode_counter: {self.worker_episode_counter}")
-		print(f"Timesteps: {self.time_steps}")
+		# print("From push buffer")
+		# print(f"Episode_counter: {self.worker_episode_counter}")
+		# print(f"Timesteps: {self.time_steps}")
 		for worker_index in range(self.num_workers):
 			if type(masks) == np.ndarray:  # the masks array indicates whether the current worker's data should be ignored
 				if masks[worker_index]:
-					print(f"Skipping worker {worker_index} since it is masked.")
+					# print(f"Skipping worker {worker_index} since it is masked.")
 					continue
 			episode_num = self.worker_episode_counter[worker_index]
 			time_step = self.time_steps[worker_index]
 
 			if episode_num >= self.num_episodes:
-				print(f"skipping worker {worker_index} since it has collected more than needed")
+				# print(f"skipping worker {worker_index} since it has collected more than needed")
 				# the workers that have collected all required episodes for this update should not store anything more
 				continue
 
@@ -740,33 +740,33 @@ class RolloutBufferShared(RolloutBuffer):
 				assert masks == None
 				# because of the above skip, after updation completes, it might be the case that the workers are somewhere in the middle of an ongoing episode
 				# so we will just do nothing till that episode completes. After it completes, storing would resume.
-				print(f"skipping worker {worker_index} till it resets")
+				# print(f"skipping worker {worker_index} till it resets")
 				continue
 		
 			if "StarCraft" in self.environment:
-				self.ally_states[self.episode_num][self.time_step] = ally_states[worker_index]
-				self.enemy_states[self.episode_num][self.time_step] = enemy_states[worker_index]
+				self.ally_states[episode_num][time_step] = ally_states[worker_index]
+				self.enemy_states[episode_num][time_step] = enemy_states[worker_index]
 			elif self.environment in ["Alice_and_Bob", "GFootball"]:
-				self.global_obs[self.episode_num][self.time_step] = global_obs[worker_index]
+				self.global_obs[episode_num][time_step] = global_obs[worker_index]
 
-			self.V_values[self.episode_num][self.time_step] = value[worker_index]
-			self.hidden_state_v[self.episode_num][self.time_step] = hidden_state_v[worker_index]
+			self.V_values[episode_num][time_step] = value[worker_index]
+			self.hidden_state_v[episode_num][time_step] = hidden_state_v[worker_index]
 			
-			self.local_obs[self.episode_num][self.time_step] = local_obs[worker_index]
-			self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor[worker_index]
-			self.logprobs[self.episode_num][self.time_step] = logprobs[worker_index]
-			self.actions[self.episode_num][self.time_step] = actions[worker_index]
-			self.one_hot_actions[self.episode_num][self.time_step] = one_hot_actions[worker_index]
-			self.action_masks[self.episode_num][self.time_step] = action_masks[worker_index]
-			self.rewards[self.episode_num][self.time_step] = rewards[worker_index]
-			self.indiv_dones[self.episode_num][self.time_step] = indiv_dones[worker_index]
-			self.team_dones[self.episode_num][self.time_step] = team_dones[worker_index]
+			self.local_obs[episode_num][time_step] = local_obs[worker_index]
+			self.hidden_state_actor[episode_num][time_step] = hidden_state_actor[worker_index]
+			self.logprobs[episode_num][time_step] = logprobs[worker_index]
+			self.actions[episode_num][time_step] = actions[worker_index]
+			self.one_hot_actions[episode_num][time_step] = one_hot_actions[worker_index]
+			self.action_masks[episode_num][time_step] = action_masks[worker_index]
+			self.rewards[episode_num][time_step] = rewards[worker_index]
+			self.indiv_dones[episode_num][time_step] = indiv_dones[worker_index]
+			self.team_dones[episode_num][time_step] = team_dones[worker_index]
 
-			print(f"Filled for {worker_index}")
-			if self.time_steps[worker_index] < self.max_time_steps-1:
+			# print(f"Filled for {worker_index}")
+			if time_step < self.max_time_steps-1:
 				self.time_steps[worker_index] += 1
 
-		print("")
+		# print("")
 
 
 	def end_episode(
@@ -799,8 +799,8 @@ class RolloutBufferShared(RolloutBuffer):
 			self.episode_num += 1
 			self.time_steps[worker_index] = 0
 			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
-			print("From episode end buffer")
-			print(f"Ending episode for worker {worker_index}")
-			print(f"Episodes {self.worker_episode_counter}")
-			print(f"Time Steps: {self.time_steps}")
-			print("")
+			# print("From episode end buffer")
+			# print(f"Ending episode for worker {worker_index}")
+			# print(f"Episodes {self.worker_episode_counter}")
+			# print(f"Time Steps: {self.time_steps}")
+			# print("")

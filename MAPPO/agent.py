@@ -478,8 +478,7 @@ class PPOAgent:
 	
 	def should_update_agent(self, episode):
 		assert self.parallel_training, "Please call this method only while doing parallel training"
-		return (True if (self.buffer.episodes_completely_filled >= self.ppo_eps_elapse_update_freq and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0) else False)
-
+		return (True if (self.buffer.episodes_completely_filled >= self.buffer.episodes_completely_filled and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0) else False)
 
 
 	def reward_model_output(self, eval_reward_model=False):
@@ -721,7 +720,6 @@ class PPOAgent:
 			# SAMPLE DATA FROM BUFFER
 			ally_states, enemy_states, hidden_state_v, global_obs, local_obs, hidden_state_actor, logprobs_old, \
 			last_actions, actions, action_masks, agent_masks, team_masks, values_old, target_values, advantage  = self.buffer.sample_recurrent_policy()
-
 			
 			if self.norm_adv:
 				shape = advantage.shape
