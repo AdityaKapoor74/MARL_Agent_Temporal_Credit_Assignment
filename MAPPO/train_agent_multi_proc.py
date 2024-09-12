@@ -104,10 +104,24 @@ class MAPPO:
 				print("Actor Directory created successfully") 
 			except OSError as error: 
 				print("Actor Directory can not be created")
+			optim_dir = dictionary["optim_dir"]
+			try: 
+				os.makedirs(optim_dir, exist_ok = True) 
+				print("Optim Directory created successfully") 
+			except OSError as error: 
+				print("Optim Directory can not be created") 
+			reward_dir = dictionary["reward_dir"]
+			try: 
+				os.makedirs(reward_dir, exist_ok = True) 
+				print("Reward Directory created successfully") 
+			except OSError as error: 
+				print("Reward Directory can not be created") 
 
 			
 			self.critic_model_path = critic_dir+"critic"
 			self.actor_model_path = actor_dir+"actor"
+			self.optim_model_path = optim_dir+"optim"
+			self.reward_model_path = reward_dir+"reward"
 			
 
 		if self.gif:
@@ -491,14 +505,14 @@ class MAPPO:
 
 					if not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0 and self.save_model:	
 						# save actor, critic, reward and optims
-						torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'critic_V_epsiode_'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'actor_epsiode_'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.v_critic_optimizer.state_dict(), self.optim_model_path+'critic_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'policy_optim_epsiode_'+str(self.num_episodes_done)+'.pt')  
+						torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'_V_epsiode'+str(episode)+'.pt')
+						torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
+						torch.save(self.agents.v_critic_optimizer.state_dict(), self.optim_model_path+'_critic_epsiode_'+str(self.num_episodes_done)+'.pt')
+						torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'_policy_epsiode_'+str(self.num_episodes_done)+'.pt')  
 
 						if self.use_reward_model:
-							torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'reward_model_epsiode_'+str(self.num_episodes_done)+'.pt')
-							torch.save(self.agents.reward_optimizer.state_dict(), self.reward_model_path+'reward_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
+							torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'_epsiode_'+str(self.num_episodes_done)+'.pt')
+							torch.save(self.agents.reward_optimizer.state_dict(), self.optim_model_path+'_reward_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
 			
 
 					# update agent
@@ -609,6 +623,8 @@ if __name__ == '__main__':
 				"device": "gpu",
 				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+				"optim_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizers/',
+				"reward_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_network/',
 				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 5,
@@ -623,6 +639,7 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
+				"optim_model_path": 
 				"eval_policy": True,
 				"save_model": True,
 				"save_model_checkpoint": 1000,
