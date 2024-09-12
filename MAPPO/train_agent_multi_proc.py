@@ -566,7 +566,7 @@ class MAPPO:
 									self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
 								
 
-					if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
+					if self.eval_policy and not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0:
 						np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
 						np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
 						np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
