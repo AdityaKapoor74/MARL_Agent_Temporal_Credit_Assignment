@@ -491,9 +491,9 @@ class MAPPO:
 
 					if not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0 and self.save_model:	
 						# save actor, critic, reward and optims
-						torch.save(self.agents.critic_network_q.state_dict(), self.critic_model_path+'critic_Q_epsiode_'+str(self.num_episodes_done)+'.pt')
+						torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'critic_V_epsiode_'+str(self.num_episodes_done)+'.pt')
 						torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'actor_epsiode_'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.q_critic_optimizer.state_dict(), self.optim_model_path+'critic_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
+						torch.save(self.agents.v_critic_optimizer.state_dict(), self.optim_model_path+'critic_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
 						torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'policy_optim_epsiode_'+str(self.num_episodes_done)+'.pt')  
 
 						if self.use_reward_model:
