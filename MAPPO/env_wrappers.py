@@ -439,8 +439,6 @@ class ShareSubprocVecEnv(ShareVecEnv):
 				else:
 					array = vector_infos[key]
 
-
-				# print(key, array.shape, np.array(value).shape)
 				# Assign the data in the `env_num` position
 				#   We only want to run this for the base-case data (not recursive data forcing the ugly function structure)
 				if "__" in key: # we are saving the entire batch (self.num_workers, data dim) in additional_info so after every info dict update capture data neatly
