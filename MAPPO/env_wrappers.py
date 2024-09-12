@@ -5,6 +5,10 @@ import numpy as np
 import torch
 from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
+from enum import Enum
+from gym.error import AlreadyPendingCallError, ClosedEnvironmentError, CustomSpaceError, NoAsyncCallError
+from typing import Any, Dict
+import warnings
 
 
 def tile_images(img_nhwc):
@@ -27,6 +31,10 @@ def tile_images(img_nhwc):
 	img_Hh_Ww_c = img_HhWwc.reshape(H*h, W*w, c)
 	return img_Hh_Ww_c
 
+class AsyncState(Enum):
+	DEFAULT = "default"
+	WAITING_RESET = "reset"
+	WAITING_STEP = "step"
 
 class CloudpickleWrapper(object):
 	"""
@@ -59,14 +67,14 @@ class ShareVecEnv(ABC):
 		'render.modes': ['human', 'rgb_array']
 	}
 
-	def __init__(self, num_envs, observation_space, share_observation_space, action_space):
+	def __init__(self, num_envs, observation_space, action_space):
 		self.num_envs = num_envs
-		self.observation_space = observation_space
-		self.share_observation_space = share_observation_space
-		self.action_space = action_space
+		self.observation_space = observation_space  # observation space of the individual env
+		self.action_space = action_space  # action space of the individual env
+		self._state = AsyncState.DEFAULT
 
 	@abstractmethod
-	def reset(self):
+	def reset_async(self, seed=None, return_info=False, options=None):
 		"""
 		Reset all the environments and return an array of
 		observations, or a dict of observation arrays.
@@ -76,9 +84,13 @@ class ShareVecEnv(ABC):
 		until step_async() is invoked again.
 		"""
 		pass
+	
+	@abstractmethod
+	def reset_wait():
+		pass
 
 	@abstractmethod
-	def step_async(self, actions):
+	def step_async(self, actions, additional_info=None):
 		"""
 		Tell all the environments to start taking a step
 		with the given actions.
@@ -118,14 +130,18 @@ class ShareVecEnv(ABC):
 		self.close_extras()
 		self.closed = True
 
-	def step(self, actions):
+	def step(self, actions, additional_info):
 		"""
 		Step the environments synchronously.
 
 		This is available for backwards compatibility.
 		"""
-		self.step_async(actions)
+		self.step_async(actions, additional_info)
 		return self.step_wait()
+	
+	def reset(self, seed=None, return_info=False, options=None):
+		self.reset_async(seed=seed, return_info=return_info, options=options)
+		return self.reset_wait()
 
 	def render(self, mode='human'):
 		imgs = self.get_images()
@@ -146,10 +162,7 @@ class ShareVecEnv(ABC):
 
 	@property
 	def unwrapped(self):
-		if isinstance(self, VecEnvWrapper):
-			return self.venv.unwrapped
-		else:
-			return self
+		return self
 
 	def get_viewer(self):
 		if self.viewer is None:
@@ -158,209 +171,84 @@ class ShareVecEnv(ABC):
 		return self.viewer
 
 
-def worker(remote, parent_remote, env_fn_wrapper):
-	parent_remote.close()
-	env = env_fn_wrapper.x()
-	while True:
-		cmd, data = remote.recv()
-		if cmd == 'step':
-			ob, reward, done, info = env.step(data)
-			if 'bool' in done.__class__.__name__:
-				if done:
-					ob = env.reset()
+def shareworker(remote, parent_remote, env_fn_wrapper, environment_name):
+	with warnings.catch_warnings():  # ignoring Gym API deprecation warnings
+		warnings.simplefilter("ignore")
+		parent_remote.close()
+		env = env_fn_wrapper.x()
+		while True:
+			cmd, data = remote.recv()
+			if cmd == 'step':
+				data, should_truncate, additional_info = data
+				ob, reward, done, info = env.step(data)
+				info["did_reset"] = False
+				if done or should_truncate:
+					if environment_name == "GFootball":
+						next_ob = env.reset()
+						next_info = {
+							"__global_obs": additional_info["__global_obs"],
+							"__last_actions": additional_info["__last_actions"],
+							"__rnn_hidden_state_actor": additional_info["__rnn_hidden_state_actor"],
+							"__mask_actions": additional_info["__mask_actions"],
+							"__actions": additional_info["__actions"],
+							"__rnn_hidden_state_v": additional_info["__rnn_hidden_state_v"],
+							}
+					elif environment_name == "StarCraft":
+						next_ob, next_info = env.reset(return_info=True)
+						next_info["__last_actions"] = additional_info["__last_actions"]
+						next_info["__rnn_hidden_state_actor"] = additional_info["__rnn_hidden_state_actor"]
+						next_info["__actions"] = additional_info["__actions"]
+						next_info["__rnn_hidden_state_v"] = additional_info["__rnn_hidden_state_v"]
+					
+
+					next_info["last_obs"] = ob
+					next_info["last_info"] = info
+					next_info["did_reset"] = True
+					ob = next_ob
+					info = next_info
+				remote.send((ob, reward, done, info))
+			elif cmd == 'reset':
+				assert type(data) == dict
+				seed = data["seed"] if "seed" in data.keys() else None
+				return_info = data["return_info"] if "return_info" in data.keys() else False
+				options = data["options"] if "options" in data.keys() else None
+				if return_info:
+					if environment_name == "GFootball":
+						ob = env.reset()
+						info = {}
+						info["did_reset"] = True
+					elif environment_name == "StarCraft":
+						ob, info = env.reset(seed=seed, return_info=return_info, options=options)
+						info["did_reset"] = True
+				else:
+					if environment_name == "GFootball":
+						ob = env.reset()
+					elif environment_name == "StarCraft":
+						ob = env.reset(seed=seed, return_info=return_info, options=options)
+					info = None
+				remote.send((ob, info))
+			elif cmd == 'render':
+				if data == "rgb_array":
+					fr = env.render(mode=data)
+					remote.send(fr)
+				elif data == "human":
+					env.render(mode=data)
+			elif cmd == 'close':
+				env.close()
+				remote.close()
+				break
+			elif cmd == 'get_spaces':
+				remote.send(
+					(env.observation_space, env.action_space))
+			elif cmd == 'render_vulnerability':
+				fr = env.render_vulnerability(data)
+				remote.send((fr))
 			else:
-				if np.all(done):
-					ob = env.reset()
-
-			remote.send((ob, reward, done, info))
-		elif cmd == 'reset':
-			ob = env.reset()
-			remote.send((ob))
-		elif cmd == 'render':
-			if data == "rgb_array":
-				fr = env.render(mode=data)
-				remote.send(fr)
-			elif data == "human":
-				env.render(mode=data)
-		elif cmd == 'reset_task':
-			ob = env.reset_task()
-			remote.send(ob)
-		elif cmd == 'close':
-			env.close()
-			remote.close()
-			break
-		elif cmd == 'get_spaces':
-			remote.send((env.observation_space, env.share_observation_space, env.action_space))
-		else:
-			raise NotImplementedError
-
-
-class GuardSubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
-		"""
-		envs: list of gym environments to run in subprocesses
-		"""
-		self.waiting = False
-		self.closed = False
-		nenvs = len(env_fns)
-		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-		for p in self.ps:
-			p.daemon = False  # could cause zombie process
-			p.start()
-		for remote in self.work_remotes:
-			remote.close()
-
-		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv()
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
-
-	def step_async(self, actions):
-
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, rews, dones, infos = zip(*results)
-		return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-	def reset(self):
-		for remote in self.remotes:
-			remote.send(('reset', None))
-		obs = [remote.recv() for remote in self.remotes]
-		return np.stack(obs)
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-
-class SubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
-		"""
-		envs: list of gym environments to run in subprocesses
-		"""
-		self.waiting = False
-		self.closed = False
-		nenvs = len(env_fns)
-		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=worker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-		for p in self.ps:
-			p.daemon = True  # if the main process crashes, we should not cause things to hang
-			p.start()
-		for remote in self.work_remotes:
-			remote.close()
-
-		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv()
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
-
-	def step_async(self, actions):
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, rews, dones, infos = zip(*results)
-		return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-	def reset(self):
-		for remote in self.remotes:
-			remote.send(('reset', None))
-		obs = [remote.recv() for remote in self.remotes]
-		return np.stack(obs)
-
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-	def render(self, mode="rgb_array"):
-		for remote in self.remotes:
-			remote.send(('render', mode))
-		if mode == "rgb_array":   
-			frame = [remote.recv() for remote in self.remotes]
-			return np.stack(frame) 
-
-
-def shareworker(remote, parent_remote, env_fn_wrapper):
-	parent_remote.close()
-	env = env_fn_wrapper.x()
-	while True:
-		cmd, data = remote.recv()
-		if cmd == 'step':
-			ob, s_ob, reward, done, info, available_actions = env.step(data)
-			if 'bool' in done.__class__.__name__:
-				if done:
-					ob, s_ob, available_actions = env.reset()
-			else:
-				if np.all(done):
-					ob, s_ob, available_actions = env.reset()
-
-			remote.send((ob, s_ob, reward, done, info, available_actions))
-		elif cmd == 'reset':
-			ob, s_ob, available_actions = env.reset()
-			remote.send((ob, s_ob, available_actions))
-		elif cmd == 'reset_task':
-			ob = env.reset_task()
-			remote.send(ob)
-		elif cmd == 'render':
-			if data == "rgb_array":
-				fr = env.render(mode=data)
-				remote.send(fr)
-			elif data == "human":
-				env.render(mode=data)
-		elif cmd == 'close':
-			env.close()
-			remote.close()
-			break
-		elif cmd == 'get_spaces':
-			remote.send(
-				(env.observation_space, env.share_observation_space, env.action_space))
-		elif cmd == 'render_vulnerability':
-			fr = env.render_vulnerability(data)
-			remote.send((fr))
-		else:
-			raise NotImplementedError
+				raise NotImplementedError
 
 
 class ShareSubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
+	def __init__(self, env_fns, spaces=None, truncation_steps=None, environment_name=None):
 		"""
 		envs: list of gym environments to run in subprocesses
 		"""
@@ -368,7 +256,7 @@ class ShareSubprocVecEnv(ShareVecEnv):
 		self.closed = False
 		nenvs = len(env_fns)
 		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=shareworker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
+		self.ps = [Process(target=shareworker, args=(work_remote, remote, CloudpickleWrapper(env_fn), environment_name))
 				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
 		for p in self.ps:
 			p.daemon = True  # if the main process crashes, we should not cause things to hang
@@ -376,469 +264,208 @@ class ShareSubprocVecEnv(ShareVecEnv):
 		for remote in self.work_remotes:
 			remote.close()
 		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv(
-		)
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
+		observation_space, action_space = self.remotes[0].recv()
+		self._state: AsyncState = AsyncState.DEFAULT
+		self.truncation_steps = truncation_steps
+		self.num_steps = np.zeros(nenvs, dtype=int)
 
-	def step_async(self, actions):
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, share_obs, rews, dones, infos, available_actions = zip(*results)
-		return np.stack(obs), np.stack(share_obs), np.stack(rews), np.stack(dones), infos, np.stack(available_actions)
-
-	def reset(self):
-		for remote in self.remotes:
-			remote.send(('reset', None))
-		results = [remote.recv() for remote in self.remotes]
-		obs, share_obs, available_actions = zip(*results)
-		return np.stack(obs), np.stack(share_obs), np.stack(available_actions)
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-
-def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
-	parent_remote.close()
-	env = env_fn_wrapper.x()
-	while True:
-		cmd, data = remote.recv()
-		if cmd == 'step':
-			ob, reward, done, info = env.step(data)
-			remote.send((ob, reward, done, info))
-		elif cmd == 'reset':
-			ob = env.reset(data)
-			remote.send((ob))
-		elif cmd == 'reset_task':
-			ob = env.reset_task()
-			remote.send(ob)
-		elif cmd == 'close':
-			env.close()
-			remote.close()
-			break
-		elif cmd == 'render':
-			if data == "rgb_array":
-				fr = env.render(mode=data)
-				remote.send(fr)
-			elif data == "human":
-				env.render(mode=data)
-		elif cmd == 'get_spaces':
-			remote.send(
-				(env.observation_space, env.share_observation_space, env.action_space))
-		else:
-			raise NotImplementedError
-
-
-class ChooseSimpleSubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
-		"""
-		envs: list of gym environments to run in subprocesses
-		"""
-		self.waiting = False
-		self.closed = False
-		nenvs = len(env_fns)
-		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=choosesimpleworker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-		for p in self.ps:
-			p.daemon = True  # if the main process crashes, we should not cause things to hang
-			p.start()
-		for remote in self.work_remotes:
-			remote.close()
-		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv()
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
-
-	def step_async(self, actions):
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, rews, dones, infos = zip(*results)
-		return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-	def reset(self, reset_choose):
-		for remote, choose in zip(self.remotes, reset_choose):
-			remote.send(('reset', choose))
-		obs = [remote.recv() for remote in self.remotes]
-		return np.stack(obs)
-
-	def render(self, mode="rgb_array"):
-		for remote in self.remotes:
-			remote.send(('render', mode))
-		if mode == "rgb_array":   
-			frame = [remote.recv() for remote in self.remotes]
-			return np.stack(frame)
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-
-def chooseworker(remote, parent_remote, env_fn_wrapper):
-	parent_remote.close()
-	env = env_fn_wrapper.x()
-	while True:
-		cmd, data = remote.recv()
-		if cmd == 'step':
-			ob, s_ob, reward, done, info, available_actions = env.step(data)
-			remote.send((ob, s_ob, reward, done, info, available_actions))
-		elif cmd == 'reset':
-			ob, s_ob, available_actions = env.reset(data)
-			remote.send((ob, s_ob, available_actions))
-		elif cmd == 'reset_task':
-			ob = env.reset_task()
-			remote.send(ob)
-		elif cmd == 'close':
-			env.close()
-			remote.close()
-			break
-		elif cmd == 'render':
-			remote.send(env.render(mode='rgb_array'))
-		elif cmd == 'get_spaces':
-			remote.send(
-				(env.observation_space, env.share_observation_space, env.action_space))
-		else:
-			raise NotImplementedError
-
-
-class ChooseSubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
-		"""
-		envs: list of gym environments to run in subprocesses
-		"""
-		self.waiting = False
-		self.closed = False
-		nenvs = len(env_fns)
-		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=chooseworker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-		for p in self.ps:
-			p.daemon = True  # if the main process crashes, we should not cause things to hang
-			p.start()
-		for remote in self.work_remotes:
-			remote.close()
-		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv(
-		)
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
-
-	def step_async(self, actions):
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, share_obs, rews, dones, infos, available_actions = zip(*results)
-		return np.stack(obs), np.stack(share_obs), np.stack(rews), np.stack(dones), infos, np.stack(available_actions)
-
-	def reset(self, reset_choose):
-		for remote, choose in zip(self.remotes, reset_choose):
-			remote.send(('reset', choose))
-		results = [remote.recv() for remote in self.remotes]
-		obs, share_obs, available_actions = zip(*results)
-		return np.stack(obs), np.stack(share_obs), np.stack(available_actions)
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-
-def chooseguardworker(remote, parent_remote, env_fn_wrapper):
-	parent_remote.close()
-	env = env_fn_wrapper.x()
-	while True:
-		cmd, data = remote.recv()
-		if cmd == 'step':
-			ob, reward, done, info = env.step(data)
-			remote.send((ob, reward, done, info))
-		elif cmd == 'reset':
-			ob = env.reset(data)
-			remote.send((ob))
-		elif cmd == 'reset_task':
-			ob = env.reset_task()
-			remote.send(ob)
-		elif cmd == 'close':
-			env.close()
-			remote.close()
-			break
-		elif cmd == 'get_spaces':
-			remote.send(
-				(env.observation_space, env.share_observation_space, env.action_space))
-		else:
-			raise NotImplementedError
-
-
-class ChooseGuardSubprocVecEnv(ShareVecEnv):
-	def __init__(self, env_fns, spaces=None):
-		"""
-		envs: list of gym environments to run in subprocesses
-		"""
-		self.waiting = False
-		self.closed = False
-		nenvs = len(env_fns)
-		self.remotes, self.work_remotes = zip(*[Pipe() for _ in range(nenvs)])
-		self.ps = [Process(target=chooseguardworker, args=(work_remote, remote, CloudpickleWrapper(env_fn)))
-				   for (work_remote, remote, env_fn) in zip(self.work_remotes, self.remotes, env_fns)]
-		for p in self.ps:
-			p.daemon = False  # if the main process crashes, we should not cause things to hang
-			p.start()
-		for remote in self.work_remotes:
-			remote.close()
-		self.remotes[0].send(('get_spaces', None))
-		observation_space, share_observation_space, action_space = self.remotes[0].recv(
-		)
-		ShareVecEnv.__init__(self, len(env_fns), observation_space,
-							 share_observation_space, action_space)
-
-	def step_async(self, actions):
-		for remote, action in zip(self.remotes, actions):
-			remote.send(('step', action))
-		self.waiting = True
-
-	def step_wait(self):
-		results = [remote.recv() for remote in self.remotes]
-		self.waiting = False
-		obs, rews, dones, infos = zip(*results)
-		return np.stack(obs), np.stack(rews), np.stack(dones), infos
-
-	def reset(self, reset_choose):
-		for remote, choose in zip(self.remotes, reset_choose):
-			remote.send(('reset', choose))
-		obs = [remote.recv() for remote in self.remotes]
-		return np.stack(obs)
-
-	def reset_task(self):
-		for remote in self.remotes:
-			remote.send(('reset_task', None))
-		return np.stack([remote.recv() for remote in self.remotes])
-
-	def close(self):
-		if self.closed:
-			return
-		if self.waiting:
-			for remote in self.remotes:
-				remote.recv()
-		for remote in self.remotes:
-			remote.send(('close', None))
-		for p in self.ps:
-			p.join()
-		self.closed = True
-
-
-# single env
-class DummyVecEnv(ShareVecEnv):
-	def __init__(self, env_fns):
-		# self.envs = [fn() for fn in env_fns]
-		self.envs = env_fns
-		env = self.envs[0]
-		ShareVecEnv.__init__(self, len(
-			env_fns), env.observation_space, env.share_observation_space, env.action_space)
-		self.actions = None
-
-	def step_async(self, actions):
-		self.actions = actions
-
-	def step_wait(self):
-		results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-		obs, rews, dones, infos = map(np.array, zip(*results))
-
-		for (i, done) in enumerate(dones):
-			if 'bool' in done.__class__.__name__:
-				if done:
-					obs[i] = self.envs[i].reset()
-			else:
-				if np.all(done):
-					obs[i] = self.envs[i].reset()
-
-		self.actions = None
-		return obs, rews, dones, infos
-
-	def reset(self):
-		obs = [env.reset() for env in self.envs]
-		return np.array(obs)
-
-	def close(self):
-		for env in self.envs:
-			env.close()
-
-	def render(self, mode="human"):
-		if mode == "rgb_array":
-			return np.array([env.render(mode=mode) for env in self.envs])
-		elif mode == "human":
-			for env in self.envs:
-				env.render(mode=mode)
-		else:
-			raise NotImplementedError
-
-
-
-class ShareDummyVecEnv(ShareVecEnv):
-	def __init__(self, env_fns):
-		self.envs = [fn() for fn in env_fns]
-		env = self.envs[0]
-		ShareVecEnv.__init__(self, len(
-			env_fns), env.observation_space, env.share_observation_space, env.action_space)
-		self.actions = None
-
-	def step_async(self, actions):
-		self.actions = actions
-
-	def step_wait(self):
-		results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-		obs, share_obs, rews, dones, infos, available_actions = map(
-			np.array, zip(*results))
-
-		for (i, done) in enumerate(dones):
-			if 'bool' in done.__class__.__name__:
-				if done:
-					obs[i], share_obs[i], available_actions[i] = self.envs[i].reset()
-			else:
-				if np.all(done):
-					obs[i], share_obs[i], available_actions[i] = self.envs[i].reset()
-		self.actions = None
-
-		return obs, share_obs, rews, dones, infos, available_actions
-
-	def reset(self):
-		results = [env.reset() for env in self.envs]
-		obs, share_obs, available_actions = map(np.array, zip(*results))
-		return obs, share_obs, available_actions
-
-	def close(self):
-		for env in self.envs:
-			env.close()
+		ShareVecEnv.__init__(self, len(env_fns), observation_space, action_space)
 	
-	def render(self, mode="human"):
-		if mode == "rgb_array":
-			return np.array([env.render(mode=mode) for env in self.envs])
-		elif mode == "human":
-			for env in self.envs:
-				env.render(mode=mode)
+	def _assert_is_running(self):
+		if self.closed:
+			raise ClosedEnvironmentError(
+				f"Trying to operate on `{type(self).__name__}`, after a call to `close()`."
+			)
+		
+	def _should_truncate(self, process_index):
+		if self.truncation_steps == None:
+			return False
+		if self.num_steps[process_index] == self.truncation_steps:
+			return True
 		else:
-			raise NotImplementedError
+			return False
 
-
-class ChooseDummyVecEnv(ShareVecEnv):
-	def __init__(self, env_fns):
-		self.envs = [fn() for fn in env_fns]
-		env = self.envs[0]
-		ShareVecEnv.__init__(self, len(
-			env_fns), env.observation_space, env.share_observation_space, env.action_space)
-		self.actions = None
-
-	def step_async(self, actions):
-		self.actions = actions
+	def step_async(self, actions, additional_info=None):
+		self._assert_is_running()
+		self.num_steps += 1
+		if self._state != AsyncState.DEFAULT:
+			raise AlreadyPendingCallError(
+				f"Calling `step_async` while waiting for a pending call to `{self._state.value}` to complete.",
+				self._state.value,
+			)
+		
+		for process_index, (remote, action) in enumerate(zip(self.remotes, actions)):
+			should_truncate = self._should_truncate(process_index)
+			if should_truncate:
+				self.num_steps[process_index] = 0
+			remote.send(('step', (action, should_truncate, additional_info)))
+		self.waiting = True
+		self._state = AsyncState.WAITING_STEP
 
 	def step_wait(self):
-		results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-		obs, share_obs, rews, dones, infos, available_actions = map(
-			np.array, zip(*results))
-		self.actions = None
-		return obs, share_obs, rews, dones, infos, available_actions
+		self._assert_is_running()
+		if self._state != AsyncState.WAITING_STEP:
+			raise NoAsyncCallError(
+				"Calling `step_wait` without any prior call " "to `step_async`.",
+				AsyncState.WAITING_STEP.value,
+			)
+		
+		results = [remote.recv() for remote in self.remotes]
+		self._state = AsyncState.DEFAULT
+		self.waiting = False
+		obs, rews, dones, infos = zip(*results)
+		done_mask = 1 - np.array(dones, dtype=int)
+		self.num_steps *= done_mask  # making num_steps = 0 for processes whose episodes are terminated.
+		combined_info = {}
+		for i, info in enumerate(infos):
+			print("i", i)
+			combined_info = self._add_info(combined_info, info, i)
+		return np.stack(obs), np.stack(rews), np.stack(dones), combined_info
 
-	def reset(self, reset_choose):
-		results = [env.reset(choose)
-				   for (env, choose) in zip(self.envs, reset_choose)]
-		obs, share_obs, available_actions = map(np.array, zip(*results))
-		return obs, share_obs, available_actions
+	def reset_async(self, seed=None, return_info=False, options=None):
+		self._assert_is_running()
+		if seed is None:
+			seed = [None for _ in range(self.num_envs)]
+
+		if isinstance(seed, int):
+			seed = [seed + i for i in range(self.num_envs)]
+
+		assert len(seed) == self.num_envs
+
+		if self._state != AsyncState.DEFAULT:
+			raise AlreadyPendingCallError(
+				f"Calling `reset_async` while waiting for a pending call to `{self._state.value}` to complete",
+				self._state.value,
+			)
+		for remote, single_seed in zip(self.remotes, seed):
+			data_dict = {
+				"seed": single_seed,
+				"return_info": return_info,
+				"options": options
+			}
+			remote.send(('reset', data_dict))
+		self._state = AsyncState.WAITING_RESET        
+	
+	def reset_wait(self):
+		self._assert_is_running()
+		if self._state != AsyncState.WAITING_RESET:
+			raise NoAsyncCallError(
+				"Calling `reset_wait` without any prior " "call to `reset_async`.",
+				AsyncState.WAITING_RESET.value,
+			)
+		
+		observations, infos = zip(*[pipe.recv() for pipe in self.remotes])
+		self._state = AsyncState.DEFAULT
+
+		self.num_steps = np.zeros(self.num_envs, dtype=int)
+		
+		if infos[0] is None:
+			return np.stack(observations)
+		else:
+			combined_info = {}
+			for i, info in enumerate(infos):
+				combined_info = self._add_info(combined_info, info, i)
+			return np.stack(observations), combined_info
+		
+	def _combine_infos(self, infos):
+		assert len(infos) == self.num_envs
+		combined_dict = {}
+		separate_infos = [{} for _ in range(self.num_envs)]
+		for i, info in enumerate(infos):
+			for k, v in info.items():
+				if k in ["next_obs", "next_info"]:
+					separate_infos[i][k] = v
+				else:
+					if k in combined_dict:
+						combined_dict[k].append(np.array(v) if type(v) != np.ndarray else v)
+					else:
+						combined_dict[k] = [np.array(v) if type(v) != np.ndarray else v]
+
+		return {"combined": combined_dict, "separate": separate_infos}
+	
+	def _add_info(
+		self, vector_infos: Dict[str, Any], env_info: Dict[str, Any], env_num: int
+	) -> Dict[str, Any]:
+		"""Add env info to the info dictionary of the vectorized environment.
+
+		Given the `info` of a single environment add it to the `infos` dictionary
+		which represents all the infos of the vectorized environment.
+		Every `key` of `info` is paired with a boolean mask `_key` representing
+		whether or not the i-indexed environment has this `info`.
+
+		Args:
+			vector_infos (dict): the infos of the vectorized environment
+			env_info (dict): the info coming from the single environment
+			env_num (int): the index of the single environment
+
+		Returns:
+			infos (dict): the (updated) infos of the vectorized environment
+		"""
+		for key, value in env_info.items():
+			# If value is a dictionary, then we apply the `_add_info` recursively.
+			if isinstance(value, dict):
+				array = self._add_info(vector_infos.get(key, {}), value, env_num)
+			# Otherwise, we are a base case to group the data
+			else:
+				# If the key doesn't exist in the vector infos, then we can create an array of that batch type
+				if key not in vector_infos:
+					if type(value) in [int, float, bool] or issubclass(
+						type(value), np.number
+					):
+						array = np.zeros(self.num_envs, dtype=type(value))
+					elif isinstance(value, np.ndarray):
+						# We assume that all instances of the np.array info are of the same shape
+						if "__" in key: # we are saving the entire batch (self.num_workers, data dim) in additional_info so after every info dict update capture data neatly
+							array = np.zeros(
+								(self.num_envs, *value.shape[1:]), dtype=value.dtype
+							)
+						else:
+							array = np.zeros(
+								(self.num_envs, *value.shape), dtype=value.dtype
+							)
+					elif isinstance(value, list):
+						value = np.array(value)
+						if "__" in key: # we are saving the entire batch (self.num_workers, data dim) in additional_info so after every info dict update capture data neatly
+							array = np.zeros(
+								(self.num_envs, *value.shape[1:])
+							)
+						else:
+							array = np.zeros(
+								(self.num_envs, *value.shape)
+							)
+					else:
+						# For unknown objects, we use a Numpy object array
+						array = np.full(self.num_envs, fill_value=None, dtype=object)
+				# Otherwise, just use the array that already exists
+				else:
+					array = vector_infos[key]
+
+				# Assign the data in the `env_num` position
+				#   We only want to run this for the base-case data (not recursive data forcing the ugly function structure)
+				if "__" in key: # we are saving the entire batch (self.num_workers, data dim) in additional_info so after every info dict update capture data neatly
+					array[env_num] = value[env_num]
+				else:
+					array[env_num] = value
+
+			# Get the array mask and if it doesn't already exist then create a zero bool array
+			array_mask = vector_infos.get(
+				f"_{key}", np.zeros(self.num_envs, dtype=np.bool_)
+			)
+			array_mask[env_num] = True
+
+			# Update the vector info with the updated data and mask information
+			vector_infos[key], vector_infos[f"_{key}"] = array, array_mask
+
+		return vector_infos
 
 	def close(self):
-		for env in self.envs:
-			env.close()
-
-	def render(self, mode="human"):
-		if mode == "rgb_array":
-			return np.array([env.render(mode=mode) for env in self.envs])
-		elif mode == "human":
-			for env in self.envs:
-				env.render(mode=mode)
-		else:
-			raise NotImplementedError
-
-class ChooseSimpleDummyVecEnv(ShareVecEnv):
-	def __init__(self, env_fns):
-		self.envs = [fn() for fn in env_fns]
-		env = self.envs[0]
-		ShareVecEnv.__init__(self, len(
-			env_fns), env.observation_space, env.share_observation_space, env.action_space)
-		self.actions = None
-
-	def step_async(self, actions):
-		self.actions = actions
-
-	def step_wait(self):
-		results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-		obs, rews, dones, infos = map(np.array, zip(*results))
-		self.actions = None
-		return obs, rews, dones, infos
-
-	def reset(self, reset_choose):
-		obs = [env.reset(choose)
-				   for (env, choose) in zip(self.envs, reset_choose)]
-		return np.array(obs)
-
-	def close(self):
-		for env in self.envs:
-			env.close()
-
-	def render(self, mode="human"):
-		if mode == "rgb_array":
-			return np.array([env.render(mode=mode) for env in self.envs])
-		elif mode == "human":
-			for env in self.envs:
-				env.render(mode=mode)
-		else:
-			raise NotImplementedError
+		if self.closed:
+			return
+		if self.waiting:
+			for remote in self.remotes:
+				remote.recv()
+		for remote in self.remotes:
+			remote.send(('close', None))
+		for p in self.ps:
+			p.join()
+		self.closed = True

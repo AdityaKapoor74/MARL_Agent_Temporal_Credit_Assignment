@@ -42,7 +42,7 @@ def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold
 
 
 
-class RewardReplayMemory:
+class RewardRolloutBuffer:
 	def __init__(
 		self, 
 		environment,
@@ -149,6 +149,178 @@ class RewardReplayMemory:
 
 	def __len__(self):
 		return self.length
+
+
+
+class RewardRolloutBufferShared(RewardRolloutBuffer):
+	def __init__(
+		self, 
+		num_workers, 
+		environment,
+		capacity, 
+		max_episode_len, 
+		num_agents, 
+		num_enemies,
+		ally_obs_shape,
+		enemy_obs_shape,
+		local_obs_shape,
+		global_obs_shape,
+		rnn_num_layers_actor,
+		actor_hidden_state,
+		action_shape,
+		device,
+		):
+
+		super(RewardRolloutBufferShared, self).__init__(
+			environment,
+			capacity, 
+			max_episode_len, 
+			num_agents, 
+			num_enemies,
+			ally_obs_shape,
+			enemy_obs_shape,
+			local_obs_shape,
+			global_obs_shape,
+			rnn_num_layers_actor,
+			actor_hidden_state,
+			action_shape,
+			device,
+			)
+
+		self.num_workers = num_workers
+		self.episodes_completely_filled = np.zeros(self.capacity, dtype=int)  # this will be used to identify the episodes in the buffer that are completely filled. 
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+		assert self.num_workers < self.capacity
+
+	@property
+	def next_episode_index_to_fill(self):
+		return np.max(self.worker_episode_counter) + 1
+	
+	@property
+	def episodes_filled(self):
+		return np.min(self.worker_episode_counter)
+
+
+	def clear(self):
+		super().clear()
+		self.episodes_completely_filled = np.zeros(self.capacity, dtype=int)
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+
+	def push(
+		self,
+		ally_obs, 
+		enemy_obs, 
+		local_obs, 
+		global_obs, 
+		actions, 
+		action_masks, 
+		hidden_state_actor, 
+		logprobs, 
+		reward, 
+		done, 
+		indiv_dones,
+		masks=None,
+		):
+
+		print("From reward push buffer")
+		print(f"Episode_counter: {self.worker_episode_counter}")
+		print(f"Timesteps: {self.time_steps}")
+
+		assert states.shape[0] == self.num_workers
+		assert one_hot_actions.shape[0] == self.num_workers
+		assert dones.shape[0] == self.num_workers
+		for worker_index in range(self.num_workers):
+			if type(masks) == np.ndarray:
+				if masks[worker_index]:
+					continue
+			episode_num = self.worker_episode_counter[worker_index] % self.capacity
+			self.episodes_completely_filled[episode_num] = 0
+			time_step = self.time_steps[worker_index]
+
+			if "StarCraft" in self.environment:
+				self.buffer['ally_obs'][episode_num][time_step] = ally_obs
+				self.buffer['enemy_obs'][episode_num][time_step] = enemy_obs
+			elif "GFootball" in self.environment:
+				self.buffer['global_obs'][episode_num][time_step] = global_obs
+			self.buffer['local_obs'][episode_num][time_step] = local_obs
+			self.buffer['actions'][episode_num][time_step] = actions
+			self.buffer['action_masks'][episode_num][time_step] = action_masks
+			self.buffer['hidden_state_actor'][episode_num][time_step] = hidden_state_actor
+			self.buffer['logprobs'][episode_num][time_step] = logprobs
+			self.buffer['reward'][episode_num][time_step] = reward
+			self.buffer['done'][episode_num][time_step] = done
+			self.buffer['indiv_dones'][episode_num][time_step] = indiv_dones
+
+			if self.time_steps[worker_index] < self.max_time_steps-1:
+				self.time_steps[worker_index] += 1
+		print("")
+
+
+	def end_episode(self, worker_indices):
+		for i, worker_index in enumerate(worker_indices):
+			episode_num = self.worker_episode_counter[worker_index] % self.capacity
+
+			self.episodes_completely_filled[episode_num] = 1
+
+			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
+
+			self.time_steps[worker_index] = 0
+
+			print("From episode end reward buffer")
+			print(f"Ending episode for worker {worker_index}")
+			print(f"Episodes {self.worker_episode_counter}")
+			print(f"Time Steps: {self.time_steps}")
+			print("")
+
+
+	def sample_reward_model(self, num_episodes):
+		indices = np.where(self.episodes_completely_filled == 1)[0]
+		assert indices.shape[0] >= num_episodes
+		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
+		
+		if "StarCraft" in self.environment:
+			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
+			enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
+		elif "GFootball" in self.environment:
+			global_obs_batch = np.take(self.buffer['global_obs'], batch_indices, axis=0)
+		local_obs_batch = np.take(self.buffer['local_obs'], batch_indices, axis=0)
+		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
+		action_masks_batch = np.take(self.buffer['action_masks'], batch_indices, axis=0)
+		hidden_state_actor_batch = np.take(self.buffer['hidden_state_actor'], batch_indices, axis=0)
+		logprobs_batch = np.take(self.buffer['logprobs'], batch_indices, axis=0)
+		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
+		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
+		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
+		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
+
+		first_last_actions = np.zeros((num_episodes, 1, self.num_agents), dtype=int) + self.action_shape
+		last_actions_batch = np.concatenate((first_last_actions, actions_batch[:, :-1, :]), axis=1)
+
+		if "StarCraft" in self.environment:
+			assert ally_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.ally_obs_shape)
+			assert enemy_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_enemies, self.enemy_obs_shape)
+		elif "GFootball" in self.environment:
+			assert global_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.global_obs_shape)
+		assert local_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.local_obs_shape)
+		assert action_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
+		assert logprobs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
+		assert logprobs_batch.shape == (num_episodes, self.max_episode_len)
+		assert mask_batch.shape == (num_episodes, self.max_episode_len)
+		assert agent_masks_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
+		assert hidden_state_actor_batch.shape == (num_episodes, self.max_episode_len, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state)
+		assert action_masks_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.action_shape)
+		assert episode_len_batch.shape == (num_episodes,)
+		assert last_actions_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
+
+
+		if "StarCraft" in self.environment:
+			return ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+		elif "GFootball" in self.environment:
+			return global_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 
@@ -429,3 +601,206 @@ class RolloutBuffer:
 			nstep_values[:, t_start, :] = nstep_return_t
 		
 		return nstep_values
+
+
+
+class RolloutBufferShared(RolloutBuffer):
+	def __init__(
+		self, 
+		num_workers,
+		environment,
+		experiment_type,
+		num_episodes, 
+		max_time_steps, 
+		num_agents, 
+		num_enemies,
+		ally_state_shape, 
+		enemy_state_shape, 
+		local_obs_shape, 
+		global_obs_shape,
+		rnn_num_layers_actor,
+		actor_hidden_state,
+		rnn_num_layers_v,
+		v_hidden_state,
+		num_actions, 
+		data_chunk_length,
+		norm_returns_v,
+		clamp_rewards,
+		clamp_rewards_value_min,
+		clamp_rewards_value_max,
+		target_calc_style,
+		gae_lambda,
+		n_steps,
+		gamma,
+		):
+
+		super(RolloutBufferShared, self).__init__(
+			environment,
+			experiment_type,
+			num_episodes, 
+			max_time_steps, 
+			num_agents, 
+			num_enemies,
+			ally_state_shape, 
+			enemy_state_shape, 
+			local_obs_shape, 
+			global_obs_shape,
+			rnn_num_layers_actor,
+			actor_hidden_state,
+			rnn_num_layers_v,
+			v_hidden_state,
+			num_actions, 
+			data_chunk_length,
+			norm_returns_v,
+			clamp_rewards,
+			clamp_rewards_value_min,
+			clamp_rewards_value_max,
+			target_calc_style,
+			gae_lambda,
+			n_steps,
+			gamma,
+			)
+
+		self.environment = environment
+		self.num_workers = num_workers
+		# counter for each rollout thread
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+
+	@property
+	def episodes_completely_filled(self):
+		return np.min(self.worker_episode_counter)
+
+	@property
+	def next_episode_index_to_fill(self):
+		return np.max(self.worker_episode_counter) + 1
+
+
+	def clear(self):
+		super().clear()
+		self.worker_episode_counter = np.arange(self.num_workers)
+		self.time_steps = np.zeros(self.num_workers, dtype=int)
+	
+
+	def push(
+		self, 
+		ally_states, 
+		enemy_states, 
+		value, 
+		hidden_state_v,
+		global_obs,
+		local_obs, 
+		hidden_state_actor, 
+		logprobs, 
+		actions, 
+		one_hot_actions,
+		action_masks, 
+		rewards, 
+		indiv_dones,
+		team_dones,
+		worker_step_counter,
+		masks=None,
+		):
+
+		if "StarCraft" in self.environment:
+			assert ally_states.shape[0] == self.num_workers
+			assert enemy_states.shape[0] == self.num_workers
+		if self.environment in ["Alice_and_Bob", "GFootball"]:
+			assert global_obs.shape[0] == self.num_workers
+		assert value.shape[0] == self.num_workers
+		assert hidden_state_v.shape[0] == self.num_workers
+		assert local_obs.shape[0] == self.num_workers
+		assert hidden_state_actor.shape[0] == self.num_workers
+		assert logprobs.shape[0] == self.num_workers
+		assert actions.shape[0] == self.num_workers
+		assert one_hot_actions.shape[0] == self.num_workers
+		assert action_masks.shape[0] == self.num_workers
+		assert rewards.shape[0] == self.num_workers
+		assert indiv_dones.shape[0] == self.num_workers 
+		assert team_dones.shape[0] == self.num_workers 
+		
+		print("From push buffer")
+		print(f"Episode_counter: {self.worker_episode_counter}")
+		print(f"Timesteps: {self.time_steps}")
+		for worker_index in range(self.num_workers):
+			if type(masks) == np.ndarray:  # the masks array indicates whether the current worker's data should be ignored
+				if masks[worker_index]:
+					print(f"Skipping worker {worker_index} since it is masked.")
+					continue
+			episode_num = self.worker_episode_counter[worker_index]
+			time_step = self.time_steps[worker_index]
+
+			if episode_num >= self.num_episodes:
+				print(f"skipping worker {worker_index} since it has collected more than needed")
+				# the workers that have collected all required episodes for this update should not store anything more
+				continue
+
+			# the below condition might hold only when running train_parallel_agent_async.py 
+			if time_step == 0 and worker_step_counter[worker_index] != 1:
+				assert masks == None
+				# because of the above skip, after updation completes, it might be the case that the workers are somewhere in the middle of an ongoing episode
+				# so we will just do nothing till that episode completes. After it completes, storing would resume.
+				print(f"skipping worker {worker_index} till it resets")
+				continue
+		
+			if "StarCraft" in self.environment:
+				self.ally_states[self.episode_num][self.time_step] = ally_states[worker_index]
+				self.enemy_states[self.episode_num][self.time_step] = enemy_states[worker_index]
+			elif self.environment in ["Alice_and_Bob", "GFootball"]:
+				self.global_obs[self.episode_num][self.time_step] = global_obs[worker_index]
+
+			self.V_values[self.episode_num][self.time_step] = value[worker_index]
+			self.hidden_state_v[self.episode_num][self.time_step] = hidden_state_v[worker_index]
+			
+			self.local_obs[self.episode_num][self.time_step] = local_obs[worker_index]
+			self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor[worker_index]
+			self.logprobs[self.episode_num][self.time_step] = logprobs[worker_index]
+			self.actions[self.episode_num][self.time_step] = actions[worker_index]
+			self.one_hot_actions[self.episode_num][self.time_step] = one_hot_actions[worker_index]
+			self.action_masks[self.episode_num][self.time_step] = action_masks[worker_index]
+			self.rewards[self.episode_num][self.time_step] = rewards[worker_index]
+			self.indiv_dones[self.episode_num][self.time_step] = indiv_dones[worker_index]
+			self.team_dones[self.episode_num][self.time_step] = team_dones[worker_index]
+
+			print(f"Filled for {worker_index}")
+			if self.time_steps[worker_index] < self.max_time_steps-1:
+				self.time_steps[worker_index] += 1
+
+		print("")
+
+
+	def end_episode(
+		self, 
+		t, 
+		value, 
+		indiv_dones,
+		team_dones,
+		worker_indices,
+		):
+
+		assert t.shape[0] == len(worker_indices)
+		assert value.shape[0] == len(worker_indices)
+		assert indiv_dones.shape[0] == len(worker_indices)
+		assert team_dones.shape[0] == len(worker_indices)
+
+
+		for i, worker_index in enumerate(worker_indices):
+			episode_num = self.worker_episode_counter[worker_index]
+			time_step = self.time_steps[worker_index]
+			if time_step == 0:
+				# Do nothing in case the worker has not stored anything
+				continue
+			time_step = self.time_steps[worker_index]
+			self.V_values[episode_num][time_step+1] = value[i]
+			self.team_dones[episode_num][time_step+1] = team_dones[i]
+			self.indiv_dones[episode_num][time_step+1] = indiv_dones[i]
+
+			self.episode_length[episode_num] = t[i]
+			self.episode_num += 1
+			self.time_steps[worker_index] = 0
+			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
+			print("From episode end buffer")
+			print(f"Ending episode for worker {worker_index}")
+			print(f"Episodes {self.worker_episode_counter}")
+			print(f"Time Steps: {self.time_steps}")
+			print("")

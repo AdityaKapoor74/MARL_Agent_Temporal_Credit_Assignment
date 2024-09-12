@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import Policy, V_network, PopArt
-from utils import RolloutBuffer, RewardReplayMemory
+from utils import RolloutBuffer, RewardRolloutBuffer, RolloutBufferShared, RewardRolloutBufferShared
 
 class PPOAgent:
 
@@ -35,6 +35,8 @@ class PPOAgent:
 			self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 		else:
 			self.device = "cpu"
+		self.parallel_training = dictionary["parallel_training"]
+		self.num_workers = dictionary["num_workers"]
 
 		self.ppo_eps_elapse_update_freq = dictionary["ppo_eps_elapse_update_freq"]
 		self.max_time_steps = dictionary["max_time_steps"]
@@ -171,32 +173,62 @@ class PPOAgent:
 		self.tau_v = dictionary["tau_v"]
 
 
-		self.buffer = RolloutBuffer(
-			environment=self.environment,
-			experiment_type=self.experiment_type,
-			num_episodes=self.ppo_eps_elapse_update_freq, 
-			max_time_steps=self.max_time_steps, 
-			num_agents=self.num_agents, 
-			num_enemies=self.num_enemies,
-			ally_state_shape=self.ally_observation_shape, 
-			enemy_state_shape=self.enemy_observation_shape, 
-			local_obs_shape=self.local_observation_shape, 
-			global_obs_shape=self.global_observation_shape,
-			rnn_num_layers_actor=self.rnn_num_layers_actor,
-			actor_hidden_state=self.rnn_hidden_actor,
-			rnn_num_layers_v=self.rnn_num_layers_v,
-			v_hidden_state=self.rnn_hidden_v,
-			num_actions=self.num_actions,
-			data_chunk_length=self.data_chunk_length,
-			norm_returns_v=self.norm_returns_v,
-			clamp_rewards=self.clamp_rewards,
-			clamp_rewards_value_min=self.clamp_rewards_value_min,
-			clamp_rewards_value_max=self.clamp_rewards_value_max,
-			target_calc_style=self.target_calc_style,
-			gae_lambda=self.gae_lambda,
-			n_steps=self.n_steps,
-			gamma=self.gamma,
-			)
+
+		if self.parallel_training:
+			self.buffer = RolloutBufferShared(
+				num_workers=self.num_workers,
+				environment=self.environment,
+				experiment_type=self.experiment_type,
+				num_episodes=self.ppo_eps_elapse_update_freq, 
+				max_time_steps=self.max_time_steps, 
+				num_agents=self.num_agents, 
+				num_enemies=self.num_enemies,
+				ally_state_shape=self.ally_observation_shape, 
+				enemy_state_shape=self.enemy_observation_shape, 
+				local_obs_shape=self.local_observation_shape, 
+				global_obs_shape=self.global_observation_shape,
+				rnn_num_layers_actor=self.rnn_num_layers_actor,
+				actor_hidden_state=self.rnn_hidden_actor,
+				rnn_num_layers_v=self.rnn_num_layers_v,
+				v_hidden_state=self.rnn_hidden_v,
+				num_actions=self.num_actions,
+				data_chunk_length=self.data_chunk_length,
+				norm_returns_v=self.norm_returns_v,
+				clamp_rewards=self.clamp_rewards,
+				clamp_rewards_value_min=self.clamp_rewards_value_min,
+				clamp_rewards_value_max=self.clamp_rewards_value_max,
+				target_calc_style=self.target_calc_style,
+				gae_lambda=self.gae_lambda,
+				n_steps=self.n_steps,
+				gamma=self.gamma,
+				)
+		else:
+			self.buffer = RolloutBuffer(
+				environment=self.environment,
+				experiment_type=self.experiment_type,
+				num_episodes=self.ppo_eps_elapse_update_freq, 
+				max_time_steps=self.max_time_steps, 
+				num_agents=self.num_agents, 
+				num_enemies=self.num_enemies,
+				ally_state_shape=self.ally_observation_shape, 
+				enemy_state_shape=self.enemy_observation_shape, 
+				local_obs_shape=self.local_observation_shape, 
+				global_obs_shape=self.global_observation_shape,
+				rnn_num_layers_actor=self.rnn_num_layers_actor,
+				actor_hidden_state=self.rnn_hidden_actor,
+				rnn_num_layers_v=self.rnn_num_layers_v,
+				v_hidden_state=self.rnn_hidden_v,
+				num_actions=self.num_actions,
+				data_chunk_length=self.data_chunk_length,
+				norm_returns_v=self.norm_returns_v,
+				clamp_rewards=self.clamp_rewards,
+				clamp_rewards_value_min=self.clamp_rewards_value_min,
+				clamp_rewards_value_max=self.clamp_rewards_value_max,
+				target_calc_style=self.target_calc_style,
+				gae_lambda=self.gae_lambda,
+				n_steps=self.n_steps,
+				gamma=self.gamma,
+				)
 
 		# Loading models
 		if dictionary["load_models"]:
@@ -219,21 +251,39 @@ class PPOAgent:
 			
 		
 		if self.use_reward_model:
-			self.reward_model_buffer = RewardReplayMemory(
-				environment = dictionary["environment"],
-				capacity = dictionary["replay_buffer_size"],
-				max_episode_len = self.max_time_steps,
-				num_agents = self.num_agents,
-				num_enemies=self.num_enemies,
-				ally_obs_shape=self.ally_observation_shape,
-				enemy_obs_shape=self.enemy_observation_shape,
-				local_obs_shape=self.local_observation_shape,
-				global_obs_shape=self.global_observation_shape,
-				rnn_num_layers_actor=self.rnn_num_layers_actor,
-				actor_hidden_state=self.rnn_hidden_actor,
-				action_shape = self.num_actions,
-				device = self.device,
-				)
+			if self.parallel_training:
+				self.reward_model_buffer = RewardRolloutBufferShared(
+					num_workers=self.num_workers,
+					environment = dictionary["environment"],
+					capacity = dictionary["replay_buffer_size"],
+					max_episode_len = self.max_time_steps,
+					num_agents = self.num_agents,
+					num_enemies=self.num_enemies,
+					ally_obs_shape=self.ally_observation_shape,
+					enemy_obs_shape=self.enemy_observation_shape,
+					local_obs_shape=self.local_observation_shape,
+					global_obs_shape=self.global_observation_shape,
+					rnn_num_layers_actor=self.rnn_num_layers_actor,
+					actor_hidden_state=self.rnn_hidden_actor,
+					action_shape = self.num_actions,
+					device = self.device,
+					)
+			else:
+				self.reward_model_buffer = RewardRolloutBuffer(
+					environment = dictionary["environment"],
+					capacity = dictionary["replay_buffer_size"],
+					max_episode_len = self.max_time_steps,
+					num_agents = self.num_agents,
+					num_enemies=self.num_enemies,
+					ally_obs_shape=self.ally_observation_shape,
+					enemy_obs_shape=self.enemy_observation_shape,
+					local_obs_shape=self.local_observation_shape,
+					global_obs_shape=self.global_observation_shape,
+					rnn_num_layers_actor=self.rnn_num_layers_actor,
+					actor_hidden_state=self.rnn_hidden_actor,
+					action_shape = self.num_actions,
+					device = self.device,
+					)
 
 			if "AREL" in self.experiment_type:
 				from AREL import AREL
@@ -366,6 +416,23 @@ class PPOAgent:
 			# Value, rnn_hidden_state_v = critic(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
 				
 			return Value.squeeze(0).cpu().numpy(), rnn_hidden_state_v.cpu().numpy()
+
+
+	def get_values_batch(self, local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_dones):
+		with torch.no_grad():
+			num_workers, num_layers, num_agents, hidden_dim = rnn_hidden_state_v.shape
+			indiv_masks = 1 - indiv_dones
+			indiv_masks = torch.FloatTensor(indiv_masks).unsqueeze(1).to(self.device)
+			if "StarCraft" in self.environment:
+				state_allies = torch.FloatTensor(state_allies).unsqueeze(1).to(self.device)
+				state_enemies = torch.FloatTensor(state_enemies).unsqueeze(1).to(self.device)
+			elif self.environment in ["Alice_and_Bob", "GFootball"]:
+				global_obs = torch.FloatTensor(global_obs).unsqueeze(1).to(self.device)
+			local_obs = torch.FloatTensor(local_obs).unsqueeze(1).to(self.device)
+			actions = torch.FloatTensor(actions).unsqueeze(1).to(self.device)
+			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).permute(1, 0, 2, 3).reshape(num_layers, num_workers*num_agents, hidden_dim)
+			Value, rnn_hidden_state_v = self.target_critic_network_v(local_obs, global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			return Value.cpu().numpy(), rnn_hidden_state_v.reshape(num_layers, num_workers, num_agents, hidden_dim).permute(1, 0, 2, 3).cpu().numpy()
 	
 	
 	def get_action(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
@@ -388,6 +455,30 @@ class PPOAgent:
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
 			return actions, action_logprob, hidden_state.cpu().numpy()
+
+
+	def get_action_batch(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
+		with torch.no_grad():
+			state_policy = torch.FloatTensor(state_policy).unsqueeze(1).to(self.device)
+			last_actions = torch.FloatTensor(last_actions).unsqueeze(1).to(self.device)
+			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(1).to(self.device)
+			num_workers, num_layers, num_agents, hidden_size = hidden_state.shape
+			hidden_state = torch.FloatTensor(hidden_state).permute(1,0,2,3).to(self.device)
+
+			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			if greedy:
+				actions = np.array([dist.argmax(dim=-1).detach().cpu().numpy().tolist() for dist in dists.squeeze(1)])
+				action_logprob = None
+			else:
+				actions = np.array([[Categorical(dist).sample().detach().cpu().item() for dist in dists[worker].squeeze(0)] for worker in range(num_workers)])
+				probs = Categorical(dists.squeeze(1))
+				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
+
+			return actions, action_logprob, hidden_state.reshape(num_layers, num_workers, num_agents, hidden_size).permute(1,0,2,3).cpu().numpy()
+	
+	def should_update_agent(self, episode):
+		assert self.parallel_training, "Please call this method only while doing parallel training"
+		return (True if (self.buffer.episodes_completely_filled >= self.ppo_eps_elapse_update_freq and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0) else False)
 
 
 
