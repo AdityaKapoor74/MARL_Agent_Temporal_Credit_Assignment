@@ -268,7 +268,6 @@ class MAPPO:
 				"__last_actions": last_actions,
 				"__rnn_hidden_state_actor": rnn_hidden_state_actor,
 				"__mask_actions": mask_actions,
-				"__actions": actions,
 				"__rnn_hidden_state_v": rnn_hidden_state_v,
 				"__global_obs": global_obs,
 				}
@@ -277,7 +276,7 @@ class MAPPO:
 			next_local_obs, rewards, next_dones, info = self.env.step(actions, additional_info)
 			next_local_obs = np.array(next_local_obs)
 			for i, d in enumerate(dones):
-				if not d and self.worker_step_counter[i]<self.max_time_steps-1:
+				if not d: #and self.worker_step_counter[i]<self.max_time_steps-1:
 					self.worker_step_counter[i] += 1
 
 
@@ -407,7 +406,7 @@ class MAPPO:
 				episode_indiv_rewards[worker_index] = [r+individual_rewards[i] for i, r in enumerate(episode_indiv_rewards[worker_index])]
 
 
-				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps-1:
+				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps:
 					assert info["did_reset"][worker_index]
 					self.num_episodes_done += 1
 					step = self.worker_step_counter[worker_index]
@@ -455,19 +454,17 @@ class MAPPO:
 						local_obs_ = np.expand_dims(info["last_obs"][worker_index], axis=0)
 						last_actions_ = np.expand_dims(info["__last_actions"][worker_index], axis=0)
 						rnn_hidden_state_actor_ = np.expand_dims(info["__rnn_hidden_state_actor"][worker_index], axis=0)
-						actions_ = np.expand_dims(info["__actions"][worker_index], axis=0)
 						rnn_hidden_state_v_ = np.expand_dims(info["__rnn_hidden_state_v"][worker_index], axis=0)
+						indiv_dones_ = np.expand_dims(info["last_info"]["indiv_dones"], axis=0)
 						if "StarCraft" in self.environment:
 							ally_states_ = np.expand_dims(info["last_info"]["ally_states"][worker_index], axis=0)
 							enemy_states_ = np.expand_dims(info["last_info"]["enemy_states"][worker_index], axis=0)
 							global_obs_ = None
-							indiv_dones_ = np.expand_dims(info["last_info"]["indiv_dones"], axis=0)
 							mask_actions_ = np.expand_dims(info["last_info"]["avail_actions"][worker_index], axis=0)
 						elif self.environment in ["Alice_and_Bob", "GFootball"]:
 							ally_states_, enemy_states_ = None, None
 							global_obs_ = np.expand_dims(info["__global_obs"][worker_index], axis=0)
 							mask_actions_ = np.expand_dims(info["__mask_actions"][worker_index], axis=0)
-							indiv_dones_ = np.expand_dims(info["indiv_dones"], axis=0)
 						
 
 
@@ -481,7 +478,7 @@ class MAPPO:
 						# action_logprob.shape = (1, 5)
 						# next_rnn_hidden_state_actor.shape = (1, rnn_num_layers_actor, 5, 64)
 
-						value, _ = self.agents.get_values_batch(local_obs_, global_obs_, ally_states_, enemy_states_, actions_, rnn_hidden_state_v_, indiv_dones_)
+						value, _ = self.agents.get_values_batch(local_obs_, global_obs_, ally_states_, enemy_states_, actions, rnn_hidden_state_v_, indiv_dones_)
 						
 						assert value.shape == (1, self.num_agents)
 
@@ -519,9 +516,6 @@ class MAPPO:
 
 					# update agent
 					if self.learn and self.agents.should_update_agent(self.num_episodes_done):
-						# print("SANITY CHECK")
-						# print((np.sum(self.agents.buffer.indiv_dones, axis=-1)>0))
-						# print(self.agents.buffer.team_dones)
 						if self.experiment_type == "uniform_team_redistribution":
 							b, t, n_a = self.agents.buffer.rewards.shape
 							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
@@ -597,6 +591,9 @@ class MAPPO:
 					
 					episode_reward[worker_index] = 0
 					episode_indiv_rewards[worker_index] = [0 for i in range(self.num_agents)]
+
+					indiv_dones[worker_index] = [0]*self.num_agents
+					dones[worker_index] = 0
 
 					rnn_hidden_state_v[worker_index] = np.zeros((self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
 					rnn_hidden_state_actor[worker_index] = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
@@ -722,8 +719,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 8e-3, #8e-3
-				"entropy_pen_final": 8e-3,
+				"entropy_pen": 5e-3, #8e-3
+				"entropy_pen_final": 5e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
