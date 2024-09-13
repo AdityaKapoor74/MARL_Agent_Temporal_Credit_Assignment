@@ -38,7 +38,7 @@ class MAPPO:
 		self.eval_policy = dictionary["eval_policy"]
 		self.parallel_training = dictionary["parallel_training"]
 		self.num_workers = dictionary["num_workers"]
-		assert len(env) == self.num_workers, f"number of rollout threads ({self.num_workers}) doesn't match the number of env functions ({len(env_fns)})"
+		assert len(env) == self.num_workers, f"number of rollout threads ({self.num_workers}) doesn't match the number of env functions ({len(env)})"
 		atexit.register(self.close)
 
 
@@ -200,7 +200,8 @@ class MAPPO:
 					else:
 						assert info["did_reset"][worker_index]
 						final_indiv_dones.append(info["last_info"]["indiv_dones"][worker_index])
-				final_dones.append(all(final_indiv_dones[-1]))
+				final_dones.append(int(all(final_indiv_dones[-1])))
+
 			return np.array(final_indiv_dones, dtype=np.int64), np.array(final_dones, dtype=np.int64)
 
 
@@ -275,8 +276,8 @@ class MAPPO:
 
 			next_local_obs, rewards, next_dones, info = self.env.step(actions, additional_info)
 			next_local_obs = np.array(next_local_obs)
-			for i, d in enumerate(next_dones):
-				if not d:
+			for i, d in enumerate(dones):
+				if not d and self.worker_step_counter[i]<self.max_time_steps-1:
 					self.worker_step_counter[i] += 1
 
 
@@ -406,7 +407,7 @@ class MAPPO:
 				episode_indiv_rewards[worker_index] = [r+individual_rewards[i] for i, r in enumerate(episode_indiv_rewards[worker_index])]
 
 
-				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps:
+				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps-1:
 					assert info["did_reset"][worker_index]
 					self.num_episodes_done += 1
 					step = self.worker_step_counter[worker_index]
@@ -518,6 +519,9 @@ class MAPPO:
 
 					# update agent
 					if self.learn and self.agents.should_update_agent(self.num_episodes_done):
+						# print("SANITY CHECK")
+						# print((np.sum(self.agents.buffer.indiv_dones, axis=-1)>0))
+						# print(self.agents.buffer.team_dones)
 						if self.experiment_type == "uniform_team_redistribution":
 							b, t, n_a = self.agents.buffer.rewards.shape
 							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length

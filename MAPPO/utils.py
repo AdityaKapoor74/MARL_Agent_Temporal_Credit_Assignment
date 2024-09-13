@@ -790,7 +790,6 @@ class RolloutBufferShared(RolloutBuffer):
 			if time_step == 0:
 				# Do nothing in case the worker has not stored anything
 				continue
-			time_step = self.time_steps[worker_index]
 			self.V_values[episode_num][time_step+1] = value[i]
 			self.team_dones[episode_num][time_step+1] = team_dones[i]
 			self.indiv_dones[episode_num][time_step+1] = indiv_dones[i]

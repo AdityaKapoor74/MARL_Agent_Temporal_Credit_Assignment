@@ -280,14 +280,14 @@ class ShareSubprocVecEnv(ShareVecEnv):
 	def _should_truncate(self, process_index):
 		if self.truncation_steps == None:
 			return False
-		if self.num_steps[process_index] == self.truncation_steps:
+		if self.num_steps[process_index] == self.truncation_steps-1:
 			return True
 		else:
 			return False
 
 	def step_async(self, actions, additional_info=None):
 		self._assert_is_running()
-		self.num_steps += 1
+		# self.num_steps += 1
 		if self._state != AsyncState.DEFAULT:
 			raise AlreadyPendingCallError(
 				f"Calling `step_async` while waiting for a pending call to `{self._state.value}` to complete.",
@@ -299,6 +299,7 @@ class ShareSubprocVecEnv(ShareVecEnv):
 			if should_truncate:
 				self.num_steps[process_index] = 0
 			remote.send(('step', (action, should_truncate, additional_info)))
+		self.num_steps += 1
 		self.waiting = True
 		self._state = AsyncState.WAITING_STEP
 
