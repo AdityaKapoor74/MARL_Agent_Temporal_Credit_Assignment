@@ -228,8 +228,8 @@ class MAPPO:
 			ally_states, enemy_states = None, None
 		
 
-		last_actions = np.zeros((self.num_workers, self.num_agents)) + self.num_actions
 		local_obs = np.array(local_obs)
+		last_actions = np.zeros((self.num_workers, self.num_agents)) + self.num_actions
 		indiv_dones = np.zeros((self.num_workers, self.num_agents), dtype=np.int64)
 		dones = np.zeros((self.num_workers), dtype=np.int64)
 		
@@ -592,7 +592,8 @@ class MAPPO:
 					episode_reward[worker_index] = 0
 					episode_indiv_rewards[worker_index] = [0 for i in range(self.num_agents)]
 
-					indiv_dones[worker_index] = [0]*self.num_agents
+					last_actions[worker_index] = np.zeros((self.num_agents)) + self.num_actions
+					indiv_dones[worker_index] = np.zeros((self.num_agents), dtype=np.int64)
 					dones[worker_index] = 0
 
 					rnn_hidden_state_v[worker_index] = np.zeros((self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
@@ -719,8 +720,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 5e-3, #8e-3
-				"entropy_pen_final": 5e-3,
+				"entropy_pen": 1e-2, #8e-3
+				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
