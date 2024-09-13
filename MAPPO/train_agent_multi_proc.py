@@ -612,8 +612,8 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
-		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
+		environment = "StarCraft" # StarCraft/ Alice_and_Bob/ GFootball
+		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
 		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
@@ -645,8 +645,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 120000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
+				"max_time_steps": 50, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -718,8 +718,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 4e-3, #8e-3
-				"entropy_pen_final": 4e-3,
+				"entropy_pen": 8e-3, #8e-3
+				"entropy_pen_final": 8e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
