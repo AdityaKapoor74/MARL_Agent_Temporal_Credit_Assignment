@@ -699,7 +699,7 @@ if __name__ == '__main__':
 				"v_weight_decay": 0.0,
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
-				"grad_clip_critic_v": 10.0,
+				"grad_clip_critic_v": 0.5,
 				"value_clip": 0.2,
 				"enable_hard_attention": False,
 				"target_calc_style": "GAE", # GAE, N_steps
@@ -716,7 +716,7 @@ if __name__ == '__main__':
 				"rnn_num_layers_actor": 1,
 				"rnn_hidden_actor": 64,
 				"enable_grad_clip_actor": True,
-				"grad_clip_actor": 10.0,
+				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
