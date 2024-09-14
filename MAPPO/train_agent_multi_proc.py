@@ -386,7 +386,7 @@ class MAPPO:
 					)
 
 				if self.use_reward_model:
-					self.agents.reward_model_buffer.push(
+					self.agents.reward_buffer.push(
 						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones, self.worker_step_counter
 						)
 
@@ -537,7 +537,7 @@ class MAPPO:
 
 					# update reward model
 					if self.learn and self.use_reward_model:
-						if self.reward_batch_size <= self.agents.reward_model_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
+						if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
 							reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 							if "AREL" in self.experiment_type:
 								reward_var_batch = 0.0
@@ -546,7 +546,7 @@ class MAPPO:
 								reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 							
 							for i in range(self.reward_model_update_epochs):
-								sample = self.agents.reward_model_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
+								sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
 								if "AREL" in self.experiment_type:
 									reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 									reward_var_batch += (reward_var/self.reward_model_update_epochs)
