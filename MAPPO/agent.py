@@ -252,7 +252,7 @@ class PPOAgent:
 		
 		if self.use_reward_model:
 			if self.parallel_training:
-				self.reward_model_buffer = RewardRolloutBufferShared(
+				self.reward_buffer = RewardRolloutBufferShared(
 					num_workers=self.num_workers,
 					environment = dictionary["environment"],
 					capacity = dictionary["replay_buffer_size"],
@@ -269,7 +269,7 @@ class PPOAgent:
 					device = self.device,
 					)
 			else:
-				self.reward_model_buffer = RewardRolloutBuffer(
+				self.reward_buffer = RewardRolloutBuffer(
 					environment = dictionary["environment"],
 					capacity = dictionary["replay_buffer_size"],
 					max_episode_len = self.max_time_steps,
