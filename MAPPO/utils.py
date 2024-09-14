@@ -317,9 +317,9 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		elif "GFootball" in self.environment:
 			assert global_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.global_obs_shape)
 		assert local_obs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents, self.local_obs_shape)
-		assert action_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
+		assert actions_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
 		assert logprobs_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
-		assert logprobs_batch.shape == (num_episodes, self.max_episode_len)
+		assert reward_batch.shape == (num_episodes, self.max_episode_len)
 		assert mask_batch.shape == (num_episodes, self.max_episode_len)
 		assert agent_masks_batch.shape == (num_episodes, self.max_episode_len, self.num_agents)
 		assert hidden_state_actor_batch.shape == (num_episodes, self.max_episode_len, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state)
