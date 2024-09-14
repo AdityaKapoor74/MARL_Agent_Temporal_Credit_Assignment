@@ -243,7 +243,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		assert reward.shape[0] == self.num_workers
 		assert done.shape[0] == self.num_workers
 		assert indiv_dones.shape[0] == self.num_workers
-		
+
 		for worker_index in range(self.num_workers):
 			if type(masks) == np.ndarray:
 				if masks[worker_index]:
@@ -291,7 +291,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 	def sample_reward_model(self, num_episodes):
 		indices = np.where(self.episodes_completely_filled == 1)[0]
 		assert indices.shape[0] >= num_episodes
-		batch_indices = np.random.choice(self.length, size=num_episodes, replace=False)
+		batch_indices = np.random.choice(indices, size=num_episodes, replace=False)
 		
 		if "StarCraft" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
