@@ -230,9 +230,20 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		# print(f"Episode_counter: {self.worker_episode_counter}")
 		# print(f"Timesteps: {self.time_steps}")
 
-		assert states.shape[0] == self.num_workers
-		assert one_hot_actions.shape[0] == self.num_workers
-		assert dones.shape[0] == self.num_workers
+		if self.environment == "StarCraft":
+			assert ally_obs.shape[0] == self.num_workers
+			assert enemy_obs.shape[0] == self.num_workers
+		elif self.environment in ["GFootball", "Alice_and_Bob"]:
+			assert global_obs.shape[0] == self.num_workers
+		assert local_obs.shape[0] == self.num_workers
+		assert actions.shape[0] == self.num_workers
+		assert action_masks.shape[0] == self.num_workers
+		assert hidden_state_actor.shape[0] == self.num_workers
+		assert logprobs.shape[0] == self.num_workers
+		assert reward.shape[0] == self.num_workers
+		assert done.shape[0] == self.num_workers
+		assert indiv_dones.shape[0] == self.num_workers
+		
 		for worker_index in range(self.num_workers):
 			if type(masks) == np.ndarray:
 				if masks[worker_index]:
