@@ -274,10 +274,13 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 	def end_episode(self, worker_indices):
 		for i, worker_index in enumerate(worker_indices):
 			episode_num = self.worker_episode_counter[worker_index] % self.capacity
+			timestep = self.time_steps[worker_index]
 
 			self.episodes_completely_filled[episode_num] = 1
 
 			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
+
+			self.episode_len[episode_num] = timestep
 
 			self.time_steps[worker_index] = 0
 
@@ -291,7 +294,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 	def sample_reward_model(self, num_episodes):
 		indices = np.where(self.episodes_completely_filled == 1)[0]
 		assert indices.shape[0] >= num_episodes
-		batch_indices = np.random.choice(indices, size=num_episodes, replace=False)
+		batch_indices = np.random.choice(indices.shape[0], size=num_episodes, replace=False)
 		
 		if "StarCraft" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
