@@ -312,7 +312,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		print(np.sum(agent_masks, axis=-1))
+		print(np.sum(agent_masks_batch, axis=-1))
 
 		first_last_actions = np.zeros((num_episodes, 1, self.num_agents), dtype=int) + self.action_shape
 		last_actions_batch = np.concatenate((first_last_actions, actions_batch[:, :-1, :]), axis=1)
