@@ -292,7 +292,8 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 
 
 	def sample_reward_model(self, num_episodes):
-		indices = np.where(self.episodes_completely_filled == 1)[0]
+		# indices = np.where(self.episodes_completely_filled == 1)[0]
+		indices = np.where(np.sum(1-self.buffer['indiv_dones'], axis=1)>0)[0]
 		assert indices.shape[0] >= num_episodes
 		batch_indices = np.random.choice(indices, size=num_episodes, replace=False)
 		
