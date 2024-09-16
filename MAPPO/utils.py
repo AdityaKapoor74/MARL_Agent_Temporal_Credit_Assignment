@@ -295,6 +295,8 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		indices = np.where(self.episodes_completely_filled == 1)[0]
 		assert indices.shape[0] >= num_episodes
 		batch_indices = np.random.choice(indices.shape[0], size=num_episodes, replace=False)
+
+		print("reward buffer allowance", indices.shape[0])
 		
 		if "StarCraft" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
