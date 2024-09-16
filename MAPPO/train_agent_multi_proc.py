@@ -544,6 +544,9 @@ class MAPPO:
 							else:
 								self.agents.buffer.clear()
 
+						self.update_agent = False
+
+
 					# update reward model
 					if self.learn and self.use_reward_model and not(self.update_reward_model):
 
@@ -595,6 +598,8 @@ class MAPPO:
 									self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, self.num_episodes_done)
 									self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
 								
+						self.update_reward_model = False
+					
 
 					if self.eval_policy and not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0:
 						np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
@@ -617,10 +622,6 @@ class MAPPO:
 					rnn_hidden_state_actor[worker_index] = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
 					self.worker_step_counter[worker_index] = 0
-			
-
-			self.update_agent = False
-			self.update_reward_model = False
 
 
 
