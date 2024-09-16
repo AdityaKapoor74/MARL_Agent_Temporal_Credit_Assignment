@@ -637,7 +637,7 @@ if __name__ == '__main__':
 		dictionary = {
 				# TRAINING
 				"iteration": i,
-				"device": "gpu",
+				"device": "cpu",
 				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
 				"optim_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizers/',
