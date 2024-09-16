@@ -556,6 +556,7 @@ class MAPPO:
 							
 							filled_episodes_list = np.where(self.agents.reward_buffer.episodes_completely_filled == 1)[0]
 							for i in range(self.reward_model_update_epochs):
+								print("reward model update", i)
 								sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size, filled_episode_list=filled_episodes_list)
 								if "AREL" in self.experiment_type:
 									reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
