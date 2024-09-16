@@ -662,7 +662,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 120000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
+				"max_time_steps": 100, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -904,7 +904,7 @@ if __name__ == '__main__':
 			dictionary["num_actions"] = env[0]().action_space[0].n
 			
 
-		torch.set_num_threads(16)
+		# torch.set_num_threads(16)
 		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()
 
