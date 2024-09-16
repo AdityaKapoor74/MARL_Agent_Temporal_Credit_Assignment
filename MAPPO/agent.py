@@ -621,6 +621,8 @@ class PPOAgent:
 				probs_batch = Categorical(dists_batch)
 				logprobs_batch = probs_batch.log_prob(actions_batch.transpose(-1, -2))
 			
+			import datetime
+			start_time = datetime.datetime.now()
 			returns, rewards, expected_importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
@@ -632,6 +634,8 @@ class PPOAgent:
 				agent_masks=agent_masks_batch,
 				train=True,
 				)
+			end_time = datetime.datetime.now()
+			print("ELAPSED TIME", end_time-start_time)
 
 			target_importance_sampling = (logprobs_batch - logprobs_old_batch) * agent_masks_batch
 			target_importance_sampling = target_importance_sampling.sum(dim=-1)
