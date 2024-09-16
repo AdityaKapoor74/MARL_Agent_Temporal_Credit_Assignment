@@ -294,13 +294,9 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 
 
 	def sample_reward_model(self, num_episodes):
-		# indices = np.where(self.episodes_completely_filled == 1)[0]
-		# assert indices.shape[0] >= num_episodes
-		# batch_indices = np.random.choice(indices.shape[0], size=num_episodes, replace=False)
-		# print(batch_indices)
-		num_episodes_filled = self.episodes_filled
-		assert num_episodes_filled >= num_episodes
-		batch_indices = np.random.choice(num_episodes_filled, size=num_episodes, replace=False)
+		indices = np.where(self.episodes_completely_filled == 1)[0]
+		assert indices.shape[0] >= num_episodes
+		batch_indices = np.random.choice(indices, size=num_episodes, replace=False)
 		
 		if "StarCraft" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
