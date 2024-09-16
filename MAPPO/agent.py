@@ -478,7 +478,7 @@ class PPOAgent:
 	
 	def should_update_agent(self, episode):
 		assert self.parallel_training, "Please call this method only while doing parallel training"
-		return (True if (self.buffer.episodes_completely_filled >= self.buffer.episodes_completely_filled and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0) else False)
+		return (True if (self.buffer.episodes_completely_filled >= self.buffer.ppo_eps_elapse_update_freq and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0) else False)
 
 
 	def reward_model_output(self, eval_reward_model=False):
@@ -584,7 +584,6 @@ class PPOAgent:
 		agent_masks_batch = torch.from_numpy(agent_masks_batch).float().to(self.device)
 		episode_len_batch = torch.from_numpy(episode_len_batch).long().to(self.device)
 
-		print(agent_masks_batch.sum(dim=1))
 
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
