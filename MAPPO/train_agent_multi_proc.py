@@ -528,7 +528,8 @@ class MAPPO:
 							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
 							self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
 							self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
-							self.agents.update(self.num_episodes_done)
+							with self.lock:
+								self.agents.update(self.num_episodes_done)
 						elif self.use_reward_model is False:
 							self.agents.update(self.num_episodes_done)
 						elif self.use_reward_model:
@@ -538,7 +539,8 @@ class MAPPO:
 								# self.agents.update_reward_model(sample)
 								
 								self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
-								self.agents.update(self.num_episodes_done)
+								with self.lock:
+									self.agents.update(self.num_episodes_done)
 							else:
 								self.agents.buffer.clear()
 
@@ -560,16 +562,19 @@ class MAPPO:
 								print("reward model update", i)
 								sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size, filled_episode_list=filled_episodes_list)
 								if "AREL" in self.experiment_type:
-									reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
+									with self.lock:
+										reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 									reward_var_batch += (reward_var/self.reward_model_update_epochs)
 								elif "TAR^2" in self.experiment_type:
-									reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
+									with self.lock:
+										reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 									entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 									entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
 									reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
 									dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
 								elif "STAS" in self.experiment_type:
-									reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
+									with self.lock:
+										reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
 
 								reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
 								grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
