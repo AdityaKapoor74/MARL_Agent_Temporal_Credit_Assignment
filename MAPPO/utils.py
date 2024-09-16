@@ -292,10 +292,13 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 
 
 	def sample_reward_model(self, num_episodes):
-		indices = np.where(self.episodes_completely_filled == 1)[0]
-		assert indices.shape[0] >= num_episodes
-		batch_indices = np.random.choice(indices.shape[0], size=num_episodes, replace=False)
-		print(batch_indices)
+		# indices = np.where(self.episodes_completely_filled == 1)[0]
+		# assert indices.shape[0] >= num_episodes
+		# batch_indices = np.random.choice(indices.shape[0], size=num_episodes, replace=False)
+		# print(batch_indices)
+		num_episodes_filled = self.episodes_filled
+		assert num_episodes_filled >= num_episodes
+		batch_indices = np.random.choice(num_episodes_filled, size=num_episodes, replace=False)
 		
 		if "StarCraft" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
@@ -312,7 +315,7 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
 		episode_len_batch = np.take(self.episode_len, batch_indices, axis=0)
 
-		print(np.sum(agent_masks_batch, axis=-2))
+		# print(np.sum(agent_masks_batch, axis=-2))
 
 		first_last_actions = np.zeros((num_episodes, 1, self.num_agents), dtype=int) + self.action_shape
 		last_actions_batch = np.concatenate((first_last_actions, actions_batch[:, :-1, :]), axis=1)
