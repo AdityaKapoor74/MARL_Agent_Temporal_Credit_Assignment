@@ -637,7 +637,7 @@ if __name__ == '__main__':
 		dictionary = {
 				# TRAINING
 				"iteration": i,
-				"device": "cpu",
+				"device": "gpu",
 				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
 				"optim_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizers/',
@@ -904,6 +904,7 @@ if __name__ == '__main__':
 			dictionary["num_actions"] = env[0]().action_space[0].n
 			
 
+		torch.set_num_threads(16)
 		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()
 
