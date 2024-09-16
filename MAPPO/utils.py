@@ -253,20 +253,20 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 			time_step = self.time_steps[worker_index]
 
 			if "StarCraft" in self.environment:
-				self.buffer['ally_obs'][episode_num][time_step] = ally_obs
-				self.buffer['enemy_obs'][episode_num][time_step] = enemy_obs
+				self.buffer['ally_obs'][episode_num][time_step] = ally_obs[worker_index]
+				self.buffer['enemy_obs'][episode_num][time_step] = enemy_obs[worker_index]
 			elif "GFootball" in self.environment:
-				self.buffer['global_obs'][episode_num][time_step] = global_obs
-			self.buffer['local_obs'][episode_num][time_step] = local_obs
-			self.buffer['actions'][episode_num][time_step] = actions
-			self.buffer['action_masks'][episode_num][time_step] = action_masks
-			self.buffer['hidden_state_actor'][episode_num][time_step] = hidden_state_actor
-			self.buffer['logprobs'][episode_num][time_step] = logprobs
-			self.buffer['reward'][episode_num][time_step] = reward
-			self.buffer['done'][episode_num][time_step] = done
-			self.buffer['indiv_dones'][episode_num][time_step] = indiv_dones
+				self.buffer['global_obs'][episode_num][time_step] = global_obs[worker_index]
+			self.buffer['local_obs'][episode_num][time_step] = local_obs[worker_index]
+			self.buffer['actions'][episode_num][time_step] = actions[worker_index]
+			self.buffer['action_masks'][episode_num][time_step] = action_masks[worker_index]
+			self.buffer['hidden_state_actor'][episode_num][time_step] = hidden_state_actor[worker_index]
+			self.buffer['logprobs'][episode_num][time_step] = logprobs[worker_index]
+			self.buffer['reward'][episode_num][time_step] = reward[worker_index]
+			self.buffer['done'][episode_num][time_step] = done[worker_index]
+			self.buffer['indiv_dones'][episode_num][time_step] = indiv_dones[worker_index]
 
-			if self.time_steps[worker_index] < self.max_time_steps-1:
+			if self.time_steps[worker_index] < self.max_episode_len-1:
 				self.time_steps[worker_index] += 1
 		# print("")
 

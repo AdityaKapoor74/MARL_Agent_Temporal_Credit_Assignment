@@ -235,12 +235,12 @@ class MAPPO:
 		
 		images = []
 
-		episodic_team_reward = [[0]*self.num_agents for _ in range(self.num_workers)]
+		episodic_team_reward = [0 for _ in range(self.num_workers)]
 		episodic_agent_reward = [[0]*self.num_agents for _ in range(self.num_workers)]
 		
 
 		episode_reward = [0 for _ in range(self.num_workers)]
-		episode_indiv_rewards = [[0 for i in range(self.num_agents)] for _ in range(self.num_workers)]
+		episode_indiv_rewards = [[0]*self.num_agents for _ in range(self.num_workers)]
 
 		rnn_hidden_state_v = np.zeros((self.num_workers, self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
 		rnn_hidden_state_actor = np.zeros((self.num_workers, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
@@ -286,7 +286,7 @@ class MAPPO:
 				next_mask_actions = np.array(info["avail_actions"], dtype=int)
 				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = info["indiv_rewards"]
-
+				
 				next_global_obs = None
 
 			elif "Alice_and_Bob" in self.environment:
@@ -316,66 +316,66 @@ class MAPPO:
 					rewards_to_send.append(np.array([rewards[worker_index]] * self.num_agents))
 			
 			elif self.experiment_type == "temporal_agent":
-				rewards_to_send = []
-				for worker_index in range(self.num_workers):
-					if "_indiv_rewards" in info.keys():
-						if info["_indiv_rewards"][worker_index]:
-							rewards_to_send.append(info["indiv_rewards"][worker_index])
-						else:  # this is only possible if the environment resets
-							assert info["did_reset"]
-							last_info = info["last_info"]
-							rewards_to_send.append(last_info["indiv_rewards"][worker_index])
-					else:
-						assert info["did_reset"]
-						last_info = info["last_info"]
-						rewards_to_send.append(last_info["indiv_rewards"][worker_index])
+				# rewards_to_send = []
+				# for worker_index in range(self.num_workers):
+				# 	if "indiv_rewards" in info.keys():
+				# 		if info["indiv_rewards"][worker_index]:
+				# 			rewards_to_send.append(info["indiv_rewards"][worker_index])
+				# 		else:  # this is only possible if the environment resets
+				# 			assert info["did_reset"]
+				# 			last_info = info["last_info"]
+				# 			rewards_to_send.append(last_info["indiv_rewards"][worker_index])
+				# 	else:
+				# 		assert info["did_reset"]
+				# 		last_info = info["last_info"]
+				# 		rewards_to_send.append(last_info["indiv_rewards"][worker_index])
+				rewards_to_send = indiv_rewards
 		
-			elif self.experiment_type == "episodic_team" or self.experiment_type == "uniform_team_redistribution" or "AREL" in self.experiment_type or "TAR^2" in self.experiment_type or "STAS" in self.experiment_type:
+			elif self.experiment_type in ["episodic_team", "uniform_team_redistribution", "AREL", "TAR^2", "STAS"]:
 				rewards_to_send = []
 				for worker_index in range(self.num_workers):
-					episodic_team_reward[worker_index] = [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
+					episodic_team_reward[worker_index] = rewards[worker_index]+episodic_team_reward[worker_index] # [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
 					if next_dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
-						rewards_to_send.append(np.array(episodic_team_reward[worker_index]))
+						rewards_to_send.append(episodic_team_reward[worker_index])
 					else:
-						rewards_to_send.append(np.zeros(self.num_agents))
+						rewards_to_send.append(0)
 			
 			elif self.experiment_type == "episodic_agent":
 				rewards_to_send = []
+				# for worker_index in range(self.num_workers):
+				# 	if "_indiv_rewards" in info.keys:
+				# 		individual_rewards = info["indiv_rewards"][worker_index] if info["_indiv_rewards"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]  # the last info is inside info["last_info"]
+				# 	else:
+				# 		assert info["did_reset"][worker_index]
+				# 		individual_rewards = info["last_info"]["indiv_rewards"][worker_index]
+				# 	episodic_agent_reward[worker_index] = [a_r+r for a_r, r in zip(episodic_agent_reward[worker_index], individual_rewards)]
+				# 	if (not next_dones[worker_index]) and (self.worker_step_counter[worker_index] == self.max_time_steps):
+				# 		rewards_to_send.append(np.array(episodic_agent_reward[worker_index]))
+				# 	else:
+				# 		rewards_to_send_worker = []
+				# 		if "_indiv_dones" in info.keys():
+				# 			next_individual_dones = info["indiv_dones"][worker_index] if info["_indiv_dones"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]
+				# 		else:
+				# 			assert info["did_reset"][worker_index]
+				# 			next_individual_dones = info["last_info"]["indiv_rewards"][worker_index]
+				# 		for i, d in enumerate(next_individual_dones):
+				# 			if d:
+				# 				rewards_to_send_worker.append(episodic_agent_reward[worker_index][i])
+				# 				# once reward is allocated to agent, make future rewards 0
+				# 				episodic_agent_reward[worker_index][i] = 0
+				# 			else:
+				# 				rewards_to_send_worker.append(0.0)
+				# 		rewards_to_send.append(np.array(rewards_to_send_worker))
 				for worker_index in range(self.num_workers):
-					if "_indiv_rewards" in info.keys:
-						individual_rewards = info["indiv_rewards"][worker_index] if info["_indiv_rewards"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]  # the last info is inside info["last_info"]
-					else:
-						assert info["did_reset"][worker_index]
-						individual_rewards = info["last_info"]["indiv_rewards"][worker_index]
-					episodic_agent_reward[worker_index] = [a_r+r for a_r, r in zip(episodic_agent_reward[worker_index], individual_rewards)]
-					if (not next_dones[worker_index]) and (self.worker_step_counter[worker_index] == self.max_time_steps):
-						rewards_to_send.append(np.array(episodic_agent_reward[worker_index]))
-					else:
-						rewards_to_send_worker = []
-						if "_indiv_dones" in info.keys():
-							next_individual_dones = info["indiv_dones"][worker_index] if info["_indiv_dones"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]
-						else:
-							assert info["did_reset"][worker_index]
-							next_individual_dones = info["last_info"]["indiv_rewards"][worker_index]
-						for i, d in enumerate(next_individual_dones):
-							if d:
-								rewards_to_send_worker.append(episodic_agent_reward[worker_index][i])
-								# once reward is allocated to agent, make future rewards 0
-								episodic_agent_reward[worker_index][i] = 0
-							else:
-								rewards_to_send_worker.append(0.0)
-						rewards_to_send.append(np.array(rewards_to_send_worker))
-			
-			elif self.experiment_type in ["AREL", "TAR^2", "STAS"]:
-				rewards_to_send = []
-				for worker_index in range(self.num_workers):
-					episodic_team_reward[worker_index] = [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
+					episodic_agent_reward[worker_index] = np.array(episodic_agent_reward[worker_index]) + np.array(indiv_rewards[worker_index])
 					if next_dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
-						rewards_to_send.append(np.array(episodic_team_reward[worker_index]))
+						rewards_to_send.append(episodic_agent_reward[worker_index])
 					else:
 						rewards_to_send.append(np.zeros(self.num_agents))
-			rewards_to_send = np.array(rewards_to_send)
 
+					episodic_agent_reward[worker_index] = np.array(episodic_agent_reward[worker_index]) * (1-np.array(next_indiv_dones)) # reset only agent rewards that are done to avoid appending episodic agent reward in the next iteration
+
+			rewards_to_send = np.array(rewards_to_send)
 
 
 			if self.learn:
@@ -387,7 +387,7 @@ class MAPPO:
 
 				if self.use_reward_model:
 					self.agents.reward_buffer.push(
-						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones, self.worker_step_counter
+						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
 						)
 
 			ally_states, enemy_states = next_ally_states, next_enemy_states
@@ -586,11 +586,11 @@ class MAPPO:
 						np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
 
 
-					episodic_team_reward[worker_index] = [0]*self.num_agents
+					episodic_team_reward[worker_index] = 0
 					episodic_agent_reward[worker_index] = [0]*self.num_agents
 					
 					episode_reward[worker_index] = 0
-					episode_indiv_rewards[worker_index] = [0 for i in range(self.num_agents)]
+					episode_indiv_rewards[worker_index] = [0]*self.num_agents
 
 					last_actions[worker_index] = np.zeros((self.num_agents)) + self.num_actions
 					indiv_dones[worker_index] = np.zeros((self.num_agents), dtype=np.int64)
@@ -616,8 +616,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "StarCraft" # StarCraft/ Alice_and_Bob/ GFootball
 		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
+		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -661,7 +661,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
