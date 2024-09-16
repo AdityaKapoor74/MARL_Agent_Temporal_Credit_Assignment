@@ -245,6 +245,10 @@ class MAPPO:
 		rnn_hidden_state_v = np.zeros((self.num_workers, self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
 		rnn_hidden_state_actor = np.zeros((self.num_workers, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
+		# we don't want the models to be updated by each thread -- first thread that finishes performs the update
+		self.update_agent = False
+		self.update_reward_model = False
+
 			
 		while self.num_episodes_done < self.max_episodes:
 
@@ -515,7 +519,10 @@ class MAPPO:
 			
 
 					# update agent
-					if self.learn and self.agents.should_update_agent(self.num_episodes_done):
+					if self.learn and self.agents.should_update_agent(self.num_episodes_done) and not(self.update_agent):
+
+						self.update_agent = True
+						
 						if self.experiment_type == "uniform_team_redistribution":
 							b, t, n_a = self.agents.buffer.rewards.shape
 							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
@@ -536,7 +543,10 @@ class MAPPO:
 								self.agents.buffer.clear()
 
 					# update reward model
-					if self.learn and self.use_reward_model:
+					if self.learn and self.use_reward_model and not(self.update_reward_model):
+
+						self.update_reward_model = True
+
 						if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
 							reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 							if "AREL" in self.experiment_type:
@@ -601,6 +611,9 @@ class MAPPO:
 					rnn_hidden_state_actor[worker_index] = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
 					self.worker_step_counter[worker_index] = 0
+
+			self.update_agent = False
+			self.update_reward_model = False
 
 
 
