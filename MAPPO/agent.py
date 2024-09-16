@@ -584,6 +584,8 @@ class PPOAgent:
 		agent_masks_batch = torch.from_numpy(agent_masks_batch).float().to(self.device)
 		episode_len_batch = torch.from_numpy(episode_len_batch).long().to(self.device)
 
+		print(agent_masks_batch.sum(dim=1))
+
 		if self.norm_rewards:
 			shape = episodic_reward_batch.shape
 			episodic_reward_batch = self.reward_normalizer(episodic_reward_batch.view(-1), None).view(shape)
