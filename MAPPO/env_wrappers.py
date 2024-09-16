@@ -268,6 +268,7 @@ class ShareSubprocVecEnv(ShareVecEnv):
 		self._state: AsyncState = AsyncState.DEFAULT
 		self.truncation_steps = truncation_steps
 		self.num_steps = np.zeros(nenvs, dtype=int)
+		self.lock = 
 
 		ShareVecEnv.__init__(self, len(env_fns), observation_space, action_space)
 	
