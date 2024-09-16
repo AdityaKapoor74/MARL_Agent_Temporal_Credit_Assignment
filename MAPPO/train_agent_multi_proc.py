@@ -308,8 +308,7 @@ class MAPPO:
 			elif "GFootball" in self.environment:
 				next_ally_states, next_enemy_states = None, None
 				next_global_obs = next_local_obs
-				next_indiv_dones = next_dones
-				next_dones = [all(next_indiv_done) for next_indiv_done in next_indiv_dones]
+				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = [rewards]*self.num_agents
 				next_mask_actions = np.ones([self.num_workers, self.num_agents, self.num_actions])
 			
