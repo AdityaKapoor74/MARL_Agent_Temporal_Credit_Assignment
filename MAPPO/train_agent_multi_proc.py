@@ -613,12 +613,12 @@ class MAPPO:
 
 					self.worker_step_counter[worker_index] = 0
 
-			with self.lock:
-				# update agent
-				if self.learn and self.agents.should_update_agent(self.num_episodes_done) and not(self.update_agent):
+			# update agent
+			if self.learn and self.agents.should_update_agent(self.num_episodes_done) and not(self.update_agent):
 
-					self.update_agent = True
-					
+				self.update_agent = True
+				
+				with self.lock:
 					if self.experiment_type == "uniform_team_redistribution":
 						b, t, n_a = self.agents.buffer.rewards.shape
 						episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
@@ -638,11 +638,12 @@ class MAPPO:
 						else:
 							self.agents.buffer.clear()
 
-				# update reward model
-				if self.learn and self.use_reward_model and not(self.update_reward_model):
+			# update reward model
+			if self.learn and self.use_reward_model and not(self.update_reward_model):
 
-					self.update_reward_model = True
+				self.update_reward_model = True
 
+				with self.lock:
 					if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
 						reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 						if "AREL" in self.experiment_type:
@@ -685,6 +686,7 @@ class MAPPO:
 
 								self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, self.num_episodes_done)
 								self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
+
 
 
 
