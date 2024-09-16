@@ -276,6 +276,8 @@ class RewardRolloutBufferShared(RewardRolloutBuffer):
 			episode_num = self.worker_episode_counter[worker_index] % self.capacity
 			timestep = self.time_steps[worker_index]
 
+			print("EPISOIDE NUM", episode_num, "WORKER INDEX", worker_indices)
+
 			self.episodes_completely_filled[episode_num] = 1
 
 			self.worker_episode_counter[worker_index] = self.next_episode_index_to_fill
