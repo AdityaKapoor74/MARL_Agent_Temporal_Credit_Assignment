@@ -521,7 +521,7 @@ class MAPPO:
 							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
 							self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
 							self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
-							self.agents.update(episode)
+							self.agents.update(self.num_episodes_done)
 						elif self.use_reward_model is False:
 							self.agents.update(self.num_episodes_done)
 						elif self.use_reward_model:
@@ -531,7 +531,7 @@ class MAPPO:
 								# self.agents.update_reward_model(sample)
 								
 								self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
-								self.agents.update(episode)
+								self.agents.update(self.num_episodes_done)
 							else:
 								self.agents.buffer.clear()
 
