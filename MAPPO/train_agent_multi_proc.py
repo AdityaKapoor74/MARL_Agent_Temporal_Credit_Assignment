@@ -689,8 +689,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
-				"max_time_steps": 100, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 50000 (GFootball)
+				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 40 (Alice_and_Bob)/ 100 (GFootball)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
