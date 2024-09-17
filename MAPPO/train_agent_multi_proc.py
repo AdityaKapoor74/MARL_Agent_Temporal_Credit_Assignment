@@ -377,7 +377,7 @@ class MAPPO:
 					else:
 						rewards_to_send.append(np.zeros(self.num_agents))
 
-					episodic_agent_reward[worker_index] = np.array(episodic_agent_reward[worker_index]) * (1-np.array(next_indiv_dones)) # reset only agent rewards that are done to avoid appending episodic agent reward in the next iteration
+					episodic_agent_reward[worker_index] = np.array(episodic_agent_reward[worker_index]) * (1-np.array(next_indiv_dones[worker_index])) # reset only agent rewards that are done to avoid appending episodic agent reward in the next iteration
 
 			rewards_to_send = np.array(rewards_to_send)
 
@@ -656,10 +656,10 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
+		environment = "StarCraft" # StarCraft/ Alice_and_Bob/ GFootball
+		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
+		experiment_type = "episodic_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_episodic_agent" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
