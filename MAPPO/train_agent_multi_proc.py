@@ -412,47 +412,68 @@ class MAPPO:
 
 				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps:
 					assert info["did_reset"][worker_index]
-					self.num_episodes_done += 1
-					step = self.worker_step_counter[worker_index]
-					# print(f"Worker {worker_index} done!")
-					if "_num_allies" in info: assert info["_num_allies"][worker_index] == False 
-					if "_num_enemies" in info: assert info["_num_enemies"][worker_index] == False 
-					print("*"*100)
-					print(
-						"EPISODE: {} | BUFFER EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(
-							self.num_episodes_done,
-							np.max(self.agents.buffer.worker_episode_counter)+1,
-							np.round(episode_reward[worker_index], decimals=4),
-							step,
-							self.max_time_steps,
-							episode_indiv_rewards[worker_index],
+					
+
+					flag = True
+					episode_num = self.agents.buffer.worker_episode_counter[worker_index]
+					time_step = self.agents.buffer.time_steps[worker_index]
+
+					if episode_num >= self.agents.buffer.num_episodes:
+						# print(f"skipping worker {worker_index} since it has collected more than needed")
+						# the workers that have collected all required episodes for this update should not store anything more
+						flag = False
+
+					# the below condition might hold only when running train_parallel_agent_async.py 
+					if time_step == 0 and self.worker_step_counter[worker_index] != 1:
+						# assert masks == None
+						# because of the above skip, after updation completes, it might be the case that the workers are somewhere in the middle of an ongoing episode
+						# so we will just do nothing till that episode completes. After it completes, storing would resume.
+						# print(f"skipping worker {worker_index} till it resets")
+						flag = False
+					
+					if flag:
+						self.num_episodes_done += 1
+
+						step = self.worker_step_counter[worker_index]
+						# print(f"Worker {worker_index} done!")
+						if "_num_allies" in info: assert info["_num_allies"][worker_index] == False 
+						if "_num_enemies" in info: assert info["_num_enemies"][worker_index] == False 
+						print("*"*100)
+						print(
+							"EPISODE: {} | BUFFER EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(
+								self.num_episodes_done,
+								np.max(self.agents.buffer.worker_episode_counter)+1,
+								np.round(episode_reward[worker_index], decimals=4),
+								step,
+								self.max_time_steps,
+								episode_indiv_rewards[worker_index],
+							)
 						)
-					)
-					if "StarCraft" in self.environment:
-						print("Num Allies Alive: {} | Num Enemies Alive: {} \n".format(info["last_info"]["num_allies"][worker_index], info["last_info"]["num_enemies"][worker_index]))
-					elif "Alice_and_Bob" in self.environment:
-						print("AGENTS DONE: {} \n".format(indiv_dones[worker_index]))
-
-					# if self.use_reward_model:
-					# 	predicted_episode_reward = self.agents.reward_model_output()
-						# print(action_list)
-
-					if self.save_comet_ml_plot:
-						self.comet_ml.log_metric('Episode_Length', step, self.num_episodes_done)
-						self.comet_ml.log_metric('Reward', episode_reward[worker_index], self.num_episodes_done)
 						if "StarCraft" in self.environment:
-							self.comet_ml.log_metric('Num Enemies', info["last_info"]["num_enemies"][worker_index], self.num_episodes_done)
-							self.comet_ml.log_metric('Num Allies', info["last_info"]["num_allies"][worker_index], self.num_episodes_done)
-							self.comet_ml.log_metric('All Enemies Dead', info["last_info"]["all_enemies_dead"][worker_index], self.num_episodes_done)
-							self.comet_ml.log_metric('All Allies Dead', info["last_info"]["all_allies_dead"][worker_index], self.num_episodes_done)
-						elif self.environment in ["Alice_and_Bob", "GFootball"]:
-							self.comet_ml.log_metric('Agents Done', dones[worker_index], self.num_episodes_done)
+							print("Num Allies Alive: {} | Num Enemies Alive: {} \n".format(info["last_info"]["num_allies"][worker_index], info["last_info"]["num_enemies"][worker_index]))
+						elif "Alice_and_Bob" in self.environment:
+							print("AGENTS DONE: {} \n".format(indiv_dones[worker_index]))
 
 						# if self.use_reward_model:
-						# 	self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, self.num_episodes_done)
+						# 	predicted_episode_reward = self.agents.reward_model_output()
+							# print(action_list)
 
-					# update entropy params
-					self.agents.update_parameters()
+						if self.save_comet_ml_plot:
+							self.comet_ml.log_metric('Episode_Length', step, self.num_episodes_done)
+							self.comet_ml.log_metric('Reward', episode_reward[worker_index], self.num_episodes_done)
+							if "StarCraft" in self.environment:
+								self.comet_ml.log_metric('Num Enemies', info["last_info"]["num_enemies"][worker_index], self.num_episodes_done)
+								self.comet_ml.log_metric('Num Allies', info["last_info"]["num_allies"][worker_index], self.num_episodes_done)
+								self.comet_ml.log_metric('All Enemies Dead', info["last_info"]["all_enemies_dead"][worker_index], self.num_episodes_done)
+								self.comet_ml.log_metric('All Allies Dead', info["last_info"]["all_allies_dead"][worker_index], self.num_episodes_done)
+							elif self.environment in ["Alice_and_Bob", "GFootball"]:
+								self.comet_ml.log_metric('Agents Done', dones[worker_index], self.num_episodes_done)
+
+							# if self.use_reward_model:
+							# 	self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, self.num_episodes_done)
+
+						# update entropy params
+						self.agents.update_parameters()
 
 					if self.learn:
 						local_obs_ = np.expand_dims(info["last_obs"][worker_index], axis=0)
@@ -491,113 +512,114 @@ class MAPPO:
 						if self.use_reward_model:
 							self.agents.reward_buffer.end_episode(np.array([worker_index]))
 
-					if self.agents.scheduler_need:
-						self.agents.scheduler_policy.step()
-						self.agents.scheduler_v_critic.step()
-						if self.use_reward_model:
-							self.agents.scheduler_reward.step()
+					if flag:
+						if self.agents.scheduler_need:
+							self.agents.scheduler_policy.step()
+							self.agents.scheduler_v_critic.step()
+							if self.use_reward_model:
+								self.agents.scheduler_reward.step()
 
-					if self.eval_policy:
-						self.rewards.append(episode_reward[worker_index])
-						self.timesteps.append(step)
+						if self.eval_policy:
+							self.rewards.append(episode_reward[worker_index])
+							self.timesteps.append(step)
 
-					if self.num_episodes_done > self.save_model_checkpoint and self.eval_policy:
-						self.rewards_mean_per_1000_eps.append(sum(self.rewards[self.num_episodes_done-self.save_model_checkpoint:self.num_episodes_done])/self.save_model_checkpoint)
-						self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[self.num_episodes_done-self.save_model_checkpoint:self.num_episodes_done])/self.save_model_checkpoint)
-
-
-					if not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0 and self.save_model:	
-						# save actor, critic, reward and optims
-						torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'_V_epsiode'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(self.num_episodes_done)+'.pt')  
-						torch.save(self.agents.v_critic_optimizer.state_dict(), self.optim_model_path+'_critic_epsiode_'+str(self.num_episodes_done)+'.pt')
-						torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'_policy_epsiode_'+str(self.num_episodes_done)+'.pt')  
-
-						if self.use_reward_model:
-							torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'_epsiode_'+str(self.num_episodes_done)+'.pt')
-							torch.save(self.agents.reward_optimizer.state_dict(), self.optim_model_path+'_reward_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
-			
-
-					# update agent
-					if self.learn and self.agents.should_update_agent(self.num_episodes_done) and not(self.update_agent):
-
-						self.update_agent = True
-						
-						if self.experiment_type == "uniform_team_redistribution":
-							b, t, n_a = self.agents.buffer.rewards.shape
-							episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
-							self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
-							self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
-							self.agents.update(self.num_episodes_done)
-						elif self.use_reward_model is False:
-							self.agents.update(self.num_episodes_done)
-						elif self.use_reward_model:
-							if self.num_episodes_done >= self.warm_up_period:
-								# finetune
-								# sample = self.agents.buffer.reward_model_obs, self.agents.buffer.actions, self.agents.buffer.one_hot_actions, self.agents.buffer.rewards[:, :, 0], 1-self.agents.buffer.team_dones[:, :-1], 1-self.agents.buffer.agent_dones[:, :-1, :], self.agents.buffer.episode_length
-								# self.agents.update_reward_model(sample)
-								
-								self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
-								self.agents.update(self.num_episodes_done)
-							else:
-								self.agents.buffer.clear()
+						if self.num_episodes_done > self.save_model_checkpoint and self.eval_policy:
+							self.rewards_mean_per_1000_eps.append(sum(self.rewards[self.num_episodes_done-self.save_model_checkpoint:self.num_episodes_done])/self.save_model_checkpoint)
+							self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[self.num_episodes_done-self.save_model_checkpoint:self.num_episodes_done])/self.save_model_checkpoint)
 
 
-					# update reward model
-					if self.learn and self.use_reward_model and not(self.update_reward_model):
+						if not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0 and self.save_model:	
+							# save actor, critic, reward and optims
+							torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'_V_epsiode'+str(self.num_episodes_done)+'.pt')
+							torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(self.num_episodes_done)+'.pt')  
+							torch.save(self.agents.v_critic_optimizer.state_dict(), self.optim_model_path+'_critic_epsiode_'+str(self.num_episodes_done)+'.pt')
+							torch.save(self.agents.policy_optimizer.state_dict(), self.optim_model_path+'_policy_epsiode_'+str(self.num_episodes_done)+'.pt')  
 
-						self.update_reward_model = True
+							if self.use_reward_model:
+								torch.save(self.agents.reward_model.state_dict(), self.reward_model_path+'_epsiode_'+str(self.num_episodes_done)+'.pt')
+								torch.save(self.agents.reward_optimizer.state_dict(), self.optim_model_path+'_reward_optim_epsiode_'+str(self.num_episodes_done)+'.pt')
+				
 
-						if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
-							reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
-							if "AREL" in self.experiment_type:
-								reward_var_batch = 0.0
-							elif "TAR^2" in self.experiment_type:
-								entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
-								reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
+						# update agent
+						if self.learn and self.agents.should_update_agent(self.num_episodes_done) and not(self.update_agent):
+
+							self.update_agent = True
 							
-							filled_episodes_list = np.where(self.agents.reward_buffer.episodes_completely_filled == 1)[0]
-							for i in range(self.reward_model_update_epochs):
-								print("reward model update", i)
-								sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size, filled_episode_list=filled_episodes_list)
+							if self.experiment_type == "uniform_team_redistribution":
+								b, t, n_a = self.agents.buffer.rewards.shape
+								episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
+								self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
+								self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
+								self.agents.update(self.num_episodes_done)
+							elif self.use_reward_model is False:
+								self.agents.update(self.num_episodes_done)
+							elif self.use_reward_model:
+								if self.num_episodes_done >= self.warm_up_period:
+									# finetune
+									# sample = self.agents.buffer.reward_model_obs, self.agents.buffer.actions, self.agents.buffer.one_hot_actions, self.agents.buffer.rewards[:, :, 0], 1-self.agents.buffer.team_dones[:, :-1], 1-self.agents.buffer.agent_dones[:, :-1, :], self.agents.buffer.episode_length
+									# self.agents.update_reward_model(sample)
+									
+									self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
+									self.agents.update(self.num_episodes_done)
+								else:
+									self.agents.buffer.clear()
+
+
+						# update reward model
+						if self.learn and self.use_reward_model and not(self.update_reward_model):
+
+							self.update_reward_model = True
+
+							if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
+								reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 								if "AREL" in self.experiment_type:
-									reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
-									reward_var_batch += (reward_var/self.reward_model_update_epochs)
+									reward_var_batch = 0.0
 								elif "TAR^2" in self.experiment_type:
-									reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
-									entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
-									entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
-									reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
-									dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
-								elif "STAS" in self.experiment_type:
-									reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
-
-								reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
-								grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
-
-								if self.agents.scheduler_need:
-									self.agents.scheduler_reward.step()
-
-							if self.comet_ml is not None:
-								self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, self.num_episodes_done)
-								self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, self.num_episodes_done)
-
-								if "AREL" in self.experiment_type:
-									self.comet_ml.log_metric('Reward_Var', reward_var_batch, self.num_episodes_done)
-								elif "TAR^2" in self.experiment_type:
-									self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, self.num_episodes_done)
-									self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, self.num_episodes_done)
-
-									self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, self.num_episodes_done)
-									self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
+									entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
+									reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 								
-					
+								filled_episodes_list = np.where(self.agents.reward_buffer.episodes_completely_filled == 1)[0]
+								for i in range(self.reward_model_update_epochs):
+									print("reward model update", i)
+									sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size, filled_episode_list=filled_episodes_list)
+									if "AREL" in self.experiment_type:
+										reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
+										reward_var_batch += (reward_var/self.reward_model_update_epochs)
+									elif "TAR^2" in self.experiment_type:
+										reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
+										entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
+										entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
+										reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
+										dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
+									elif "STAS" in self.experiment_type:
+										reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
 
-					if self.eval_policy and not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0:
-						np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
-						np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
-						np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
-						np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+									reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
+									grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
+
+									if self.agents.scheduler_need:
+										self.agents.scheduler_reward.step()
+
+								if self.comet_ml is not None:
+									self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, self.num_episodes_done)
+									self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, self.num_episodes_done)
+
+									if "AREL" in self.experiment_type:
+										self.comet_ml.log_metric('Reward_Var', reward_var_batch, self.num_episodes_done)
+									elif "TAR^2" in self.experiment_type:
+										self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, self.num_episodes_done)
+										self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, self.num_episodes_done)
+
+										self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, self.num_episodes_done)
+										self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
+									
+						
+
+						if self.eval_policy and not(self.num_episodes_done%self.save_model_checkpoint) and self.num_episodes_done!=0:
+							np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
+							np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
+							np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
+							np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
 
 
 					episodic_team_reward[worker_index] = 0
