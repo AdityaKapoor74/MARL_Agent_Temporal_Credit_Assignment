@@ -40,7 +40,6 @@ class MAPPO:
 		self.num_workers = dictionary["num_workers"]
 		assert len(env) == self.num_workers, f"number of rollout threads ({self.num_workers}) doesn't match the number of env functions ({len(env)})"
 		atexit.register(self.close)
-		self.lock = dictionary["lock"]
 
 
 		self.num_agents = dictionary["num_agents"]
@@ -671,7 +670,7 @@ if __name__ == '__main__':
 				"optim_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/optimizers/',
 				"reward_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_network/',
 				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 15,
 				"ppo_eps_elapse_update_freq": 30, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
@@ -777,7 +776,7 @@ if __name__ == '__main__':
 			import smaclite  # noqa
 			
 			# env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
-			env = [lambda: gym.make(f"smaclite/{env_name}-v0", seed=seeds[i] + 1000*j, use_cpp_rvo2=USE_CPP_RVO2) for j in range(dictionary["num_workers"])]
+			env = [lambda: gym.make(f"smaclite/{env_name}-v0", seed=seeds[i-1] + 1000*j, use_cpp_rvo2=USE_CPP_RVO2) for j in range(dictionary["num_workers"])]
 			obs, info = env[0]().reset(return_info=True)
 			dictionary["ally_observation_shape"] = info["ally_states"][0].shape[0]
 			dictionary["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
@@ -931,7 +930,7 @@ if __name__ == '__main__':
 					return info
 
 
-			env = [lambda: FootballEnv(seeds[i] + j*1000) for j in range(dictionary["num_workers"])]
+			env = [lambda: FootballEnv(seeds[i-1] + j*1000) for j in range(dictionary["num_workers"])]
 
 			dictionary["num_agents"] = env[0]().num_agents
 			dictionary["local_observation_shape"] = env[0]().observation_space[0].shape[0]
@@ -940,8 +939,6 @@ if __name__ == '__main__':
 			
 
 		# torch.set_num_threads(16)
-		from multiprocessing import Lock
-		dictionary["lock"] = Lock()
 		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()
 
