@@ -288,8 +288,10 @@ class PPOAgent:
 			if "AREL" in self.experiment_type:
 				from AREL import AREL
 				self.reward_model = AREL.Time_Agent_Transformer(
+					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape,
+					obs_shape=self.global_observation_shape,
 					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
