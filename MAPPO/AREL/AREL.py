@@ -104,7 +104,7 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, ally_obs, enemy_obs, actions, episodic_reward, team_masks=None, agent_masks=None):
+	def forward(self, ally_obs, enemy_obs, obs, actions, episodic_reward, team_masks=None, agent_masks=None):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
