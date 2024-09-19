@@ -702,7 +702,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
