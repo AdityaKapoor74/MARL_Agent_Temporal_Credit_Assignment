@@ -52,8 +52,9 @@ class Time_Agent_Transformer(nn.Module):
 		self.version = version
 		self.device = device
 		self.depth = depth
+		self.environment = environment
 
-		# self.obs_shape = obs_shape
+		self.obs_shape = obs_shape
 		self.action_shape = action_shape
 		self.seq_length = seq_length
 		self.comp_emb = linear_compression_dim
@@ -129,7 +130,7 @@ class Time_Agent_Transformer(nn.Module):
 			x = (ally_obs_embedding+enemy_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
 		elif "GFootball" in self.environment:
 			x = (obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
-			
+
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0
 
