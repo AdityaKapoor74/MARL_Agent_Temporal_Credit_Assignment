@@ -597,7 +597,7 @@ class PPOAgent:
 			rewards, temporal_weights, agent_weights, temporal_scores, agent_scores = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
-				state_batch,
+				global_obs_batch,
 				actions_batch, 
 				episodic_reward_batch,
 				team_masks=team_mask_batch,
