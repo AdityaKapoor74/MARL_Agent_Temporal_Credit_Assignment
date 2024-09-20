@@ -563,13 +563,13 @@ class MAPPO:
 								else:
 									self.agents.buffer.clear()
 
-
 						# update reward model
 						if self.learn and self.use_reward_model and not(self.update_reward_model):
 
-							self.update_reward_model = True
-
 							if self.reward_batch_size <= self.agents.reward_buffer.episodes_filled and self.num_episodes_done != 0 and self.num_episodes_done % self.update_reward_model_freq == 0:
+								
+								self.update_reward_model = True
+
 								reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
 								if "AREL" in self.experiment_type:
 									reward_var_batch = 0.0
@@ -635,6 +635,8 @@ class MAPPO:
 					rnn_hidden_state_actor[worker_index] = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
 					self.worker_step_counter[worker_index] = 0
+
+					print("WORKER INDEX", worker_index, "REWARD MODEL UPDATE-STATUS", self.update_reward_model, "AGENT UPDATE-STATUS", self.update_agent)
 
 					if self.update_reward_model:
 						self.update_reward_model = False
@@ -721,8 +723,8 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 200, # 100
-				"reward_model_update_epochs": 200, # 200
+				"update_reward_model_freq": 20, # 100
+				"reward_model_update_epochs": 10, # 200
 				"norm_rewards": False,
 
 
