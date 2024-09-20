@@ -107,7 +107,7 @@ class STAS_ML(nn.Module):
 			enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_states)).mean(dim=1, keepdim=True).repeat(1, n_a, 1, 1)
 			ally_obs_embedding = self.ally_obs_compress_input(ally_states)
 		elif "GFootball" in self.environment:
-			b, n_a, t, _ = obs.size()
+			b, n_a, t, _ = states.size()
 			obs_embedding = self.obs_compress_input(states)
 
 		
