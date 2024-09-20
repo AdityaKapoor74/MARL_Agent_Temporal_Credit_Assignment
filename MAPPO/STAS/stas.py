@@ -45,7 +45,7 @@ class ShapelyAttention(nn.Module):
 
 		return shapley_reward
 		
-		
+
 
 class STAS_ML(nn.Module):
 	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
@@ -68,14 +68,14 @@ class STAS_ML(nn.Module):
 
 		if "StarCraft" in self.environment:
 			self.ally_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(ally_obs_shape, emb_dim), activate=False),
+				nn.Linear(ally_obs_shape, emb_dim),
 				)
 			self.enemy_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(enemy_obs_shape, emb_dim), activate=False),
+				nn.Linear(enemy_obs_shape, emb_dim),
 				)
 		elif "GFootball" in self.environment:
 			self.obs_compress_input = nn.Sequential(
-				init_(nn.Linear(obs_shape, emb_dim), activate=False),
+				nn.Linear(obs_shape, emb_dim),
 				)
 
 		if not action_space == 'discrete':
