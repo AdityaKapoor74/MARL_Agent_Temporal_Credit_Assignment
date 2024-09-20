@@ -678,7 +678,7 @@ class PPOAgent:
 
 			rewards = rewards.transpose(1, 2) * agent_masks_batch
 
-			reward_loss = F.mse_loss(rewards.reshape(ally_obs_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()
