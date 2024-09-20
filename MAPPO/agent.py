@@ -331,8 +331,10 @@ class PPOAgent:
 			elif "STAS" in self.experiment_type:
 				from STAS import stas
 				self.reward_model = stas.STAS_ML(
+					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape, 
+					obs_shape=self.global_observation_shape,
 					n_actions=self.num_actions, 
 					emb_dim=dictionary["reward_linear_compression_dim"], 
 					n_heads=dictionary["reward_n_heads"], 
@@ -549,7 +551,8 @@ class PPOAgent:
 				with torch.no_grad():
 					rewards = self.reward_model( 
 						ally_state_batch, 
-						enemy_state_batch, 
+						enemy_state_batch,
+						state_batch, 
 						actions_batch, 
 						episode_len_batch,
 						agent_masks_batch,
@@ -666,6 +669,7 @@ class PPOAgent:
 			rewards = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
+				global_obs_batch,
 				actions_batch, 
 				episode_len_batch,
 				# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
