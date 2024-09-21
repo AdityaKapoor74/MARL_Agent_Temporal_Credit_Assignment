@@ -68,17 +68,17 @@ class STAS_ML(nn.Module):
 
 		if "StarCraft" in self.environment:
 			self.ally_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
+				nn.Linear(ally_obs_shape, self.emb_dim),
 				)
 			self.enemy_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
+				nn.Linear(enemy_obs_shape, self.emb_dim),
 				)
 		elif "GFootball" in self.environment:
 			self.ally_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
+				nn.Linear(ally_obs_shape, self.emb_dim),
 				)
 			self.common_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
+				nn.Linear(obs_shape, self.emb_dim),
 				)
 
 		if not action_space == 'discrete':
