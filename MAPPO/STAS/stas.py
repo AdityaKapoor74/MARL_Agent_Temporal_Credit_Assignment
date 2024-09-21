@@ -68,14 +68,17 @@ class STAS_ML(nn.Module):
 
 		if "StarCraft" in self.environment:
 			self.ally_obs_compress_input = nn.Sequential(
-				nn.Linear(ally_obs_shape, emb_dim),
+				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
 				)
 			self.enemy_obs_compress_input = nn.Sequential(
-				nn.Linear(enemy_obs_shape, emb_dim),
+				init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
 				)
 		elif "GFootball" in self.environment:
-			self.obs_compress_input = nn.Sequential(
-				nn.Linear(obs_shape, emb_dim),
+			self.ally_obs_compress_input = nn.Sequential(
+				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
+				)
+			self.common_obs_compress_input = nn.Sequential(
+				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
 				)
 
 		if not action_space == 'discrete':
@@ -107,8 +110,10 @@ class STAS_ML(nn.Module):
 			enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_states)).mean(dim=1, keepdim=True).repeat(1, n_a, 1, 1)
 			ally_obs_embedding = self.ally_obs_compress_input(ally_states)
 		elif "GFootball" in self.environment:
-			b, n_a, t, _ = states.size()
-			obs_embedding = self.obs_compress_input(states)
+			b, n_a, t, _ = ally_states.size()
+			ally_obs_embedding = self.ally_obs_compress_input(ally_states)
+			common_obs_embedding = self.common_obs_compress_input(states)
+			ally_obs_embedding = ally_obs_embedding + common_obs_embedding.unsqueeze(1)
 
 		
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
@@ -117,7 +122,7 @@ class STAS_ML(nn.Module):
 		if "StarCraft" in self.environment:
 			x = (ally_obs_embedding+enemy_obs_embedding+actions_embed+positions)
 		elif "GFootball" in self.environment:
-			x = (obs_embedding+actions_embed+positions)
+			x = (ally_obs_embedding+actions_embed+positions)
 
 		time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
 		# time_mask = self.get_time_mask(episode_length)
