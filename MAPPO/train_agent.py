@@ -166,11 +166,13 @@ class MAPPO:
 				global_obs = np.array(global_obs)
 				mask_actions = np.ones([self.num_agents, self.num_actions])
 				ally_states, enemy_states = None, None
+				info = {}
 			else:
 				local_obs = self.env.reset()
 				global_obs = self.env.get_state()
 				mask_actions = np.ones([self.num_agents, self.num_actions])
 				ally_states, enemy_states = None, None
+				info = {}
 			
 
 			last_actions = np.zeros((self.num_agents)) + self.num_actions
@@ -209,15 +211,15 @@ class MAPPO:
 
 				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 				
-				next_local_obs, rewards, next_dones, info = self.env.step(actions)
+				next_local_obs, rewards, next_dones, next_info = self.env.step(actions)
 				next_local_obs = np.array(next_local_obs)
 
 				if "StarCraft" in self.environment:
-					next_ally_states = np.array(info["ally_states"])
-					next_enemy_states = np.array(info["enemy_states"])
-					next_mask_actions = np.array(info["avail_actions"], dtype=int)
-					next_indiv_dones = info["indiv_dones"]
-					indiv_rewards = info["indiv_rewards"]
+					next_ally_states = np.array(next_info["ally_states"])
+					next_enemy_states = np.array(next_info["enemy_states"])
+					next_mask_actions = np.array(next_info["avail_actions"], dtype=int)
+					next_indiv_dones = next_info["indiv_dones"]
+					indiv_rewards = next_info["indiv_rewards"]
 
 					next_global_obs = None
 

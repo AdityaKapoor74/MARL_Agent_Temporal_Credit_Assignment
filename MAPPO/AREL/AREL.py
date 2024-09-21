@@ -71,7 +71,10 @@ class Time_Agent_Transformer(nn.Module):
 				init_(nn.Linear(enemy_obs_shape, self.comp_emb), activate=False),
 				)
 		elif "GFootball" in self.environment:
-			self.obs_compress_input = nn.Sequential(
+			self.ally_obs_compress_input = nn.Sequential(
+				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
+				)
+			self.common_obs_compress_input = nn.Sequential(
 				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
 				)
 
@@ -119,8 +122,10 @@ class Time_Agent_Transformer(nn.Module):
 			enemy_obs_embedding = (self.enemy_obs_compress_input(enemy_obs)).mean(dim=1, keepdim=True)
 			ally_obs_embedding = self.ally_obs_compress_input(ally_obs) #+ agent_embedding
 		elif "GFootball" in self.environment:
-			b, n_a, t, _ = obs.size()
-			obs_embedding = self.obs_compress_input(obs)
+			b, n_a, t, _ = ally_obs.size()
+			ally_obs_embedding = self.ally_obs_compress_input(ally_obs)
+			common_obs_embedding = self.common_obs_compress_input(obs)
+			ally_obs_embedding = ally_obs_embedding + common_obs_embedding.unsqueeze(1)
 
 		position_embedding = self.position_embedding(torch.arange(t, device=self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents, device=self.device))[None, :, None, :].expand(b, n_a, t, self.comp_emb)
@@ -129,7 +134,7 @@ class Time_Agent_Transformer(nn.Module):
 		if "StarCraft" in self.environment:
 			x = (ally_obs_embedding+enemy_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
 		elif "GFootball" in self.environment:
-			x = (obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
+			x = (ally_obs_embedding+action_embedding+agent_embedding+position_embedding).view(b*n_a, t, self.comp_emb)
 
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 		i = 0

@@ -182,17 +182,23 @@ def shareworker(remote, parent_remote, env_fn_wrapper, environment_name):
 				data, should_truncate, additional_info = data
 				ob, reward, done, info = env.step(data)
 				info["did_reset"] = False
-				if done or should_truncate:
+				if done or should_truncate:	
 					if environment_name == "GFootball":
-						next_ob = env.reset()
+						next_ob, next_info = env.reset()
 						# storing this info to generate state-value function
-						next_info = {
-							"__global_obs": additional_info["__global_obs"],
-							"__last_actions": additional_info["__last_actions"],
-							"__rnn_hidden_state_actor": additional_info["__rnn_hidden_state_actor"],
-							"__mask_actions": additional_info["__mask_actions"],
-							"__rnn_hidden_state_v": additional_info["__rnn_hidden_state_v"],
-							}
+						# next_info = {
+						# 	"__global_obs": additional_info["__global_obs"],
+						# 	"__last_actions": additional_info["__last_actions"],
+						# 	"__rnn_hidden_state_actor": additional_info["__rnn_hidden_state_actor"],
+						# 	"__mask_actions": additional_info["__mask_actions"],
+						# 	"__rnn_hidden_state_v": additional_info["__rnn_hidden_state_v"],
+						# 	}
+						next_info["__global_obs"] = additional_info["__global_obs"]
+						next_info["__last_actions"] = additional_info["__last_actions"]
+						next_info["__rnn_hidden_state_actor"] = additional_info["__rnn_hidden_state_actor"]
+						next_info["__mask_actions"] = additional_info["__mask_actions"]
+						next_info["__rnn_hidden_state_v"] = additional_info["__rnn_hidden_state_v"]
+						
 					elif environment_name == "StarCraft":
 						next_ob, next_info = env.reset(return_info=True)
 						# storing this info to generate state-value function
@@ -214,15 +220,15 @@ def shareworker(remote, parent_remote, env_fn_wrapper, environment_name):
 				options = data["options"] if "options" in data.keys() else None
 				if return_info:
 					if environment_name == "GFootball":
-						ob = env.reset()
-						info = {}
+						ob, info = env.reset()
+						# info = {}
 						info["did_reset"] = True
 					elif environment_name == "StarCraft":
 						ob, info = env.reset(seed=seed, return_info=return_info, options=options)
 						info["did_reset"] = True
 				else:
 					if environment_name == "GFootball":
-						ob = env.reset()
+						ob, _ = env.reset()
 					elif environment_name == "StarCraft":
 						ob = env.reset(seed=seed, return_info=return_info, options=options)
 					info = None

@@ -189,7 +189,6 @@ class MAPPO:
 
 		def _combine_indiv_dones(info):
 			final_indiv_dones = []
-			final_dones = []
 			for worker_index in range(self.num_workers):
 				if "_indiv_dones" not in info.keys():
 					assert info["did_reset"][worker_index]
@@ -200,9 +199,8 @@ class MAPPO:
 					else:
 						assert info["did_reset"][worker_index]
 						final_indiv_dones.append(info["last_info"]["indiv_dones"][worker_index])
-				final_dones.append(int(all(final_indiv_dones[-1])))
 
-			return np.array(final_indiv_dones, dtype=np.int64), np.array(final_dones, dtype=np.int64)
+			return np.array(final_indiv_dones, dtype=np.int64)
 
 
 		self.reward_plot_counter = 0
@@ -215,17 +213,15 @@ class MAPPO:
 			mask_actions = np.array(info["avail_actions"], dtype=int)
 			ally_states = np.array(info["ally_states"])
 			enemy_states = np.array(info["enemy_states"])
-			global_obs = None
+			global_obs, common_obs = None, None
 		elif "GFootball" in self.environment:
 			global_obs, info = local_obs, info = self.env.reset(return_info=True)
 			global_obs = np.array(global_obs)
 			mask_actions = np.ones([self.num_workers, self.num_agents, self.num_actions])
-			ally_states, enemy_states = None, None
-		else:
-			local_obs = self.env.reset()
-			global_obs = self.env.get_state()
-			mask_actions = np.ones([self.num_agents, self.num_actions])
-			ally_states, enemy_states = None, None
+			ally_states = np.array(info["player_observations"])
+			common_obs = np.array(info["common_information"])
+			enemy_states = None
+			
 		
 
 		local_obs = np.array(local_obs)
@@ -278,6 +274,7 @@ class MAPPO:
 
 
 			next_local_obs, rewards, next_dones, info = self.env.step(actions, additional_info)
+
 			next_local_obs = np.array(next_local_obs)
 			for i, d in enumerate(dones):
 				if not d: #and self.worker_step_counter[i]<self.max_time_steps-1:
@@ -291,26 +288,17 @@ class MAPPO:
 				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = info["indiv_rewards"]
 				
-				next_global_obs = None
-
-			elif "Alice_and_Bob" in self.environment:
-				next_global_obs = self.env.get_state()
-
-				next_ally_states = None
-				next_enemy_states = None
-				next_mask_actions = np.ones([self.num_agents, self.num_actions])
-				# next_dones and rewards is a list: [global_val]*num_agents
-				next_indiv_dones = next_dones
-				next_dones = [all(next_indiv_done) for next_indiv_done in next_indiv_dones]
-				indiv_rewards = rewards
-				rewards = indiv_rewards[0]
+				next_global_obs, next_common_obs = None, None
 
 			elif "GFootball" in self.environment:
-				next_ally_states, next_enemy_states = None, None
+				next_ally_states = np.array(info["player_observations"])
+				next_common_obs = np.array(info["common_information"])
 				next_global_obs = next_local_obs
 				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = [rewards]*self.num_agents
 				next_mask_actions = np.ones([self.num_workers, self.num_agents, self.num_actions])
+
+				next_enemy_states = None
 			
 			
 			if self.experiment_type == "temporal_team":
@@ -384,18 +372,19 @@ class MAPPO:
 			if self.learn:
 				self.agents.buffer.push(
 					ally_states, enemy_states, value, rnn_hidden_state_v, \
-					global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+					global_obs, local_obs, common_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
 					rewards_to_send, indiv_dones, dones, self.worker_step_counter
 					)
 
 				if self.use_reward_model:
 					self.agents.reward_buffer.push(
-						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
+						ally_states, enemy_states, local_obs, common_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
 						)
 
 			ally_states, enemy_states = next_ally_states, next_enemy_states
+			common_obs = next_common_obs
 			global_obs, local_obs, last_actions, mask_actions = next_global_obs, next_local_obs, actions, next_mask_actions
-			indiv_dones, dones = _combine_indiv_dones(info)
+			indiv_dones, dones = _combine_indiv_dones(info), next_dones
 			rnn_hidden_state_v, rnn_hidden_state_actor = next_rnn_hidden_state_v, next_rnn_hidden_state_actor
 
 			
@@ -408,10 +397,8 @@ class MAPPO:
 					individual_rewards = info["last_info"]["indiv_rewards"][worker_index]
 				episode_indiv_rewards[worker_index] = [r+individual_rewards[i] for i, r in enumerate(episode_indiv_rewards[worker_index])]
 
-
-				if all(indiv_dones[worker_index]) or self.worker_step_counter[worker_index] == self.max_time_steps:
+				if dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
 					assert info["did_reset"][worker_index]
-					
 
 					flag = True
 					episode_num = self.agents.buffer.worker_episode_counter[worker_index]
@@ -450,8 +437,6 @@ class MAPPO:
 						)
 						if "StarCraft" in self.environment:
 							print("Num Allies Alive: {} | Num Enemies Alive: {} \n".format(info["last_info"]["num_allies"][worker_index], info["last_info"]["num_enemies"][worker_index]))
-						elif "Alice_and_Bob" in self.environment:
-							print("AGENTS DONE: {} \n".format(indiv_dones[worker_index]))
 
 						# if self.use_reward_model:
 						# 	predicted_episode_reward = self.agents.reward_model_output()
@@ -465,7 +450,7 @@ class MAPPO:
 								self.comet_ml.log_metric('Num Allies', info["last_info"]["num_allies"][worker_index], self.num_episodes_done)
 								self.comet_ml.log_metric('All Enemies Dead', info["last_info"]["all_enemies_dead"][worker_index], self.num_episodes_done)
 								self.comet_ml.log_metric('All Allies Dead', info["last_info"]["all_allies_dead"][worker_index], self.num_episodes_done)
-							elif self.environment in ["Alice_and_Bob", "GFootball"]:
+							elif self.environment == "GFootball":
 								self.comet_ml.log_metric('Agents Done', dones[worker_index], self.num_episodes_done)
 
 							# if self.use_reward_model:
@@ -485,7 +470,7 @@ class MAPPO:
 							enemy_states_ = np.expand_dims(info["last_info"]["enemy_states"][worker_index], axis=0)
 							global_obs_ = None
 							mask_actions_ = np.expand_dims(info["last_info"]["avail_actions"][worker_index], axis=0)
-						elif self.environment in ["Alice_and_Bob", "GFootball"]:
+						elif self.environment == "GFootball":
 							ally_states_, enemy_states_ = None, None
 							global_obs_ = np.expand_dims(info["__global_obs"][worker_index], axis=0)
 							mask_actions_ = np.expand_dims(info["__mask_actions"][worker_index], axis=0)
@@ -636,8 +621,6 @@ class MAPPO:
 
 					self.worker_step_counter[worker_index] = 0
 
-					print("WORKER INDEX", worker_index, "REWARD MODEL UPDATE-STATUS", self.update_reward_model, "AGENT UPDATE-STATUS", self.update_agent)
-
 					if self.update_reward_model:
 						self.update_reward_model = False
 
@@ -657,10 +640,10 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
-		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
-		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
+		environment = "GFootball" # StarCraft/ GFootball
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_AREL_agent_temporal" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -690,8 +673,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 50000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments -- 100 for 3s5z)/ 40 (Alice_and_Bob)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (GFootball)
+				"max_time_steps": 200, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -786,16 +769,7 @@ if __name__ == '__main__':
 			dictionary["num_agents"] = env[0]().n_agents
 			dictionary["num_enemies"] = env[0]().n_enemies
 			dictionary["num_actions"] = env[0]().action_space[0].n
-		elif "Alice_and_Bob" in dictionary["environment"]:
-			sys.path.append("../../../environments/alice_and_bob/") # local
-			sys.path.append("../../environments/alice_and_bob/") # remote
-			from alice_and_bob import *
-
-			env = Alice_and_Bob()
-			dictionary["num_agents"] = env.agent_num
-			dictionary["local_observation_shape"] = env.obs_dim
-			dictionary["global_observation_shape"] = env.state_dim
-			dictionary["num_actions"] = env.n_action
+		
 		elif "GFootball" in dictionary["environment"]:
 			import random
 
@@ -886,11 +860,86 @@ if __name__ == '__main__':
 								dtype=self.env.observation_space.dtype
 							))
 
+						self.indiv_agent_observation_shape = 4 # pose + direction
+						self.common_information_observation_shape = 115 - self.num_agents*self.indiv_agent_observation_shape - 11 # 11 -- one hot for active players
+
+
+				def process_indiv_agent_obs(self, obs):
+					'''
+					https://github.com/google-research/football/blob/master/gfootball/doc/observation.md
+
+					simple115_v2:-
+					Same as simple115, but with the bug fixed.
+
+					    22 - (x,y) coordinates of left team players (COMMON)
+					    22 - (x,y) direction of left team players (COMMON)
+					    22 - (x,y) coordinates of right team players (COMMON)
+					    22 - (x, y) direction of right team players (COMMON)
+					    3 - (x, y and z) - ball position (COMMON)
+					    3 - ball direction (COMMON)
+					    3 - one hot encoding of ball ownership (noone, left, right) (COMMON)
+					    11 - one hot encoding of which player is active
+					    7 - one hot encoding of game_mode (COMMON)
+
+					Entries for players that are not active (either due to red cards or if number of player is less than 11) are set to -1.
+					'''
+
+					obs = np.array(obs)
+
+					player_positions = np.reshape(obs[0, :22], (11, 2))
+					player_directions = np.reshape(obs[0, 22:44], (11, 2))
+					opponent_positions = obs[0, 44:66]
+					opponent_directions = obs[0, 66:88]
+					ball_position = np.reshape(obs[0, 88:91], (3))
+					ball_direction = np.reshape(obs[0, 91:94], (3))
+					ball_ownership = np.reshape(obs[0, 94:97], (3))
+					active_players = np.reshape(obs[:, 97:108], (self.num_agents, 11))
+					players_active_inactive = np.sum(active_players, axis=1)
+					active_players = np.argmax(active_players, axis=1).reshape((self.num_agents))
+					game_mode = np.reshape(obs[0, 108:], (7))
+
+					player_observations = []
+					indiv_dones = []
+					for player_id, player_active in zip(active_players, players_active_inactive):
+						if player_active:
+							player_obs = [player_positions[player_id][0], player_positions[player_id][1], player_directions[player_id][0], player_directions[player_id][1]]
+							indiv_dones.append(False)
+						else:
+							player_obs = [0, 0, 0, 0]
+							indiv_dones.append(True)
+
+						player_observations.append(player_obs)
+
+					common_information = []
+					for player_id in range(11):
+						if player_id in active_players:
+							continue
+
+						common_information.extend([player_positions[player_id][0], player_positions[player_id][1], player_directions[player_id][0], player_directions[player_id][1]])
+
+					common_information.extend(opponent_positions)
+					common_information.extend(opponent_directions)
+					common_information.extend(ball_position)
+					common_information.extend(ball_direction)
+					common_information.extend(ball_ownership)
+					common_information.extend(game_mode)
+
+					player_observations, common_information, indiv_dones = np.array(player_observations), np.array(common_information), np.array(indiv_dones)
+
+					return player_observations, common_information, indiv_dones
+
 
 				def reset(self):
 					obs = self.env.reset()
 					obs = self._obs_wrapper(obs)
-					return obs
+
+					info = {}
+					player_observations, common_information, indiv_dones = self.process_indiv_agent_obs(obs)
+					info["player_observations"] = player_observations
+					info["common_information"] = common_information
+					info["indiv_dones"] = indiv_dones
+
+					return obs, info
 
 				def step(self, action):
 					obs, reward, done, info = self.env.step(action)
@@ -903,8 +952,16 @@ if __name__ == '__main__':
 						reward = global_reward
 
 					# done = np.array([done] * self.num_agents)
-					info["indiv_dones"] = np.array([done] * self.num_agents)
+					# info["indiv_dones"] = np.array([done] * self.num_agents)
 					info = self._info_wrapper(info)
+
+					player_observations, common_information, indiv_dones = self.process_indiv_agent_obs(obs)
+					info["player_observations"] = player_observations
+					info["common_information"] = common_information
+					info["indiv_dones"] = indiv_dones # the indiv dones only capture red card
+					if done:
+						info["indiv_dones"] = np.array([done] * self.num_agents)
+
 					return obs, reward, done, info
 
 				def seed(self, seed=None):
@@ -937,6 +994,8 @@ if __name__ == '__main__':
 			dictionary["num_agents"] = env[0]().num_agents
 			dictionary["local_observation_shape"] = env[0]().observation_space[0].shape[0]
 			dictionary["global_observation_shape"] = env[0]().observation_space[0].shape[0]
+			dictionary["ally_observation_shape"] = env[0]().indiv_agent_observation_shape
+			dictionary["common_information_observation_shape"] = env[0]().common_information_observation_shape
 			dictionary["num_actions"] = env[0]().action_space[0].n
 			
 
