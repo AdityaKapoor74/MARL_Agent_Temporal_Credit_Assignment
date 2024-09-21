@@ -707,7 +707,7 @@ if __name__ == '__main__':
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 100, # 100
-				"reward_model_update_epochs": 200, # 200
+				"reward_model_update_epochs": 50, # 200
 				"norm_rewards": False,
 
 
