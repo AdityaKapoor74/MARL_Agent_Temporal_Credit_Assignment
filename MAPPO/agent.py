@@ -653,7 +653,7 @@ class PPOAgent:
 
 			target_importance_sampling = (logprobs_batch - logprobs_old_batch) * agent_masks_batch
 			target_importance_sampling = target_importance_sampling.sum(dim=-1)
-			target_importance_sampling = torch.exp(target_importance_sampling)
+			target_importance_sampling = torch.exp(target_importance_sampling).clamp(1e-5, 10.0)
 			target_importance_sampling = target_importance_sampling * team_mask_batch
 
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
