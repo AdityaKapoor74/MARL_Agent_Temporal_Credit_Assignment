@@ -296,7 +296,7 @@ class MAPPO:
 				next_global_obs = next_local_obs
 				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = info["indiv_rewards"]
-				next_mask_actions = np.array(info["mask_actions"], dtype=int)
+				next_mask_actions = np.ones((self.num_workers, self.num_agents, self.num_actions)) # np.array(info["mask_actions"], dtype=int)
 
 				next_enemy_states = None
 			
@@ -641,8 +641,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
+		experiment_type = "episodic_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_episodic_agent" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -930,13 +930,16 @@ if __name__ == '__main__':
 
 				def reset(self):
 					obs = self.env.reset()
+					obs, _, _, info = self.env.step([0]*self.num_agents) # we want to mine information from info dict -- wrong approach but can do for now
 					obs = self._obs_wrapper(obs)
 
-					info = {}
+					# info = {}
 					player_observations, common_information, indiv_dones = self.process_indiv_agent_obs(obs)
 					info["player_observations"] = player_observations
 					info["common_information"] = common_information
 					info["indiv_dones"] = indiv_dones
+
+					info = self._info_wrapper(info)
 
 					return obs, info
 
@@ -988,73 +991,6 @@ if __name__ == '__main__':
 					info["active"] = np.array([state[i]["active"] for i in range(self.num_agents)])
 					info["designated"] = np.array([state[i]["designated"] for i in range(self.num_agents)])
 					info["sticky_actions"] = np.stack([state[i]["sticky_actions"] for i in range(self.num_agents)])
-
-
-					'''
-					sticky_actions - 10-elements vectors of 0s or 1s denoting whether corresponding action is active:
-
-				    0 - action_left
-				    1 - action_top_left
-				    2 - action_top
-				    3 - action_top_right
-				    4 - action_right
-				    5 - action_bottom_right
-				    6 - action_bottom
-				    7 - action_bottom_left
-				    8 - action_sprint
-				    9 - action_dribble
-
-					'''
-
-					'''
-					The default action set consists of 19 actions:
-
-				    Idle actions
-				        action_idle = 0, a no-op action, sticky actions are not affected (player maintains his directional movement etc.).
-
-				    Movement actions
-				        action_left = 1, run to the left, sticky action.
-				        action_top_left = 2, run to the top-left, sticky action.
-				        action_top = 3, run to the top, sticky action.
-				        action_top_right = 4, run to the top-right, sticky action.
-				        action_right = 5, run to the right, sticky action.
-				        action_bottom_right = 6, run to the bottom-right, sticky action.
-				        action_bottom = 7, run to the bottom, sticky action.
-				        action_bottom_left = 8, run to the bottom-left, sticky action.
-
-				    Passing / Shooting
-				        action_long_pass = 9, perform a long pass to the player on your team. Player to pass the ball to is auto-determined based on the movement direction.
-				        action_high_pass = 10, perform a high pass, similar to action_long_pass.
-				        action_short_pass = 11, perform a short pass, similar to action_long_pass.
-				        action_shot = 12, perform a shot, always in the direction of the opponent's goal.
-
-				    Other actions
-				        action_sprint = 13, start sprinting, sticky action. Player moves faster, but has worse ball handling.
-				        action_release_direction = 14, reset current movement direction.
-				        action_release_sprint = 15, stop sprinting.
-				        action_sliding = 16, perform a slide (effective when not having a ball).
-				        action_dribble = 17, start dribbling (effective when having a ball), sticky action. Player moves slower, but it is harder to take over the ball from him.
-				        action_release_dribble = 18, stop dribbling.
-
-					'''
-					info["mask_actions"] = []
-					for agent_num in range(self.num_agents):
-						mask_actions = []
-						for action_num in range(self.action_space[agent_num].n):
-							if action_num in [0, 9, 10, 11, 12, 14, 15, 16, 18]:
-								mask_actions.append(1)
-							else:
-								if action_num >=1 and action_num <= 8:
-									mask_actions.append(info["sticky_actions"][agent_num][action_num-1])
-								elif action_num == 13:
-									mask_actions.append(info["sticky_actions"][agent_num][8])
-								elif action_num == 17:
-									mask_actions.append(info["sticky_actions"][agent_num][9])
-						
-						info["mask_actions"].append(mask_actions)
-
-					info["mask_actions"] = np.array(info["mask_actions"])
-
 
 					return info
 
