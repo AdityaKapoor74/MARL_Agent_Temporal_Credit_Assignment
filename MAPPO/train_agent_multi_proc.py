@@ -562,10 +562,9 @@ class MAPPO:
 									entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 									reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 								
-								filled_episodes_list = np.where(self.agents.reward_buffer.episodes_completely_filled == 1)[0]
 								for i in range(self.reward_model_update_epochs):
 									print("reward model update", i)
-									sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size, filled_episode_list=filled_episodes_list)
+									sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
 									if "AREL" in self.experiment_type:
 										reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 										reward_var_batch += (reward_var/self.reward_model_update_epochs)
@@ -641,9 +640,9 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "episodic_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_episodic_agent" # default setting: reward prediction loss + dynamic loss
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_AREL_agent_temporal" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -683,7 +682,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 200, # 200
+				"warm_up_period": 2000, # 200
 
 
 				# REWARD MODEL
@@ -706,7 +705,7 @@ if __name__ == '__main__':
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
 				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 200, # 100
+				"update_reward_model_freq": 100, # 100
 				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
 
@@ -746,8 +745,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 4e-3, #8e-3
+				"entropy_pen_final": 4e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
