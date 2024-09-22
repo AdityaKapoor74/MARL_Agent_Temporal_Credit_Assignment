@@ -961,8 +961,8 @@ if __name__ == '__main__':
 					if done:
 						info["indiv_dones"] = np.array([done] * self.num_agents)
 
-					print("*"*20)
-					print(info.keys())
+					# print("*"*20)
+					# print(info.keys())
 
 					return obs, reward, done, info
 
