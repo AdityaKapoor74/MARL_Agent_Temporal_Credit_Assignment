@@ -295,7 +295,7 @@ class MAPPO:
 				next_common_obs = np.array(info["common_information"])
 				next_global_obs = next_local_obs
 				next_indiv_dones = info["indiv_dones"]
-				indiv_rewards = [rewards]*self.num_agents
+				indiv_rewards = info["indiv_rewards"]
 				next_mask_actions = np.ones([self.num_workers, self.num_agents, self.num_actions])
 
 				next_enemy_states = None
@@ -641,7 +641,7 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
 		experiment_type = "episodic_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_episodic_agent" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
@@ -746,8 +746,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 4e-3, #8e-3
+				"entropy_pen_final": 4e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
@@ -903,10 +903,10 @@ if __name__ == '__main__':
 					for player_id, player_active in zip(active_players, players_active_inactive):
 						if player_active:
 							player_obs = [player_positions[player_id][0], player_positions[player_id][1], player_directions[player_id][0], player_directions[player_id][1]]
-							indiv_dones.append(False)
+							indiv_dones.append(0)
 						else:
 							player_obs = [0, 0, 0, 0]
-							indiv_dones.append(True)
+							indiv_dones.append(1)
 
 						player_observations.append(player_obs)
 
@@ -944,12 +944,12 @@ if __name__ == '__main__':
 				def step(self, action):
 					obs, reward, done, info = self.env.step(action)
 					obs = self._obs_wrapper(obs)
-					reward = reward.reshape(self.num_agents, 1)
+					reward = reward.reshape(self.num_agents)
 					info["indiv_rewards"] = np.array(reward)
 					if self.share_reward:
-						global_reward = np.sum(reward)
+						# global_reward = np.sum(reward)
 						# reward = [[global_reward]] * self.num_agents
-						reward = global_reward
+						reward = np.sum(reward)
 
 					# done = np.array([done] * self.num_agents)
 					# info["indiv_dones"] = np.array([done] * self.num_agents)
