@@ -47,7 +47,7 @@ class ShapelyAttention(nn.Module):
 		
 
 
-class STAS_ML(nn.Module):
+class TARR(nn.Module):
 	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
 				device, dropout=0.0, emb_dropout=0.5, action_space='discrete'):
 		super().__init__()
@@ -92,12 +92,12 @@ class STAS_ML(nn.Module):
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
 		self.dynamics_model = nn.Sequential(
-			init_(nn.Linear(self.emb_dim*(self.n_layer+1), self.emb_dim), activate=True),
+			nn.Linear(self.emb_dim*(self.n_layer+1), self.emb_dim),
 			nn.GELU(),
-			init_(nn.Linear(self.emb_dim, n_actions+1), activate=False)
+			nn.Linear(self.emb_dim, n_actions),
 			)
 
-		self.linear = nn.Linear(emb_dim*self.n_layer, 1)
+		self.linear = nn.Linear(emb_dim*self.n_layer*2, 1)
 
 	def get_time_mask(self, episode_length):
 		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
@@ -108,7 +108,7 @@ class STAS_ML(nn.Module):
 		return mask
 
 
-	def forward(self, ally_states, enemy_states, states, actions, episode_length, agent_temporal_mask):
+	def forward(self, ally_states, enemy_states, states, actions, episode_length, episodic_reward, agent_temporal_mask):
 		# b, n_a, t, e = ally_states.size()
 
 		if "StarCraft" in self.environment:
@@ -135,18 +135,31 @@ class STAS_ML(nn.Module):
 		time_mask = self.get_time_mask(episode_length).repeat(n_a, 1, 1)
 		# time_mask = self.get_time_mask(episode_length)
 		x = x.reshape(b*n_a, t, -1).squeeze()
+
 		x_intermediate = []
+		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
+
 		for layer in self.layers:
 			x, _ = layer[0](x, time_mask)
+			temporal_scores.append(layer[0].self_attn.temporal_scores)
+			temporal_weights.append(layer[0].self_attn.temporal_weights)
 			x = x.reshape(b, n_a, t, -1)
 			x = layer[1](x, agent_temporal_mask=None)
+			agent_scores.append(layer[1].phi.agent_scores)
+			agent_weights.append(layer[1].phi.agent_weights)
 			x = x.reshape(b*n_a, t, -1).squeeze()
 			x_intermediate.append(x)
+
+		# to ensure masking across rows and columns
+		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.n_layer, b, t, n_a, n_a) * agent_temporal_mask.unsqueeze(0).unsqueeze(-1) * agent_temporal_mask.unsqueeze(0).unsqueeze(-2)
+		temporal_weights = torch.stack(temporal_weights, dim=0).reshape(self.n_layer, b, n_a, t, t) * agent_temporal_mask.permute(0, 2, 1).unsqueeze(0).unsqueeze(-1) * agent_temporal_mask.permute(0, 2, 1).unsqueeze(0).unsqueeze(-2)
+		agent_scores = torch.stack(agent_scores, dim=0).reshape(self.n_layer, b, self.n_heads, t, n_a, n_a) * agent_temporal_mask.unsqueeze(0).unsqueeze(2).unsqueeze(-1) * agent_temporal_mask.unsqueeze(0).unsqueeze(2).unsqueeze(-2)
+		temporal_scores = torch.stack(temporal_scores, dim=0).reshape(self.n_layer, b, self.n_heads, n_a, t, t) * agent_temporal_mask.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-1) * agent_temporal_mask.permute(0, 2, 1).unsqueeze(0).unsqueeze(2).unsqueeze(-2)
 
 		x_intermediate = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 
 		first_state_embedding = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, 1, self.emb_dim)[:, :, 0, :, :].reshape(b, n_a, 1, -1)
-		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_masks.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
+		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
 		state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
@@ -154,15 +167,14 @@ class STAS_ML(nn.Module):
 		action_prediction = self.dynamics_model(state_past_state_action_embeddings)
 
 
-		indiv_agent_episode_len = (agent_masks.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
-		all_x = torch.cat(shapley_rewards, dim=-1).reshape(b, n_a, t, -1)
-		final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)
+		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
+		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
 		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-		rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+		rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		
-		
-		return shapley_reward
+
+		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 

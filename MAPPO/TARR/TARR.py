@@ -103,7 +103,6 @@ class Time_Agent_Transformer(nn.Module):
 		seq_length, 
 		n_agents, 
 		n_enemies,
-		n_actions,
 		agent=True, 
 		dropout=0.0, 
 		wide=True,  
@@ -183,13 +182,12 @@ class Time_Agent_Transformer(nn.Module):
 			)
 
 			
-	def forward(self, ally_obs, enemy_obs, obs, actions, episodic_reward, team_masks=None, agent_masks=None, logprobs=None, train=False):
+	def forward(self, ally_obs, enemy_obs, obs, actions, episodic_reward, agent_masks):
 
 		"""
 		:param x: A (batch, number of agents, sequence length, state dimension) tensor of state sequences.
 		:return: predicted log-probability vectors for each token based on the preceding tokens.
 		"""
-		# tokens = self.token_embedding(x)
 
 		if "StarCraft" in self.environment:
 			b, n_a, t, _ = ally_obs.size()
@@ -265,26 +263,11 @@ class Time_Agent_Transformer(nn.Module):
 		all_x = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 		final_x = torch.gather(all_x, 2, indiv_agent_episode_len).squeeze(2)
 
-		# returns = F.relu(self.rblocks(all_x).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		# returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		# rewards_ = returns.detach()
-		# importance_sampling = None
-		
 		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
 		# we further multiply the sign of the episodic reward before relu to separate the neurons that get activated for +/- rewards and then again multiply with the sign of the episodic reward to maintain the sign of the redistributed rewards
-		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
-		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
-		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		rewards = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		
-		# # use hypernet for importance sampling
-		# importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		# importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x.detach(), final_x.detach(), agent_masks).reshape(b, t)
-		# rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
-
-		importance_sampling = None
-		rewards_ = returns
-
-		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
+		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 

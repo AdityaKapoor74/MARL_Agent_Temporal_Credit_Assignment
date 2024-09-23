@@ -311,27 +311,46 @@ class PPOAgent:
 					device=self.device,
 					).to(self.device)
 
-			elif "TAR^2" in self.experiment_type:
-				from TARR import TARR
-				self.reward_model = TARR.Time_Agent_Transformer(
-					environment=dictionary["environment"],
-					ally_obs_shape=self.ally_observation_shape,
-					enemy_obs_shape=self.enemy_observation_shape,
-					obs_shape=self.common_information_observation_shape,
-					action_shape=self.num_actions, 
-					heads=dictionary["reward_n_heads"], 
-					depth=dictionary["reward_depth"], 
-					seq_length=dictionary["max_time_steps"], 
-					n_agents=self.num_agents, 
-					n_enemies=self.num_enemies,
-					n_actions=self.num_actions,
-					agent=dictionary["reward_agent_attn"], 
-					dropout=dictionary["reward_dropout"], 
-					wide=dictionary["reward_attn_net_wide"],
-					linear_compression_dim=dictionary["reward_linear_compression_dim"],
-					device=self.device,
-					).to(self.device)
-
+			elif self.experiment_type in ["TAR^2", "TAR^2_v2"]:
+				if self.experiment_type == "TAR^2":
+					from TARR import TARR
+					self.reward_model = TARR.Time_Agent_Transformer(
+						environment=dictionary["environment"],
+						ally_obs_shape=self.ally_observation_shape,
+						enemy_obs_shape=self.enemy_observation_shape,
+						obs_shape=self.common_information_observation_shape,
+						action_shape=self.num_actions, 
+						heads=dictionary["reward_n_heads"], 
+						depth=dictionary["reward_depth"], 
+						seq_length=dictionary["max_time_steps"], 
+						n_agents=self.num_agents, 
+						n_enemies=self.num_enemies,
+						agent=dictionary["reward_agent_attn"], 
+						dropout=dictionary["reward_dropout"], 
+						wide=dictionary["reward_attn_net_wide"],
+						linear_compression_dim=dictionary["reward_linear_compression_dim"],
+						device=self.device,
+						).to(self.device)
+				elif self.experiment_type == "TAR^2_v2":
+					from TARR_v2 import TARR_v2
+					self.reward_model = TARR_v2.TARR(
+						environment=dictionary["environment"],
+						ally_obs_shape=self.ally_observation_shape,
+						enemy_obs_shape=self.enemy_observation_shape, 
+						obs_shape=self.common_information_observation_shape,
+						n_actions=self.num_actions, 
+						emb_dim=dictionary["reward_linear_compression_dim"], 
+						n_heads=dictionary["reward_n_heads"], 
+						n_layer=dictionary["reward_depth"], 
+						seq_length=dictionary["max_time_steps"], 
+						n_agents=self.num_agents, 
+						n_enemies=self.num_enemies,
+						sample_num=5,
+						device=self.device, 
+						dropout=0.3, 
+						emb_dropout=0.0, 
+						action_space='discrete'
+						).to(self.device)
 			elif "STAS" in self.experiment_type:
 				from STAS import stas
 				self.reward_model = stas.STAS_ML(
@@ -539,16 +558,26 @@ class PPOAgent:
 			elif "TAR^2" in self.experiment_type:
 
 				with torch.no_grad():
-					returns, rewards, expected_importance_sampling, temporal_weights, agent_weights,\
-					temporal_scores, agent_scores, action_prediction = self.reward_model(
+					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 						ally_state_batch, 
 						enemy_state_batch, 
 						state_batch,
 						actions_batch, 
 						episodic_reward_batch,
-						team_masks=team_mask_batch,
-						agent_masks=agent_masks_batch,
-						logprobs=logprobs_batch,
+						agent_masks_batch,
+						)
+
+			elif "TAR^2_v2" in self.experiment_type:
+
+				with torch.no_grad():
+					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+						ally_state_batch, 
+						enemy_state_batch, 
+						state_batch,
+						actions_batch, 
+						episode_len_batch,
+						episodic_reward_batch,
+						agent_masks_batch,
 						)
 
 			elif "STAS" in self.experiment_type:
@@ -618,43 +647,33 @@ class PPOAgent:
 			reward_var = torch.tensor([-1])
 			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
-		elif "TAR^2" in self.experiment_type:
-
-			with torch.no_grad():
-				b, t, n_a, _ = local_obs_batch.shape
-				rnn_num_layers = hidden_state_actor_batch.shape[2]
-				dists_batch, _ = self.policy_network(
-						local_obs_batch.reshape(b*t, 1, n_a, -1),
-						last_actions_batch.reshape(b*t, 1, n_a),
-						hidden_state_actor_batch.reshape(b*t, 1, rnn_num_layers, n_a, -1),
-						action_masks_batch.reshape(b*t, 1, n_a, -1).bool(),
-						)
-
-				dists_batch = dists_batch.reshape(b, t, n_a, -1)
-
-				probs_batch = Categorical(dists_batch)
-				logprobs_batch = probs_batch.log_prob(actions_batch.transpose(-1, -2))
+		elif self.experiment_type in ["TAR^2", "TAR^2_v2"]:
 			
 			import datetime
 			start_time = datetime.datetime.now()
-			returns, rewards, expected_importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
-				ally_obs_batch, 
-				enemy_obs_batch, 
-				common_obs_batch,
-				actions_batch, 
-				episodic_reward_batch,
-				logprobs=logprobs_batch,
-				team_masks=team_mask_batch,
-				agent_masks=agent_masks_batch,
-				train=True,
-				)
+
+			if self.experiment_type == "TAR^2":
+				rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+					ally_obs_batch, 
+					enemy_obs_batch, 
+					common_obs_batch,
+					actions_batch, 
+					episodic_reward_batch,
+					agent_masks_batch,
+					)
+			elif self.experiment_type == "TAR^2_v2":
+				rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+					ally_obs_batch, 
+					enemy_obs_batch, 
+					common_obs_batch,
+					actions_batch, 
+					episode_len_batch,
+					episodic_reward_batch,
+					agent_masks_batch,
+					)
+
 			end_time = datetime.datetime.now()
 			print("ELAPSED TIME", end_time-start_time)
-
-			target_importance_sampling = (logprobs_batch - logprobs_old_batch) * agent_masks_batch
-			target_importance_sampling = target_importance_sampling.sum(dim=-1)
-			target_importance_sampling = torch.exp(target_importance_sampling).clamp(1e-5, 10.0)
-			target_importance_sampling = target_importance_sampling * team_mask_batch
 
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
@@ -663,13 +682,11 @@ class PPOAgent:
 				b, t, _, e = ally_obs_batch.shape
 			elif "GFootball" in self.environment:
 				b, t, e = common_obs_batch.shape
-			reward_prediction_loss = F.mse_loss(returns.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
-			if expected_importance_sampling is not None:
-				expected_logprob_prediction_loss = self.expected_logprob_prediction_loss_coeffecient * F.huber_loss(expected_importance_sampling, target_importance_sampling, reduction='sum') / team_mask_batch.sum()
-			else:
-				expected_logprob_prediction_loss = 0.0
-			reward_loss = reward_prediction_loss + dynamic_loss + expected_logprob_prediction_loss
+			
+			reward_loss = reward_prediction_loss + dynamic_loss
+
 			
 		elif "STAS" in self.experiment_type:
 			
@@ -679,7 +696,6 @@ class PPOAgent:
 				common_obs_batch,
 				actions_batch, 
 				episode_len_batch,
-				# (agent_masks_batch.sum(dim=1)-1).long().to(self.device),
 				agent_masks_batch,
 				)
 
