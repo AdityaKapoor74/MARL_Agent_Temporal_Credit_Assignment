@@ -227,7 +227,7 @@ class Time_Agent_Transformer(nn.Module):
 			i += 1
 
 			# keep current context
-			x = x + state_action_embedding
+			# x = x + state_action_embedding
 
 			if self.agent_attn:
 				# odd numbers have agent attention
@@ -238,7 +238,7 @@ class Time_Agent_Transformer(nn.Module):
 				i += 1
 
 				# keep current context
-				x = x + state_action_embedding
+				# x = x + state_action_embedding
 
 
 			x_intermediate.append(x)
@@ -274,6 +274,7 @@ class Time_Agent_Transformer(nn.Module):
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
 		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		
 		# # use hypernet for importance sampling
 		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
 		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x.detach(), final_x.detach(), agent_masks).reshape(b, t)

@@ -640,9 +640,9 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_AREL_agent_temporal" # default setting: reward prediction loss + dynamic loss
+		env_name = "10m_vs_11m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_TAR^2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -672,8 +672,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 50000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
+				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -694,7 +694,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
-				"reward_batch_size": 128, # 64
+				"reward_batch_size": 64, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
