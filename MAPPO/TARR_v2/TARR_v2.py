@@ -166,7 +166,6 @@ class TARR(nn.Module):
 		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
 		action_prediction = self.dynamics_model(state_past_state_action_embeddings)
 
-
 		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
 		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
