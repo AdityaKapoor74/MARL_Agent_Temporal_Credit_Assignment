@@ -555,7 +555,7 @@ class PPOAgent:
 						)
 
 
-			elif "TAR^2" in self.experiment_type:
+			elif self.experiment_type == "TAR^2":
 
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
@@ -567,7 +567,7 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
-			elif "TAR^2_v2" in self.experiment_type:
+			elif self.experiment_type == "TAR^2_v2":
 
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
