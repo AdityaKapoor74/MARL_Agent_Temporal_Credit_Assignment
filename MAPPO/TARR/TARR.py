@@ -174,7 +174,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		# self.reward_hyper_net = RewardHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth)
 
-		self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth*2)
+		# self.importance_sampling_hyper_net = ImportanceSamplingHyperNetwork(num_agents=self.n_agents, hidden_dim=self.comp_emb, total_obs_dim=self.comp_emb*depth*2)
 					   
 		self.do = nn.Dropout(dropout)
 
@@ -272,13 +272,16 @@ class Time_Agent_Transformer(nn.Module):
 		
 		# # expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
 		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
-		gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
-		gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
+		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
+		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		
 		# # use hypernet for importance sampling
-		importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
-		importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x.detach(), final_x.detach(), agent_masks).reshape(b, t)
-		rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
+		# importance_sampling = ((logprobs.to(self.device) - gen_policy_logprobs.to(self.device)) * agent_masks.to(self.device))
+		# importance_sampling = self.importance_sampling_hyper_net(importance_sampling.detach(), all_x.detach(), final_x.detach(), agent_masks).reshape(b, t)
+		# rewards_ = returns.detach() * importance_sampling.unsqueeze(-1).detach()
+
+		importance_sampling = None
+		rewards_ = returns
 
 		return returns, rewards_, importance_sampling, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
