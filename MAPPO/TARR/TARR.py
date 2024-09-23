@@ -270,8 +270,9 @@ class Time_Agent_Transformer(nn.Module):
 		# rewards_ = returns.detach()
 		# importance_sampling = None
 		
-		# # expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
-		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2)  * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1)))
+		# expected rewards given a state-action embedding are readjusted using the final multi-agent outcome
+		# we further multiply the sign of the episodic reward before relu to separate the neurons that get activated for +/- rewards and then again multiply with the sign of the episodic reward to maintain the sign of the redistributed rewards
+		returns = F.relu(self.rblocks(torch.cat([all_x, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)).view(b, n_a, t).contiguous().transpose(1, 2) * agent_masks.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		# gen_policy_probs = Categorical(F.softmax(action_prediction.detach().transpose(1, 2), dim=-1))
 		# gen_policy_logprobs = gen_policy_probs.log_prob(actions.transpose(1, 2).to(self.device))
 		
