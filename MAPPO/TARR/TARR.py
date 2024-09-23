@@ -140,7 +140,7 @@ class Time_Agent_Transformer(nn.Module):
 				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
 				)
 
-		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
+		self.action_embedding = nn.Embedding(action_shape, self.comp_emb)
 
 		self.position_embedding = nn.Embedding(seq_length, self.comp_emb)
 		self.agent_embedding = nn.Embedding(n_agents, self.comp_emb)
