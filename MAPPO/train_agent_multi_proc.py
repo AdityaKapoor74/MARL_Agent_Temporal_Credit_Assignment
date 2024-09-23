@@ -639,10 +639,10 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ GFootball
-		env_name = "10m_vs_11m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_TAR^2_v2" # default setting: reward prediction loss + dynamic loss
+		environment = "GFootball" # StarCraft/ GFootball
+		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "STAS" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_STAS" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -667,13 +667,13 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": False,
-				"save_model": False,
+				"eval_policy": True,
+				"save_model": True,
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
