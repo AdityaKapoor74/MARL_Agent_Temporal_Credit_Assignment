@@ -170,7 +170,7 @@ class TARR(nn.Module):
 		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
 		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-		rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+		rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) #* torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		
 
 		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
