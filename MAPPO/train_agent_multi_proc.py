@@ -682,7 +682,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 1000, # 200
+				"warm_up_period": 200, # 200
 
 
 				# REWARD MODEL
