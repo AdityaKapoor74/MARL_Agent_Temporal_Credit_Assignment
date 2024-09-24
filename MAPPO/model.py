@@ -115,12 +115,14 @@ class Policy(nn.Module):
 		self.rnn_num_layers = rnn_num_layers
 		self.rnn_hidden_actor = rnn_hidden_actor
 
-		self.mask_value = torch.tensor(
-				torch.finfo(torch.float).min, dtype=torch.float
-			).to(self.device)
+		
 		self.num_agents = num_agents
 		self.num_actions = num_actions
 		self.device = device
+
+		self.mask_value = torch.tensor(
+				torch.finfo(torch.float).min, dtype=torch.float
+			).to(self.device)
 
 		self.agent_embedding = nn.Embedding(self.num_agents, self.rnn_hidden_actor)
 		self.action_embedding = nn.Embedding(self.num_actions+1, self.rnn_hidden_actor) # we assume the first "last action" to be NON-EXISTENT so one of the embedding represents that
