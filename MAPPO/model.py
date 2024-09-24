@@ -247,7 +247,7 @@ class V_network(nn.Module):
 
 		self.mask_value = torch.tensor(
 			torch.finfo(torch.float).min, dtype=torch.float
-			)
+			).to(self.device)
 
 		self.one_hot_actions = torch.eye(self.num_actions).to(self.device)
 		self.agent_ids = torch.eye(self.num_agents).to(self.device)
