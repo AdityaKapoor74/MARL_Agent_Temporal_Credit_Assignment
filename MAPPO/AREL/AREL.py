@@ -104,7 +104,7 @@ class Time_Agent_Transformer(nn.Module):
 
 		self.mask_value = torch.tensor(
 				torch.finfo(torch.float).min, dtype=torch.float
-			)
+			).to(self.device)
 
 			
 	def forward(self, ally_obs, enemy_obs, obs, actions, episodic_reward, team_masks=None, agent_masks=None):
