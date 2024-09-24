@@ -97,7 +97,11 @@ class TARR(nn.Module):
 			nn.Linear(self.emb_dim, n_actions),
 			)
 
-		self.linear = nn.Linear(emb_dim*self.n_layer*2, 1)
+		self.linear = nn.Sequential(
+			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
+			nn.GELU(),
+			nn.Linear(emb_dim, 1)
+			)
 
 	def get_time_mask(self, episode_length):
 		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
