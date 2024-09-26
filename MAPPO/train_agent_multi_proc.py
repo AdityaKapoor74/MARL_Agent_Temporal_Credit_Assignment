@@ -322,7 +322,7 @@ class MAPPO:
 				# 		rewards_to_send.append(last_info["indiv_rewards"][worker_index])
 				rewards_to_send = indiv_rewards
 		
-			elif self.experiment_type in ["episodic_team", "uniform_team_redistribution", "AREL", "TAR^2", "STAS", "TAR^2_v2"]:
+			elif self.experiment_type in ["episodic_team", "uniform_team_redistribution", "AREL", "TAR^2", "STAS", "TAR^2_v2", "TAR^2_HindSight"]:
 				rewards_to_send = []
 				for worker_index in range(self.num_workers):
 					episodic_team_reward[worker_index] = rewards[worker_index]+episodic_team_reward[worker_index] # [r+rewards[worker_index] for r in episodic_team_reward[worker_index]]
@@ -640,8 +640,8 @@ if __name__ == '__main__':
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "AREL" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
 		experiment_name = "MAPPO_AREL_agent_temporal" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
@@ -667,10 +667,10 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
+				"save_comet_ml_plot": False,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
 				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
@@ -694,7 +694,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
-				"reward_batch_size": 128, # 64
+				"reward_batch_size": 64, # 64
 				"reward_lr": 1e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
@@ -703,7 +703,7 @@ if __name__ == '__main__':
 				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
-				"reward_grad_clip_value": 0.5,
+				"reward_grad_clip_value": 10.0,
 				"replay_buffer_size": 5000,
 				"update_reward_model_freq": 100, # 100
 				"reward_model_update_epochs": 200, # 200
@@ -745,8 +745,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 4e-3, #8e-3
+				"entropy_pen_final": 4e-3,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,

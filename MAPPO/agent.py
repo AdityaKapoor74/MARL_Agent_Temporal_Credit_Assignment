@@ -311,7 +311,7 @@ class PPOAgent:
 					device=self.device,
 					).to(self.device)
 
-			elif self.experiment_type in ["TAR^2", "TAR^2_v2"]:
+			elif self.experiment_type in ["TAR^2", "TAR^2_v2", "TAR^2_HindSight"]:
 				if self.experiment_type == "TAR^2":
 					from TARR import TARR
 					self.reward_model = TARR.Time_Agent_Transformer(
@@ -350,6 +350,25 @@ class PPOAgent:
 						dropout=0.3, 
 						emb_dropout=0.0, 
 						action_space='discrete'
+						).to(self.device)
+				elif self.experiment_type == "TAR^2_HindSight":
+					from TARR_HindSight import TARR
+					self.reward_model = TARR.Time_Agent_Transformer(
+						environment=dictionary["environment"],
+						ally_obs_shape=self.ally_observation_shape,
+						enemy_obs_shape=self.enemy_observation_shape,
+						obs_shape=self.common_information_observation_shape,
+						action_shape=self.num_actions, 
+						heads=dictionary["reward_n_heads"], 
+						depth=dictionary["reward_depth"], 
+						seq_length=dictionary["max_time_steps"], 
+						n_agents=self.num_agents, 
+						n_enemies=self.num_enemies,
+						agent=dictionary["reward_agent_attn"], 
+						dropout=dictionary["reward_dropout"], 
+						wide=dictionary["reward_attn_net_wide"],
+						linear_compression_dim=dictionary["reward_linear_compression_dim"],
+						device=self.device,
 						).to(self.device)
 			elif "STAS" in self.experiment_type:
 				from STAS import stas
@@ -555,7 +574,7 @@ class PPOAgent:
 						)
 
 
-			elif self.experiment_type == "TAR^2":
+			elif self.experiment_type == "TAR^2" or self.experiment_type == "TAR^2_HindSight":
 
 				with torch.no_grad():
 					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
@@ -647,12 +666,12 @@ class PPOAgent:
 			reward_var = torch.tensor([-1])
 			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) #+ self.variance_loss_coeff*reward_var
 
-		elif self.experiment_type in ["TAR^2", "TAR^2_v2"]:
+		elif self.experiment_type in ["TAR^2", "TAR^2_v2", "TAR^2_HindSight"]:
 			
 			import datetime
 			start_time = datetime.datetime.now()
 
-			if self.experiment_type == "TAR^2":
+			if self.experiment_type == "TAR^2" or self.experiment_type == "TAR^2_HindSight":
 				rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 					ally_obs_batch, 
 					enemy_obs_batch, 
@@ -683,7 +702,12 @@ class PPOAgent:
 			elif "GFootball" in self.environment:
 				b, t, e = common_obs_batch.shape
 			reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
-			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+			
+			if self.experiment_type in ["TAR^2", "TAR^2_v2"]:
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+			elif self.experiment_type == "TAR^2_HindSight":
+				actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 3, 1, 2).reshape(-1)) * agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).sum() + 1e-5)
 			
 			reward_loss = reward_prediction_loss + dynamic_loss
 
