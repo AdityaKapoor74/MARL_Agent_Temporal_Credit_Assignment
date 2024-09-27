@@ -671,7 +671,7 @@ class PPOAgent:
 
 
 			reward_var = (((rewards - rewards.mean(dim=1, keepdims=True).detach())**2).sum(dim=1) / agent_masks_batch.sum(dim=1, keepdims=True)).mean()
-			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) + self.variance_loss_coeff*reward_var
+			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) - self.variance_loss_coeff*reward_var
 
 		elif self.experiment_type in ["TAR^2", "TAR^2_v2", "TAR^2_HindSight"]:
 			
