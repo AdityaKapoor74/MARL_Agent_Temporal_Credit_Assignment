@@ -91,7 +91,13 @@ class STAS_ML(nn.Module):
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 		self.shapley_block = ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)
-		self.linear = nn.Linear(emb_dim*self.n_layer, 1)
+		
+		# self.linear = nn.Linear(emb_dim*self.n_layer, 1)
+		self.linear = nn.Sequential(
+			nn.Linear(emb_dim*self.n_layer, emb_dim),
+			nn.GELU(),
+			nn.Linear(emb_dim, 1),
+			)
 
 	def get_time_mask(self, episode_length):
 		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
