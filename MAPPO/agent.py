@@ -527,6 +527,9 @@ class PPOAgent:
 
 
 	def reward_model_output(self, eval_reward_model=False):
+
+		action_prediction = None
+
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
 			if "StarCraft" in self.environment:
@@ -586,6 +589,8 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
+					action_prediction = action_prediction.cpu().numpy()
+
 			elif self.experiment_type == "TAR^2_v2":
 
 				with torch.no_grad():
@@ -598,6 +603,8 @@ class PPOAgent:
 						episodic_reward_batch,
 						agent_masks_batch,
 						)
+
+					action_prediction = action_prediction.cpu().numpy()
 
 			elif "STAS" in self.experiment_type:
 
@@ -614,7 +621,7 @@ class PPOAgent:
 					rewards = rewards.transpose(1, 2)
 
 
-			return rewards.cpu()
+			return rewards.cpu().numpy(), action_prediction
 			
 
 	def update_reward_model(self, sample):
@@ -772,7 +779,10 @@ class PPOAgent:
 		grad_norm_value_v_batch = 0
 		grad_norm_policy_batch = 0
 
-		self.buffer.calculate_targets(episode, self.V_PopArt)
+		if self.experiment_type == "TAR^2_HindSight":
+			self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
+		else:
+			self.buffer.calculate_targets(episode, self.V_PopArt)
 
 		# Optimize policy for n epochs
 		for pp_epoch in range(self.n_epochs):

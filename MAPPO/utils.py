@@ -1,8 +1,9 @@
 import torch
 from torch import Tensor
-import numpy as np
+import torch.nn.functional as F
+from torch.distributions import Categorical
 
-from model import PopArt
+import numpy as np
 
 
 def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold: float = 0.5) -> Tensor:
@@ -433,8 +434,7 @@ class RolloutBuffer:
 
 		self.episode_length = np.zeros(num_episodes)
 
-		data_chunks = max_time_steps//data_chunk_length
-		self.factor = torch.ones((num_episodes*data_chunks, data_chunk_length)).float()
+		self.action_prediction = None
 	
 
 	def clear(self):
@@ -463,7 +463,7 @@ class RolloutBuffer:
 		self.time_step = 0
 		self.episode_num = 0
 
-		data_chunks = self.max_time_steps//self.data_chunk_length
+		self.action_prediction = None
 
 
 	def push(
@@ -627,6 +627,73 @@ class RolloutBuffer:
 			nstep_values[:, t_start, :] = nstep_return_t
 		
 		return nstep_values
+
+
+	def calculate_targets_hindsight(self, episode, v_value_norm=None):
+
+		b, t, n_a = self.actions.shape
+		action_prediction_dist = F.softmax(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4), dim=-1) # b x t x t x n_a x n_actions
+		action_prediction_probs = Categorical(action_prediction_dist)
+		actions_batch = torch.from_numpy(self.actions).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
+		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
+		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
+		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs) # b x t x t x n_a
+		
+		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])
+		next_mask = 1 - torch.from_numpy(self.indiv_dones[:, -1, :])
+
+		rewards = torch.from_numpy(self.rewards)
+
+		values = torch.from_numpy(self.V_values[:, :-1, :]) * masks
+		next_values = torch.from_numpy(self.V_values[:, -1, :]) * next_mask
+
+		if self.norm_returns_v:
+			values_shape = values.shape
+			values = v_value_norm.denormalize(values.view(-1)).view(values_shape) * masks.view(values_shape)
+
+			next_values_shape = next_values.shape
+			next_values = v_value_norm.denormalize(next_values.view(-1)).view(next_values_shape) * next_mask.view(next_values_shape)
+
+		if self.clamp_rewards:
+			rewards = torch.clamp(rewards, min=self.clamp_rewards_value_min, max=self.clamp_rewards_value_max)
+
+		# TARGET CALC
+		if self.target_calc_style == "GAE":
+			target_values = self.gae_targets(rewards, values, next_values, masks, next_mask)
+			advantage = self.gae_targets_hindsight(rewards.unsqueeze(1), values.unsqueeze(1), next_values.unsqueeze(1), masks.unsqueeze(1), next_mask.unsqueeze(1), action_importance_sampling)
+		
+		self.advantage = advantage.detach()
+		self.target_values = target_values
+
+
+	def gae_targets_hindsight(self, rewards, values, next_value, masks, next_mask, action_importance_sampling):
+
+		b, _, t_, n_a = rewards.shape
+		# target_values = rewards.new_zeros(*rewards.shape).repeat(1, t, 1, 1)
+		advantages = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
+		advantage = 0
+		next_action_importance_sampling = torch.zeros(b, t_, n_a)
+
+		for t in reversed(range(0, rewards.shape[2])):
+
+			td_error = action_importance_sampling[:,:,t,:]*rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - action_importance_sampling[:,:,t,:] * values.data[:,:,t,:] * masks[:,:,t,:]
+			advantage = td_error + self.gamma * self.gae_lambda * advantage * next_mask
+			
+			# target_values[:,:,t,:] = advantage + action_importance_sampling[:,:,t,:] * values.data[:,:,t,:] * masks[:,:,t,:]
+			advantages[:,:,t,:] = advantage
+
+			next_value = values.data[:,:,t,:]
+			next_mask = masks[:,:,t,:]
+			next_action_importance_sampling = action_importance_sampling[:,:,t,:]
+
+		# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+		# return advantages * masks * upper_triangular_mask
+
+		# extract advantages
+		advantages = torch.diagonal(advantages.permute(0, 3, 1, 2).reshape(-1, t_, t_), offset=0).reshape(b, n_a, t_).permute(0, 2, 1)
+
+		return advantages
+		
 
 
 
