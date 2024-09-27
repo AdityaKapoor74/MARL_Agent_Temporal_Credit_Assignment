@@ -697,7 +697,7 @@ if __name__ == '__main__':
 				"reward_attn_net_wide": True,
 				"version": "agent_temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
-				"reward_batch_size": 64, # 64
+				"reward_batch_size": 96, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
