@@ -252,7 +252,6 @@ class Time_Agent_Transformer(nn.Module):
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), all_x[:, :, :-1, :]], dim=-2)
 		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
 		
-		torch.cuda.empty_cache()
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 		x_goal_states = (all_x*agent_masks.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1) * upper_triangular_mask
 		state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_masks.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1) * upper_triangular_mask

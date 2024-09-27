@@ -563,6 +563,7 @@ class MAPPO:
 									reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 								
 								for i in range(self.reward_model_update_epochs):
+
 									print("reward model update", i)
 									sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
 									if "AREL" in self.experiment_type:
@@ -582,6 +583,8 @@ class MAPPO:
 
 									if self.agents.scheduler_need:
 										self.agents.scheduler_reward.step()
+
+									torch.cuda.empty_cache()
 
 								if self.comet_ml is not None:
 									self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, self.num_episodes_done)
