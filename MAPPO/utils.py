@@ -668,6 +668,8 @@ class RolloutBuffer:
 
 	def gae_targets_hindsight(self, rewards, values, next_value, masks, next_mask, action_importance_sampling):
 
+		print(action_importance_sampling)
+
 		b, _, t_, n_a = rewards.shape
 		target_values = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
 		# advantages = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
