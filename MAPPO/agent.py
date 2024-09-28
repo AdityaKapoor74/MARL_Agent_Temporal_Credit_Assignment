@@ -670,8 +670,9 @@ class PPOAgent:
 				)
 
 
-			reward_var = (((rewards - rewards.mean(dim=1, keepdims=True).detach())**2).sum(dim=1) / agent_masks_batch.sum(dim=1, keepdims=True)).mean()
-			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) - self.variance_loss_coeff*reward_var
+			rewards_mean = rewards.sum(dim=1, keepdims=True) / agent_masks_batch.sum(dim=1, keepdims=True)
+			rewards_var = ((rewards - rewards_mean)**2).sum() / agent_masks_batch.sum()
+			reward_loss = F.huber_loss((rewards.reshape(episodic_reward_batch.shape[0], -1)).sum(dim=-1), episodic_reward_batch.to(self.device)) - self.variance_loss_coeff*rewards_var
 
 		elif self.experiment_type in ["TAR^2", "TAR^2_v2", "TAR^2_HindSight"]:
 			
@@ -749,7 +750,7 @@ class PPOAgent:
 		self.reward_optimizer.step()
 
 		if "AREL" in self.experiment_type:
-			return reward_loss.item(), reward_var.item(), grad_norm_value_reward.item()
+			return reward_loss.item(), rewards_var.item(), grad_norm_value_reward.item()
 		elif "TAR^2" in self.experiment_type:
 			return reward_loss.item(), reward_prediction_loss.item(), dynamic_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()
 		elif "STAS" in self.experiment_type:
