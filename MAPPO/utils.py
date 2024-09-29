@@ -640,7 +640,7 @@ class RolloutBuffer:
 		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs) * upper_triangular_mask # b x t x t x n_a
+		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).clamp(0, 10.0) * upper_triangular_mask # b x t x t x n_a
 		
 		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])
 		next_mask = 1 - torch.from_numpy(self.indiv_dones[:, -1, :])
