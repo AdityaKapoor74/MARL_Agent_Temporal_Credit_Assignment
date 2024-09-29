@@ -635,9 +635,12 @@ class RolloutBuffer:
 		action_prediction_dist = F.softmax(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4), dim=-1) # b x t x t x n_a x n_actions
 		action_prediction_probs = Categorical(action_prediction_dist)
 		actions_batch = torch.from_numpy(self.actions).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
+		# print(action_prediction_dist[0, 0, :, 0, :])
+		# print(actions_batch[0, 0, :, 0])
 		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
-		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs) # b x t x t x n_a
+		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs) * upper_triangular_mask # b x t x t x n_a
 		
 		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])
 		next_mask = 1 - torch.from_numpy(self.indiv_dones[:, -1, :])
@@ -668,7 +671,7 @@ class RolloutBuffer:
 
 	def gae_targets_hindsight(self, rewards, values, next_value, masks, next_mask, action_importance_sampling):
 
-		print(action_importance_sampling)
+		# print(action_importance_sampling)
 
 		b, _, t_, n_a = rewards.shape
 		target_values = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
