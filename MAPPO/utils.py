@@ -641,6 +641,10 @@ class RolloutBuffer:
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).clamp(0, 10.0) * upper_triangular_mask # b x t x t x n_a
+		# make diagonal elements 1
+		action_importance_sampling = action_importance_sampling.permute(0, 3, 1, 2).reshape(b*n_a, t, t)
+		action_importance_sampling = torch.eye(t).unsqueeze(0).repeat(b*n_a, t, t)
+		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2,,3, 1)
 		
 		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])
 		next_mask = 1 - torch.from_numpy(self.indiv_dones[:, -1, :])
@@ -677,7 +681,7 @@ class RolloutBuffer:
 		target_values = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
 		# advantages = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
 		advantage = 0
-		next_action_importance_sampling = torch.zeros(b, t_, n_a)
+		next_action_importance_sampling = torch.ones(b, t_, n_a)
 
 		for t in reversed(range(0, rewards.shape[2])):
 
