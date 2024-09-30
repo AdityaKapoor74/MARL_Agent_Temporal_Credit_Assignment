@@ -702,6 +702,7 @@ class RolloutBuffer:
 
 		# extract advantages
 		advantages = (target_values - upper_triangular_mask*action_importance_sampling*values).detach()
+		print(advantages[0, :, :, 0])
 		advantages = torch.diagonal(advantages.permute(0, 3, 1, 2).reshape(-1, t_, t_), offset=0, dim1=-2, dim2=-1).reshape(b, n_a, t_).permute(0, 2, 1)
 
 		return advantages
