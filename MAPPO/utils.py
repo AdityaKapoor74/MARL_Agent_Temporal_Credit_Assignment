@@ -683,7 +683,7 @@ class RolloutBuffer:
 		# advantages = rewards.new_zeros(*rewards.shape).repeat(1, t_, 1, 1)
 		advantage = 0
 		next_action_importance_sampling = torch.ones(b, t_, n_a)
-		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t_, t_)).reshape(b, n_a, t_, t_).permute(0, 2, 3, 1)
 
 		for t in reversed(range(0, rewards.shape[2])):
 
