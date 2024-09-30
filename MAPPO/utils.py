@@ -644,7 +644,7 @@ class RolloutBuffer:
 		# make diagonal elements 1
 		action_importance_sampling = action_importance_sampling.permute(0, 3, 1, 2).reshape(b*n_a, t, t)
 		action_importance_sampling = torch.eye(t).unsqueeze(0).repeat(b*n_a, t, t)
-		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2,,3, 1)
+		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 		
 		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])
 		next_mask = 1 - torch.from_numpy(self.indiv_dones[:, -1, :])
