@@ -256,7 +256,7 @@ class Time_Agent_Transformer(nn.Module):
 		x_goal_states = (all_x*agent_masks.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
 		state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_masks.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
 		current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
-		action_prediction = self.dynamics_model(current_context_goal)
+		action_prediction = self.dynamics_model(current_context_goal.detach())
 
 		# to ensure masking across rows and columns
 		agent_weights = torch.stack(agent_weights, dim=0).reshape(self.depth, b, t, n_a, n_a) * agent_masks.unsqueeze(0).unsqueeze(-1) * agent_masks.unsqueeze(0).unsqueeze(-2)
