@@ -97,18 +97,24 @@ class TARR(nn.Module):
 			nn.Linear(self.emb_dim, n_actions),
 			)
 
-		self.reward_magnitude = nn.Sequential(
+
+		self.reward_prediction = nn.Sequential(
 			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
-			nn.ReLU(),
 			)
+		# self.reward_magnitude = nn.Sequential(
+		# 	nn.Linear(emb_dim*self.n_layer*2, emb_dim),
+		# 	nn.GELU(),
+		# 	nn.Linear(emb_dim, 1),
+		# 	nn.ReLU(),
+		# 	)
 
-		self.reward_sign = nn.Sequential(
-			nn.Linear(emb_dim*self.n_layer, emb_dim),
-			nn.GELU(),
-			nn.Linear(emb_dim, 3)
-			)
+		# self.reward_sign = nn.Sequential(
+		# 	nn.Linear(emb_dim*self.n_layer, emb_dim),
+		# 	nn.GELU(),
+		# 	nn.Linear(emb_dim, 3)
+		# 	)
 
 	def get_time_mask(self, episode_length):
 		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()
@@ -187,17 +193,19 @@ class TARR(nn.Module):
 		# rewards = F.relu(self.linear(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
 		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-		reward_magnitude = self.reward_magnitude(reward_prediction_embeddings).reshape(b, n_a, t).permute(0, 2, 1)
-		reward_sign = self.reward_sign(final_x.mean(dim=1))
+		# reward_magnitude = self.reward_magnitude(reward_prediction_embeddings).reshape(b, n_a, t).permute(0, 2, 1)
+		# reward_sign = self.reward_sign(final_x.mean(dim=1))
 
-		sign = torch.argmax(reward_sign.clone(), dim=-1) # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
-		sign[sign==0] = -1.0
-		sign[sign==1] = 0.0
-		sign[sign==2] = 1.0
-		print("SIGN", sign)
-		rewards = reward_magnitude.clone() * sign.reshape(b, 1, 1)
+		# sign = torch.argmax(reward_sign.clone(), dim=-1) # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
+		# sign[sign==0] = -1.0
+		# sign[sign==1] = 0.0
+		# sign[sign==2] = 1.0
+		# print("SIGN", sign)
+		# rewards = reward_magnitude.clone() * sign.reshape(b, 1, 1)
 
-		return rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
+		rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
+
+		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 
