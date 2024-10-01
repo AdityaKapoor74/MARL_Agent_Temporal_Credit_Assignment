@@ -713,7 +713,7 @@ class PPOAgent:
 				b, t, e = common_obs_batch.shape
 			# reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 			
-			if self.experiment_type == "TAR^2" or self.experiment_type == "TAR^2_v2":
+			if self.experiment_type == "TAR^2": # or self.experiment_type == "TAR^2_v2":
 				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 				
@@ -730,11 +730,12 @@ class PPOAgent:
 			# 	reward_loss = reward_magnitude_prediction_loss + reward_sign_prediction_loss + dynamic_loss
 
 			# 	print("REWARD MAGNITUDE PREDICTION LOSS", reward_magnitude_prediction_loss.item(), "REWARD SIGN PREDICTION LOSS", reward_sign_prediction_loss.item(), "DYNAMIC LOSS", dynamic_loss.item())
-			elif self.experiment_type == "TAR^2_HindSight":
+			elif self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
 				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 				b, t, n_a = rewards.shape
 				upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 				actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
+				print(action_prediction.shape, actions_batch.shape)
 				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 3, 1, 2).reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).sum() + 1e-5)
 
 				reward_loss = reward_prediction_loss + dynamic_loss
@@ -800,7 +801,7 @@ class PPOAgent:
 		grad_norm_value_v_batch = 0
 		grad_norm_policy_batch = 0
 
-		if self.experiment_type == "TAR^2_HindSight":
+		if self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
 			self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 		else:
 			self.buffer.calculate_targets(episode, self.V_PopArt)
