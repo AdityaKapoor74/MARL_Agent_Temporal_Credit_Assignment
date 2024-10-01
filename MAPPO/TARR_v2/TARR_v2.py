@@ -97,10 +97,17 @@ class TARR(nn.Module):
 			nn.Linear(self.emb_dim, n_actions),
 			)
 
-		self.linear = nn.Sequential(
+		self.reward_magnitude = nn.Sequential(
 			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
 			nn.GELU(),
-			nn.Linear(emb_dim, 1)
+			nn.Linear(emb_dim, 1),
+			nn.RELU(),
+			)
+
+		self.reward_sign = nn.Sequential(
+			nn.Linear(emb_dim*self.n_layer, emb_dim),
+			nn.GELU(),
+			nn.Linear(emb_dim, 3)
 			)
 
 	def get_time_mask(self, episode_length):
@@ -173,13 +180,23 @@ class TARR(nn.Module):
 		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
 		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
-		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-		rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
+		# reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		# rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		# rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device))
 		
 		# rewards = F.relu(self.linear(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 
-		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
+		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		reward_magnitude = self.reward_magnitude(reward_prediction_embeddings)
+		reward_sign = self.reward_sign(final_x.mean(dim=1))
+
+		sign = torch.argmax(reward_sign, dim=-1) # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
+		sign[sign==0] = -1.0
+		sign[sign==1] = 0.0
+		sign[sign==2] = 1.0
+		rewards = reward_magnitude * sign
+
+		return rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
 
 

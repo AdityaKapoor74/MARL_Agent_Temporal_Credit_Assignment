@@ -594,7 +594,7 @@ class PPOAgent:
 			elif self.experiment_type == "TAR^2_v2":
 
 				with torch.no_grad():
-					rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+					rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 						ally_state_batch, 
 						enemy_state_batch, 
 						state_batch,
@@ -691,7 +691,7 @@ class PPOAgent:
 					agent_masks_batch,
 					)
 			elif self.experiment_type == "TAR^2_v2":
-				rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
+				rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction = self.reward_model(
 					ally_obs_batch, 
 					enemy_obs_batch, 
 					common_obs_batch,
@@ -711,17 +711,28 @@ class PPOAgent:
 				b, t, _, e = ally_obs_batch.shape
 			elif "GFootball" in self.environment:
 				b, t, e = common_obs_batch.shape
-			reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			# reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 			
-			if self.experiment_type in ["TAR^2", "TAR^2_v2"]:
+			if self.experiment_type == "TAR^2":
+				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+				
+				reward_loss = reward_prediction_loss + dynamic_loss
+			elif self.experiment_type == "TAR^2_v2":
+				reward_magnitude_prediction_loss = F.mse_loss(reward_magnitude.reshape(actions_batch.shape[0], -1).sum(dim=-1), torch.abs(episodic_reward_batch))
+				episodic_reward_sign = (torch.sign(episodic_reward_batch) + 1).long() # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
+				reward_sign_prediction_loss = self.classification_loss(reward_sign.reshape(action_batch.shape[0], -1), episodic_reward_sign).mean()
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+	
+				reward_loss = reward_magnitude_prediction_loss + 5e-2 * reward_sign_prediction_loss + dynamic_loss
 			elif self.experiment_type == "TAR^2_HindSight":
+				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 				b, t, n_a = rewards.shape
 				upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 				actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
 				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 3, 1, 2).reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).sum() + 1e-5)
 
-			reward_loss = reward_prediction_loss + dynamic_loss
+				reward_loss = reward_prediction_loss + dynamic_loss
 
 			
 		elif "STAS" in self.experiment_type:
