@@ -685,8 +685,8 @@ class RolloutBuffer:
 		next_action_importance_sampling = torch.ones(b, t_, n_a)
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t_, t_)).reshape(b, n_a, t_, t_).permute(0, 2, 3, 1)
 
-		print("-------------------------------------- ACTION IMPORTANCE SAMPLING --------------------------------------")
-		print(action_importance_sampling[0,:,:,0])
+		# print("-------------------------------------- ACTION IMPORTANCE SAMPLING --------------------------------------")
+		# print(action_importance_sampling[0,:,:,0])
 
 		for t in reversed(range(0, rewards.shape[2])):
 
@@ -707,6 +707,9 @@ class RolloutBuffer:
 		# extract advantages
 		# advantages = (target_values - upper_triangular_mask*values).detach()
 		advantages = torch.diagonal(advantages.permute(0, 3, 1, 2).reshape(-1, t_, t_), offset=0, dim1=-2, dim2=-1).reshape(b, n_a, t_).permute(0, 2, 1)
+
+		print("-------------------------------------- ADVANTAGES --------------------------------------")
+		print(advantages[0, :, 0])
 
 		return advantages
 		
