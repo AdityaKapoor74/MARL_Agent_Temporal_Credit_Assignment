@@ -186,7 +186,7 @@ class TARR(nn.Module):
 		first_state_embedding = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, 1, self.emb_dim)[:, :, 0, :, :].reshape(b, n_a, 1, -1)
 		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
 		state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.depth*self.emb_dim)
+		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), all_x[:, :, :-1, :]], dim=-2)
 		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
 		
