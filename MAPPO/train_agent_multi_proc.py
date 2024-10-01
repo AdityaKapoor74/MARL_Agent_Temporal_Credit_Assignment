@@ -700,7 +700,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 128, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
+				"dynamic_loss_coeffecient": 1.0,
 				"expected_logprob_prediction_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
