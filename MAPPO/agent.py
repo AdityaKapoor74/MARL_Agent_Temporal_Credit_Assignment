@@ -723,7 +723,8 @@ class PPOAgent:
 				episodic_reward_sign = (torch.sign(episodic_reward_batch) + 1).long() # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
 				reward_sign_prediction_loss = self.classification_loss(reward_sign.reshape(actions_batch.shape[0], -1), episodic_reward_sign).mean()
 				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
-	
+				
+				reward_prediction_loss = reward_magnitude_prediction_loss + 5e-2 * reward_sign_prediction_loss
 				reward_loss = reward_magnitude_prediction_loss + 5e-2 * reward_sign_prediction_loss + dynamic_loss
 			elif self.experiment_type == "TAR^2_HindSight":
 				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
