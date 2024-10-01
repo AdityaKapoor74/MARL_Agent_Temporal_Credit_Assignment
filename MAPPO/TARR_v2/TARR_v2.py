@@ -101,7 +101,7 @@ class TARR(nn.Module):
 			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
-			nn.RELU(),
+			nn.ReLU(),
 			)
 
 		self.reward_sign = nn.Sequential(
