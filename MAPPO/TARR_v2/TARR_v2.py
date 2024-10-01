@@ -190,11 +190,12 @@ class TARR(nn.Module):
 		reward_magnitude = self.reward_magnitude(reward_prediction_embeddings).reshape(b, n_a, t).permute(0, 2, 1)
 		reward_sign = self.reward_sign(final_x.mean(dim=1))
 
-		sign = torch.argmax(reward_sign, dim=-1) # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
+		sign = torch.argmax(reward_sign.clone(), dim=-1) # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
 		sign[sign==0] = -1.0
 		sign[sign==1] = 0.0
 		sign[sign==2] = 1.0
-		rewards = reward_magnitude * sign.reshape(b, 1, 1)
+		print("SIGN", sign)
+		rewards = reward_magnitude.clone() * sign.reshape(b, 1, 1)
 
 		return rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
