@@ -644,8 +644,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "TAR^2_HindSight" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_HindSight" # default setting: reward prediction loss + dynamic loss
+		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
+		experiment_name = "MAPPO_TAR^2_v2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -700,7 +700,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 128, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
+				"dynamic_loss_coeffecient": 0.0,
 				"expected_logprob_prediction_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
