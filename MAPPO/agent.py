@@ -722,8 +722,8 @@ class PPOAgent:
 				reward_magnitude_prediction_loss = F.mse_loss(reward_magnitude.reshape(actions_batch.shape[0], -1).sum(dim=-1), torch.abs(episodic_reward_batch))
 				episodic_reward_sign = (torch.sign(episodic_reward_batch) + 1).long() # -ve -- class label 0 / 0 -- class label 1 / +ve -- class label 2 
 				reward_sign_prediction_loss = self.classification_loss(reward_sign.reshape(actions_batch.shape[0], -1), episodic_reward_sign).mean()
-				print(action_prediction.shape, actions_batch.shape, self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)).shape)
-				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+				# print(action_prediction.shape, actions_batch.shape, self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)).shape)
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 				
 				reward_prediction_loss = reward_magnitude_prediction_loss + reward_sign_prediction_loss
 				reward_loss = reward_magnitude_prediction_loss + reward_sign_prediction_loss + dynamic_loss
