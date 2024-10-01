@@ -735,8 +735,7 @@ class PPOAgent:
 				b, t, n_a = rewards.shape
 				upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 				actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
-				print(action_prediction.shape, actions_batch.shape)
-				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 3, 1, 2).reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).sum() + 1e-5)
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(-2).repeat(1, 1, t, 1).sum() + 1e-5)
 
 				reward_loss = reward_prediction_loss + dynamic_loss
 
