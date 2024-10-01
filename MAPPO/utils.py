@@ -685,6 +685,9 @@ class RolloutBuffer:
 		next_action_importance_sampling = torch.ones(b, t_, n_a)
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t_, t_)).reshape(b, n_a, t_, t_).permute(0, 2, 3, 1)
 
+		print("-------------------------------------- ACTION IMPORTANCE SAMPLING --------------------------------------")
+		print(action_importance_sampling[0,:,:,0])
+
 		for t in reversed(range(0, rewards.shape[2])):
 
 			td_error = action_importance_sampling[:,:,t,:] * rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
