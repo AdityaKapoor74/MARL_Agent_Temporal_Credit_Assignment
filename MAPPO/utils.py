@@ -687,7 +687,8 @@ class RolloutBuffer:
 
 		for t in reversed(range(0, rewards.shape[2])):
 
-			td_error = action_importance_sampling[:,:,t,:] * rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
+			# td_error = action_importance_sampling[:,:,t,:] * rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
+			td_error = rewards[:,:,t,:] + (self.gamma * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
 			advantage = td_error + self.gamma * self.gae_lambda * advantage * next_mask
 			
 			# target_values[:,:,t,:] = (advantage + action_importance_sampling[:,:,t,:] * values.data[:,:,t,:] * masks[:,:,t,:]) * upper_triangular_mask[:,:,t,:]
