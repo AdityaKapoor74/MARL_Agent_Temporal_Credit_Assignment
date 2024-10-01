@@ -700,7 +700,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 128, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 1.0,
+				"dynamic_loss_coeffecient": 5e-2,
 				"expected_logprob_prediction_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
@@ -748,8 +748,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, #prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, #8e-3
-				"entropy_pen_final": 1e-2,
+				"entropy_pen": 3e-2, #8e-3
+				"entropy_pen_final": 3e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
