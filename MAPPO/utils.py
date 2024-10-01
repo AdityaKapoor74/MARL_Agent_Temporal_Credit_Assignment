@@ -640,7 +640,7 @@ class RolloutBuffer:
 		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).clamp(0, 10.0) * upper_triangular_mask # b x t x t x n_a
+		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).clamp(0, 2.0) * upper_triangular_mask # b x t x t x n_a
 		# make diagonal elements 1
 		action_importance_sampling = action_importance_sampling.permute(0, 3, 1, 2).reshape(b*n_a, t, t)
 		for i in range(t):
@@ -687,7 +687,7 @@ class RolloutBuffer:
 
 		for t in reversed(range(0, rewards.shape[2])):
 
-			td_error = action_importance_sampling[:,:,t,:]*rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
+			td_error = action_importance_sampling[:,:,t,:] * rewards[:,:,t,:] + (self.gamma * next_action_importance_sampling * next_value * next_mask) - values.data[:,:,t,:] * masks[:,:,t,:]
 			advantage = td_error + self.gamma * self.gae_lambda * advantage * next_mask
 			
 			# target_values[:,:,t,:] = (advantage + action_importance_sampling[:,:,t,:] * values.data[:,:,t,:] * masks[:,:,t,:]) * upper_triangular_mask[:,:,t,:]
