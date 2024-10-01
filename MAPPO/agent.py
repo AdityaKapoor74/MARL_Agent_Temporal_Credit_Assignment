@@ -620,6 +620,8 @@ class PPOAgent:
 
 					rewards = rewards.transpose(1, 2)
 
+			print("EXPERIMENT TYPE", self.experiment_type, "REWARDS:-")
+			print(rewards[0, :, 0])
 
 			return rewards.cpu().numpy(), action_prediction
 			
