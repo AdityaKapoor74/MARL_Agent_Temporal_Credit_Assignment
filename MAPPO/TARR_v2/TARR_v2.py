@@ -194,6 +194,7 @@ class TARR(nn.Module):
 		sign[sign==0] = -1.0
 		sign[sign==1] = 0.0
 		sign[sign==2] = 1.0
+		print(reward_magnitude.shape, sign.shape, reward_sign.shape)
 		rewards = reward_magnitude * sign
 
 		return rewards, reward_magnitude, reward_sign, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
