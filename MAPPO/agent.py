@@ -732,11 +732,16 @@ class PPOAgent:
 			# 	print("REWARD MAGNITUDE PREDICTION LOSS", reward_magnitude_prediction_loss.item(), "REWARD SIGN PREDICTION LOSS", reward_sign_prediction_loss.item(), "DYNAMIC LOSS", dynamic_loss.item())
 			elif self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
 				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
-				b, t, n_a = rewards.shape
-				upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
-				actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
-				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1).sum() + 1e-5)
+
+				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().permute(0, 2, 1).reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+
+				# b, t, n_a = rewards.shape
+				# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
+				# actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
+				# dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1).sum() + 1e-5)
+				
 				# dynamic_loss = torch.tensor([0.0])
+				
 				reward_loss = reward_prediction_loss + dynamic_loss
 
 			

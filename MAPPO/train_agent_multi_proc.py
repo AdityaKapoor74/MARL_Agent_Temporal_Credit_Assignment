@@ -676,7 +676,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 70, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
