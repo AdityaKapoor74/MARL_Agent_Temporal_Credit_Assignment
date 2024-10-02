@@ -604,7 +604,7 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
-					action_prediction = action_prediction.cpu().numpy()
+					# action_prediction = action_prediction.cpu().numpy()
 
 			elif "STAS" in self.experiment_type:
 
