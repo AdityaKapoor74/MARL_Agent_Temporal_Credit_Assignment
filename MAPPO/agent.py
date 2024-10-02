@@ -805,10 +805,11 @@ class PPOAgent:
 		grad_norm_value_v_batch = 0
 		grad_norm_policy_batch = 0
 
-		if self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
-			self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
-		else:
-			self.buffer.calculate_targets(episode, self.V_PopArt)
+		# if self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
+		# 	self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
+		# else:
+		# 	self.buffer.calculate_targets(episode, self.V_PopArt)
+		self.buffer.calculate_targets(episode, self.V_PopArt)
 
 		# Optimize policy for n epochs
 		for pp_epoch in range(self.n_epochs):
