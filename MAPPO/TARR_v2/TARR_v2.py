@@ -92,8 +92,8 @@ class TARR(nn.Module):
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
 		self.dynamics_model = nn.Sequential(
-			# nn.Linear(self.emb_dim*(self.n_layer+1), self.emb_dim),
-			nn.Linear(self.emb_dim*3, self.emb_dim),
+			nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
+			# nn.Linear(self.emb_dim*3, self.emb_dim),
 			nn.GELU(),
 			nn.Linear(self.emb_dim, n_actions),
 			)
@@ -196,19 +196,19 @@ class TARR(nn.Module):
 		state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 		# using agent specific embeddings only
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.emb_dim)
-		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), state_action_embedding[:, :, :-1, :]], dim=-2)
-		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
-		x_goal_states = (state_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
-		state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
-		current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
-		# using intermediate embeddings
-		# first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
-		# past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
-		# state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
-		# x_goal_states = (x_intermediate*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
+		# first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.emb_dim)
+		# past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), state_action_embedding[:, :, :-1, :]], dim=-2)
+		# state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
+		# x_goal_states = (state_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
 		# state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
 		# current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
+		# using intermediate embeddings
+		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
+		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
+		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
+		x_goal_states = (x_intermediate*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
+		state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
+		current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
 		
 		action_prediction = self.dynamics_model(current_context_goal)
 
