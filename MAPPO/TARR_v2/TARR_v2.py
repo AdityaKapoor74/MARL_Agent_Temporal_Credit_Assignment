@@ -91,11 +91,11 @@ class TARR(nn.Module):
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
-		self.dynamics_model = nn.Sequential(
-			nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
-			nn.GELU(),
-			nn.Linear(self.emb_dim, n_actions),
-			)
+		# self.dynamics_model = nn.Sequential(
+		# 	nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
+		# 	nn.GELU(),
+		# 	nn.Linear(self.emb_dim, n_actions),
+		# 	)
 
 
 		self.reward_prediction = nn.Sequential(
@@ -183,18 +183,18 @@ class TARR(nn.Module):
 		# state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)
 		# action_prediction = self.dynamics_model(state_past_state_action_embeddings)
 
-		first_state_embedding = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, 1, self.emb_dim)[:, :, 0, :, :].reshape(b, n_a, 1, -1)
-		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
-		state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
-		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
-		state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
+		# first_state_embedding = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, 1, self.emb_dim)[:, :, 0, :, :].reshape(b, n_a, 1, -1)
+		# state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
+		# state_embeddings = torch.cat([first_state_embedding.to(self.device), state_embeddings[:, :, 1:, :]], dim=2)
+		# first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
+		# past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
+		# state_past_state_action_embeddings = torch.cat([state_embeddings, past_state_action_embeddings], dim=-1) # b, n_a, t, -1
 		
-		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
-		x_goal_states = (x_intermediate*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
-		state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
-		current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
-		action_prediction = self.dynamics_model(current_context_goal)
+		# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
+		# x_goal_states = (x_intermediate*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
+		# state_past_state_action_embeddings = (state_past_state_action_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
+		# current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
+		# action_prediction = self.dynamics_model(current_context_goal)
 
 
 		# indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
