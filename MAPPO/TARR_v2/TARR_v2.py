@@ -91,11 +91,11 @@ class TARR(nn.Module):
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
-		# self.dynamics_model = nn.Sequential(
-		# 	nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
-		# 	nn.GELU(),
-		# 	nn.Linear(self.emb_dim, n_actions),
-		# 	)
+		self.dynamics_model = nn.Sequential(
+			nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
+			nn.GELU(),
+			nn.Linear(self.emb_dim, n_actions),
+			)
 
 
 		self.reward_prediction = nn.Sequential(
