@@ -491,7 +491,7 @@ class MAPPO:
 						
 						assert value.shape == (1, self.num_agents)
 
-						self.agents.buffer.end_episode(np.array([self.worker_step_counter[worker_index]]), value, np.array([indiv_dones[worker_index]]), np.array([dones[worker_index]]), np.array([worker_index]))
+						self.agents.buffer.end_episode(np.array([self.worker_step_counter[worker_index]]), value, np.array([indiv_dones_[worker_index]]), np.array([all(indiv_dones_[worker_index])]), np.array([worker_index]))
 
 						if self.use_reward_model:
 							self.agents.reward_buffer.end_episode(np.array([worker_index]))
