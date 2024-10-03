@@ -155,7 +155,7 @@ class TARR(nn.Module):
 		x = x.reshape(b*n_a, t, -1).squeeze()
 
 		x_intermediate = []
-		only_agent_specific_temporal_x_intermediate = None
+		# only_agent_specific_temporal_x_intermediate = None
 		temporal_weights, agent_weights, temporal_scores, agent_scores = [], [], [], []
 
 		for i, layer in enumerate(self.layers):
@@ -163,8 +163,8 @@ class TARR(nn.Module):
 			temporal_scores.append(layer[0].self_attn.temporal_scores)
 			temporal_weights.append(layer[0].self_attn.temporal_weights)
 			x = x.reshape(b, n_a, t, -1)
-			if i == 0:
-				only_agent_specific_temporal_x_intermediate = x
+			# if i == 0:
+			# 	only_agent_specific_temporal_x_intermediate = x
 			x = layer[1](x, agent_temporal_mask=None)
 			agent_scores.append(layer[1].phi.agent_scores)
 			agent_weights.append(layer[1].phi.agent_weights)
@@ -214,6 +214,8 @@ class TARR(nn.Module):
 		current_context_goal = torch.cat([state_past_state_action_embeddings, x_goal_states], dim=-1) * upper_triangular_mask # b, n_a, t, t, -1
 		
 		action_prediction = self.dynamics_model(current_context_goal)
+
+		print(action_prediction)
 
 		# simple hindsight inverse dynamics model for agent specific action prediction
 		# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
