@@ -665,6 +665,10 @@ class RolloutBuffer:
 			action_importance_sampling[:, i, i] = torch.ones(b*n_a)
 		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2, 3, 1) * masks.unsqueeze(1)
 
+		print("action_importance_sampling")
+		print(action_importance_sampling[0, 0, :, 0])
+		print(action_importance_sampling[0, 1, :, 0])
+
 
 		if self.norm_returns_v:
 			values_shape = values.shape
