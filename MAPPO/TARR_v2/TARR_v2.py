@@ -222,7 +222,6 @@ class TARR(nn.Module):
 		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim)
 		current_state_past_context_embeddings = (torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
 		goal_state_embeddings = (state_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
-		print(torch.cat([current_state_past_context_embeddings, goal_state_embeddings], dim=-1).shape)
 		current_state_past_context_future_goal_embeddings = torch.cat([current_state_past_context_embeddings, goal_state_embeddings], dim=-1) * upper_triangular_mask
 		action_prediction = self.dynamics_model(current_state_past_context_future_goal_embeddings) * upper_triangular_mask
 
