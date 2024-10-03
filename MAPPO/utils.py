@@ -668,6 +668,8 @@ class RolloutBuffer:
 
 		print("masks")
 		print(masks[0, :, 0])
+		print("actions")
+		print(actions_batch[0, :, 0, 0])
 		print("action_prediction_logprobs")
 		print(action_prediction_logprobs[0, 0, :, 0])
 		print("action_logprobs")
