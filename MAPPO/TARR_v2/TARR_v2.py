@@ -217,7 +217,7 @@ class TARR(nn.Module):
 
 		# simple hindsight inverse dynamics model for agent specific action prediction
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.emb_dim).tp(self.device)
+		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding, only_agent_specific_temporal_x_intermediate[:, :, :-1, :]], dim=-1)
 		state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim)
 		current_state_past_context_embeddings = (torch.cat([state_embeddings, past_state_action_embeddings], dim=-1)*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-2).repeat(1, 1, 1, t, 1)
