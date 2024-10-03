@@ -215,6 +215,8 @@ class TARR(nn.Module):
 		
 		action_prediction = self.dynamics_model(current_context_goal)
 
+		print(current_context_goal[0, 0, 0, :, :])
+
 		# simple hindsight inverse dynamics model for agent specific action prediction
 		# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 		# first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)
