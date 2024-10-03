@@ -665,7 +665,7 @@ class RolloutBuffer:
 		for i in range(t):
 			action_importance_sampling[:, i, i] = action_probs[:, i, :].reshape(-1) # torch.ones(b*n_a)
 		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2, 3, 1) * upper_triangular_mask * masks.unsqueeze(1)
-		action_importance_sampling = torch.prod(action_importance_sampling, dim=-1, keepdim=True)
+		# action_importance_sampling = torch.prod(action_importance_sampling, dim=-1, keepdim=True)
 
 		print("masks")
 		print(masks[0, :, 0])
