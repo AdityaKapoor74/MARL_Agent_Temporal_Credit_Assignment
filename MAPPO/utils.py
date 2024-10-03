@@ -633,7 +633,7 @@ class RolloutBuffer:
 
 		b, t, n_a = self.actions.shape
 		print("action_prediction_dist_output")
-		print(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4)[:, 0, :, 0])
+		print(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4)[0, 0, :, 0])
 		action_prediction_dist = F.softmax(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4), dim=-1) # b x t x t x n_a x n_actions
 		print("action_prediction_dist", action_prediction_dist.shape)
 		action_prediction_probs = Categorical(action_prediction_dist)
