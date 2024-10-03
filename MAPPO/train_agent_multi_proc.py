@@ -645,7 +645,7 @@ if __name__ == '__main__':
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
 		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_v2_hindsight_inverse_dynamics_model_w_intermediat_emb_imp_sampling_finetune" # default setting: reward prediction loss + dynamic loss
+		experiment_name = "MAPPO_TAR^2_v2_hindsight_inverse_dynamics_model_w_intermediat_emb_imp_sampling" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -685,7 +685,7 @@ if __name__ == '__main__':
 				"clamp_rewards": False,
 				"clamp_rewards_value_min": 0.0,
 				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 0, # 200
+				"warm_up_period": 200, # 200
 
 
 				# REWARD MODEL
