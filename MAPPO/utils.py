@@ -518,9 +518,9 @@ class RolloutBuffer:
 		indiv_dones,
 		team_dones
 		):
-		self.V_values[self.episode_num][self.time_step+1] = value
-		self.indiv_dones[self.episode_num][self.time_step+1] = indiv_dones
-		self.team_dones[self.episode_num][self.time_step+1] = team_dones
+		self.V_values[self.episode_num][self.time_step] = value
+		self.indiv_dones[self.episode_num][self.time_step] = indiv_dones
+		self.team_dones[self.episode_num][self.time_step] = team_dones
 
 		self.episode_length[self.episode_num] = t
 		self.episode_num += 1
@@ -933,9 +933,9 @@ class RolloutBufferShared(RolloutBuffer):
 			if time_step == 0:
 				# Do nothing in case the worker has not stored anything
 				continue
-			self.V_values[episode_num][time_step+1] = value[i]
-			self.team_dones[episode_num][time_step+1] = team_dones[i]
-			self.indiv_dones[episode_num][time_step+1] = indiv_dones[i]
+			self.V_values[episode_num][time_step] = value[i]
+			self.team_dones[episode_num][time_step] = team_dones[i]
+			self.indiv_dones[episode_num][time_step] = indiv_dones[i]
 
 			self.episode_length[episode_num] = t[i]
 			self.episode_num += 1
