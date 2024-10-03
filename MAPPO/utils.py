@@ -669,7 +669,7 @@ class RolloutBuffer:
 		print("action_prediction_logprobs")
 		print(action_prediction_logprobs[0, 0, :, 0])
 		print("action_logprobs")
-		print(action_logprobs[0, :, 0, :])
+		print(action_logprobs[0, :, 0, 0])
 		print("action_importance_sampling")
 		print(action_importance_sampling[0, 0, :, 0])
 		print(action_importance_sampling[0, 1, :, 0])
