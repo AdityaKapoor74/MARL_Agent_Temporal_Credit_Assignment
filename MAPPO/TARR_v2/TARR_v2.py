@@ -224,7 +224,7 @@ class TARR(nn.Module):
 		goal_state_embeddings = (state_embeddings*agent_temporal_mask.transpose(1, 2).unsqueeze(-1)).unsqueeze(-3).repeat(1, 1, t, 1, 1)
 		print(torch.cat([current_state_past_context_embeddings, goal_state_embeddings], dim=-1).shape)
 		current_state_past_context_future_goal_embeddings = torch.cat([current_state_past_context_embeddings, goal_state_embeddings], dim=-1) * upper_triangular_mask
-		action_prediction = self.dynamics_model(current_state_past_context_future_goal_embeddings) * upper_triangular_mask.squeeze(-1)
+		action_prediction = self.dynamics_model(current_state_past_context_future_goal_embeddings) * upper_triangular_mask
 
 		# no inverse dynamics model
 		# action_prediction = None
