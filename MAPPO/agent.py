@@ -623,7 +623,7 @@ class PPOAgent:
 			print("EXPERIMENT TYPE", self.experiment_type, "REWARDS:-")
 			print(rewards[0, :, 0])
 
-			return (rewards.cpu()*agent_masks_batch).numpy(), action_prediction
+			return (rewards*agent_masks_batch).cpu().numpy(), action_prediction
 			
 
 	def update_reward_model(self, sample):
