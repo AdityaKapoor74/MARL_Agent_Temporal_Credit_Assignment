@@ -722,7 +722,7 @@ class RolloutBuffer:
 		print("-------------------------------------- ADVANTAGES --------------------------------------")
 		print(advantages[0, :, 0])
 
-		return advantages * masks
+		return advantages * masks.squeeze(1)
 		
 
 
