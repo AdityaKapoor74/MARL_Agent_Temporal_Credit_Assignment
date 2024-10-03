@@ -92,7 +92,7 @@ class TARR(nn.Module):
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
 		self.dynamics_model = nn.Sequential(
-			nn.Linear(self.emb_dim*(self.n_layer*2+1), self.emb_dim),
+			nn.Linear(self.emb_dim*(self.n_layer+2), self.emb_dim),
 			# nn.Linear(self.emb_dim*3, self.emb_dim),
 			nn.GELU(),
 			nn.Linear(self.emb_dim, n_actions),
