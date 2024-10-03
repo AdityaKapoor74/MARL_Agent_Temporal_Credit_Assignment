@@ -560,6 +560,17 @@ class RolloutBuffer:
 		last_actions, actions, action_masks, agent_masks, team_masks, values, target_values, advantage
 
 
+	def sample_finetune_reward_model(self):
+		if "StarCraft" in self.environment:
+			return self.ally_states, self.enemy_states, self.local_obs, self.actions, np.concatenate((np.zeros((self.num_episodes, 1, self.num_agents), dtype=int) + self.num_actions, self.actions[:, :-1, :]), axis=1), \
+			self.action_masks, self.hidden_state_actor, self.logprobs, self.rewards, 1-self.team_dones[:, :-1], \
+			1-self.indiv_dones[:, :-1, :], self.episode_length
+		elif "GFootball" in self.environment:
+			return self.ally_states, self.local_obs, self.common_obs, self.actions, np.concatenate((np.zeros((self.num_episodes, 1, self.num_agents), dtype=int) + self.num_actions, self.actions[:, :-1, :]), axis=1), \
+			self.action_masks, self.hidden_state_actor, self.logprobs, self.rewards, 1-self.team_dones[:, :-1], \
+			1-self.indiv_dones[:, :-1, :], self.episode_length
+
+
 	def calculate_targets(self, episode, v_value_norm=None):
 		
 		masks = 1 - torch.from_numpy(self.indiv_dones[:, :-1, :])

@@ -540,8 +540,8 @@ class MAPPO:
 							elif self.use_reward_model:
 								if self.num_episodes_done >= self.warm_up_period:
 									# finetune
-									# sample = self.agents.buffer.reward_model_obs, self.agents.buffer.actions, self.agents.buffer.one_hot_actions, self.agents.buffer.rewards[:, :, 0], 1-self.agents.buffer.team_dones[:, :-1], 1-self.agents.buffer.agent_dones[:, :-1, :], self.agents.buffer.episode_length
-									# self.agents.update_reward_model(sample)
+									sample = self.agents.buffer.sample_finetune_reward_model()
+									self.agents.update_reward_model(sample)
 									
 									self.agents.buffer.rewards, self.agents.buffer.action_prediction = self.agents.reward_model_output()
 									self.agents.update(self.num_episodes_done)
@@ -645,7 +645,7 @@ if __name__ == '__main__':
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
 		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_v2_simple_hindsight_inverse_dynamics_model_w_agent_specific_imp_sampling" # default setting: reward prediction loss + dynamic loss
+		experiment_name = "MAPPO_TAR^2_v2_simple_hindsight_inverse_dynamics_model_w_agent_specific_imp_sampling_finetune" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
