@@ -100,7 +100,7 @@ class TARR(nn.Module):
 
 
 		self.reward_prediction = nn.Sequential(
-			nn.Linear(emb_dim*self.n_layer, emb_dim),
+			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
 			)
