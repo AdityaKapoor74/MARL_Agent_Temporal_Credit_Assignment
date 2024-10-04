@@ -430,7 +430,7 @@ class PPOAgent:
 				num_agents=self.num_agents, 
 				device=self.device,
 			).to(self.device)
-			
+
 			self.inverse_dynamic_optimizer = optim.AdamW(self.inverse_dynamic_network.parameters(), lr=dictionary["inverse_dynamics_lr"], weight_decay=dictionary["inverse_dynamics_weight_decay"], eps=1e-5)
 			
 			if self.scheduler_need:
@@ -831,9 +831,9 @@ class PPOAgent:
 
 		# first update inverse dynamics model
 		if self.use_inverse_dynamics:
-			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor)
-			actions = torch.from_numpy(self.buffer.actions)
-			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :])
+			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
+			actions = torch.from_numpy(self.buffer.actions).float()
+			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device))
 
 			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction, actions.to(self.device)) * agent_masks.to(self.device).unsqueeze(1)).sum() / agent_masks.to(self.device).unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).sum() + 1e-5
