@@ -424,7 +424,7 @@ class RolloutBuffer:
 		self.V_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
 		self.local_obs = np.zeros((num_episodes, max_time_steps, num_agents, local_obs_shape))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
-		self.latent_state_actor = np.zeros((num_episodes, max_time_steps+1, num_agents, actor_hidden_state))
+		self.latent_state_actor = np.zeros((num_episodes, max_time_steps, num_agents, actor_hidden_state))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
@@ -519,12 +519,10 @@ class RolloutBuffer:
 		self, 
 		t, 
 		value, 
-		latent_state_actor,
 		indiv_dones,
 		team_dones
 		):
 		self.V_values[self.episode_num][self.time_step] = value
-		self.latent_state_actor[self.episode_num][self.time_step] = latent_state_actor
 		self.indiv_dones[self.episode_num][self.time_step] = indiv_dones
 		self.team_dones[self.episode_num][self.time_step] = team_dones
 
