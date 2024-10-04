@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import Policy, V_network, PopArt
-from utils import RolloutBuffer, RewardRolloutBuffer, RolloutBufferShared, RewardRolloutBufferShared
+from utils import RolloutBuffer, RewardRolloutBuffer, RolloutBufferShared, RewardRolloutBufferShared, InverseDynamicsModel
 
 class PPOAgent:
 
@@ -72,6 +72,13 @@ class PPOAgent:
 		self.temporal_score_coefficient = dictionary["temporal_score_coefficient"]
 		self.agent_score_coefficient = dictionary["agent_score_coefficient"]
 		self.reward_depth = dictionary["reward_depth"]
+
+
+		self.use_inverse_dynamics = dictionary["use_inverse_dynamics"]
+		self.inverse_dynamics_lr = dictionary["inverse_dynamics_lr"]
+		self.inverse_dynamics_weight_decay = dictionary["inverse_dynamics_weight_decay"]
+		self.enable_grad_clip_inverse_dynamics = dictionary["enable_grad_clip_inverse_dynamics"]
+		self.grad_clip_inverse_dynamics = dictionary["grad_clip_inverse_dynamics"]
 
 		# Critic
 		self.use_recurrent_critic = dictionary["use_recurrent_critic"]
@@ -170,7 +177,9 @@ class PPOAgent:
 			).to(self.device)
 		
 
-		self.network_update_interval_v = dictionary["network_update_interval_v"]
+		self.network_uactions=self.num_actions, 
+			num_agents=self.num_agents, 
+			devipdate_interval_v = dictionary["network_update_interval_v"]
 		self.soft_update_v = dictionary["soft_update_v"]
 		self.tau_v = dictionary["tau_v"]
 
@@ -370,6 +379,8 @@ class PPOAgent:
 						linear_compression_dim=dictionary["reward_linear_compression_dim"],
 						device=self.device,
 						).to(self.device)
+
+
 			elif "STAS" in self.experiment_type:
 				from STAS import stas
 				self.reward_model = stas.STAS_ML(
@@ -403,7 +414,7 @@ class PPOAgent:
 					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"]))
 
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
-			
+
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
 
@@ -411,6 +422,22 @@ class PPOAgent:
 
 		else:
 			self.reward_model = None
+
+
+		if self.use_inverse_dynamics:
+			# Inverse Dynamics Model
+			self.inverse_dynamic_network = InverseDynamicsModel(
+				rnn_hidden_actor=self.rnn_hidden_actor, 
+				num_actions=self.num_actions, 
+				num_agents=self.num_agents, 
+				device=self.device,
+			)
+			self.inverse_dynamic_optimizer = optim.AdamW(self.inverse_dynamic_model.parameters(), lr=dictionary["inverse_dynamics_lr"], weight_decay=dictionary["inverse_dynamics_weight_decay"], eps=1e-5)
+			
+			if self.scheduler_need:
+				self.scheduler_inverse_dynamics = optim.lr_scheduler.MultiStepLR(self.inverse_dynamic_optimizer, milestones=[10000, 30000], gamma=0.5)
+
+			self.inverse_dynamic_cross_entropy_loss = nn.CrossEntropyLoss(reduction="none")
 
 
 
@@ -487,7 +514,7 @@ class PPOAgent:
 			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			hidden_state = torch.FloatTensor(hidden_state).to(self.device)
 
-			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			dists, hidden_state, latent_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
 			# dists, hidden_state = actor(state_policy, last_actions, hidden_state, mask_actions)
 
 			if greedy:
@@ -499,7 +526,7 @@ class PPOAgent:
 				probs = Categorical(dists)
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
-			return actions, action_logprob, hidden_state.cpu().numpy()
+			return actions, action_logprob, hidden_state.cpu().numpy(), latent_state.cpu().numpy()
 
 
 	def get_action_batch(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
@@ -510,7 +537,7 @@ class PPOAgent:
 			num_workers, num_layers, num_agents, hidden_size = hidden_state.shape
 			hidden_state = torch.FloatTensor(hidden_state).permute(1,0,2,3).to(self.device)
 
-			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			dists, hidden_state, latent_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
 			if greedy:
 				actions = np.array([dist.argmax(dim=-1).detach().cpu().numpy().tolist() for dist in dists.squeeze(1)])
 				action_logprob = None
@@ -519,8 +546,9 @@ class PPOAgent:
 				probs = Categorical(dists.squeeze(1))
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
-			return actions, action_logprob, hidden_state.reshape(num_layers, num_workers, num_agents, hidden_size).permute(1,0,2,3).cpu().numpy()
+			return actions, action_logprob, hidden_state.reshape(num_layers, num_workers, num_agents, hidden_size).permute(1,0,2,3).cpu().numpy(), , latent_state.cpu().numpy()
 	
+
 	def should_update_agent(self, episode):
 		assert self.parallel_training, "Please call this method only while doing parallel training"
 		return (True if (self.buffer.episodes_completely_filled >= self.ppo_eps_elapse_update_freq) else False)
@@ -791,6 +819,9 @@ class PPOAgent:
 		self.comet_ml.log_metric('V_Value_Loss',self.plotting_dict["v_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
 
+		self.comet_ml.log_metric("Inverse Dynamic Loss", self.plotting_dict["inverse_dynamic_loss"], episode)
+		self.comet_ml.log_metric("Grad Norm Inverse Dynamic", self.plotting_dict["grad_norm_inverse_dynamics"], episode)	
+
 
 	def update_parameters(self):
 		if self.entropy_pen - self.entropy_pen_decay > self.entropy_pen_final:
@@ -798,6 +829,30 @@ class PPOAgent:
 
 
 	def update(self, episode):
+
+		# first update inverse dynamics model
+		if self.use_inverse_dynamics:
+			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor)
+			actions = torch.from_numpy(self.buffer.actions)
+			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones)
+			action_prediction = self.inverse_dynamic_network(latent_state_actor, latent_state_actor, agent_masks)
+
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction, actions) * agent_masks.unsqueeze(1)).sum() / agent_masks.unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).sum() + 1e-5
+
+			self.inverse_dynamic_optimizer.zero_grad()
+			inverse_dynamic_loss.backward()
+			if self.enable_grad_clip_inverse_dynamics:
+				grad_norm_inverse_dynamics = torch.nn.utils.clip_grad_norm_(self.inverse_dynamic_network.parameters(), self.grad_clip_inverse_dynamics)
+			else:
+				total_norm = 0
+				for p in self.inverse_dynamic_network.parameters():
+					if p.grad is None:
+						continue
+					param_norm = p.grad.detach().data.norm(2)
+					total_norm += param_norm.item() ** 2
+				grad_norm_inverse_dynamics = torch.tensor([total_norm ** 0.5])
+			self.inverse_dynamic_optimizer.step()
+
 		
 		v_value_loss_batch = 0
 		policy_loss_batch = 0
@@ -954,6 +1009,8 @@ class PPOAgent:
 		"entropy": entropy_batch,
 		"grad_norm_policy": grad_norm_policy_batch,
 		"grad_norm_value_v": grad_norm_value_v_batch,
+		"inverse_dynamic_loss": inverse_dynamic_loss,
+		"grad_norm_inverse_dynamics": grad_norm_inverse_dynamics
 		}
 		
 		if self.comet_ml is not None:

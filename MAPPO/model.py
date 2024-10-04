@@ -181,7 +181,11 @@ class Policy(nn.Module):
 			logits = self.final_layer(local_observations)
 
 		logits = torch.where(mask_actions, logits, self.mask_value)
-		return F.softmax(logits, dim=-1), h
+
+		if self.use_recurrent_policy:
+			return F.softmax(logits, dim=-1), h, output
+		else:
+			return F.softmax(logits, dim=-1), h, local_observations
 
 
 
@@ -300,3 +304,39 @@ class V_network(nn.Module):
 		Value = self.value_layer(final_state_embedding)
 
 		return Value.squeeze(-1), h
+
+
+
+class InverseDynamicsModel(nn.Module):
+	def __init__(
+		self, 
+		rnn_hidden_actor, 
+		num_actions, 
+		num_agents, 
+		device
+		):
+		super(Policy, self).__init__()
+
+		
+		self.num_agents = num_agents
+		self.num_actions = num_actions
+		self.device = device
+
+		self.action_prediction = nn.Sequential(
+			nn.LayerNorm(2*rnn_hidden_actor),
+			init_(nn.Linear(rnn_hidden_actor*2, rnn_hidden_actor)),
+			nn.GELU(),
+			init_(nn.Linear(rnn_hidden_actor, num_actions), gain=0.01)
+			)
+
+
+	def forward(self, current_latent_state, goal_latent_state, agent_masks):
+
+		batch, timesteps, _, _ = current_latent_state.shape
+		upper_triangular_matrix = torch.triu(torch.ones(batch*self.num_agents, timesteps, timesteps)).reshape(batch, self.num_agents, timesteps, timesteps, 1).permute(0, 2, 3, 1, 4)
+		current_latent_state = current_latent_state.unsqueeze(2).repeat(1, 1, timesteps, 1, 1)
+		goal_latent_state = goal_latent_state.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
+		current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
+		logits = self.action_prediction(current_goal_latent_state)
+
+		return F.softmax(logits, dim=-1)

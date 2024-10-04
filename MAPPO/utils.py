@@ -424,6 +424,7 @@ class RolloutBuffer:
 		self.V_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
 		self.local_obs = np.zeros((num_episodes, max_time_steps, num_agents, local_obs_shape))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
+		self.latent_state_actor = np.zeros((num_episodes, max_time_steps+1, num_agents, actor_hidden_state))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
@@ -450,6 +451,7 @@ class RolloutBuffer:
 		self.V_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
 		self.local_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.local_obs_shape))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
+		self.latent_state_actor = np.zeros((num_episodes, max_time_steps, num_agents, actor_hidden_state))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
@@ -475,6 +477,7 @@ class RolloutBuffer:
 		global_obs,
 		local_obs, 
 		common_obs,
+		latent_state_actor,
 		hidden_state_actor, 
 		logprobs, 
 		actions, 
@@ -498,6 +501,7 @@ class RolloutBuffer:
 		self.hidden_state_v[self.episode_num][self.time_step] = hidden_state_v
 		
 		self.local_obs[self.episode_num][self.time_step] = local_obs
+		self.latent_state_actor[self.episode_num][self.time_step] = latent_state_actor
 		self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor
 		self.logprobs[self.episode_num][self.time_step] = logprobs
 		self.actions[self.episode_num][self.time_step] = actions
@@ -515,10 +519,12 @@ class RolloutBuffer:
 		self, 
 		t, 
 		value, 
+		latent_state_actor,
 		indiv_dones,
 		team_dones
 		):
 		self.V_values[self.episode_num][self.time_step] = value
+		self.latent_state_actor[self.episode_num][self.time_step] = latent_state_actor
 		self.indiv_dones[self.episode_num][self.time_step] = indiv_dones
 		self.team_dones[self.episode_num][self.time_step] = team_dones
 
@@ -841,6 +847,7 @@ class RolloutBufferShared(RolloutBuffer):
 		global_obs,
 		local_obs, 
 		common_obs,
+		latent_state_actor,
 		hidden_state_actor, 
 		logprobs, 
 		actions, 
@@ -863,6 +870,7 @@ class RolloutBufferShared(RolloutBuffer):
 		assert value.shape[0] == self.num_workers
 		assert hidden_state_v.shape[0] == self.num_workers
 		assert local_obs.shape[0] == self.num_workers
+		assert latent_state_actor.shape[0] == self.num_workers
 		assert hidden_state_actor.shape[0] == self.num_workers
 		assert logprobs.shape[0] == self.num_workers
 		assert actions.shape[0] == self.num_workers
@@ -908,6 +916,7 @@ class RolloutBufferShared(RolloutBuffer):
 			self.hidden_state_v[episode_num][time_step] = hidden_state_v[worker_index]
 			
 			self.local_obs[episode_num][time_step] = local_obs[worker_index]
+			self.latent_state_actor[episode_num][time_step] = latent_state_actor[worker_index]
 			self.hidden_state_actor[episode_num][time_step] = hidden_state_actor[worker_index]
 			self.logprobs[episode_num][time_step] = logprobs[worker_index]
 			self.actions[episode_num][time_step] = actions[worker_index]
@@ -928,6 +937,7 @@ class RolloutBufferShared(RolloutBuffer):
 		self, 
 		t, 
 		value, 
+		latent_state_actor,
 		indiv_dones,
 		team_dones,
 		worker_indices,
@@ -935,6 +945,7 @@ class RolloutBufferShared(RolloutBuffer):
 
 		assert t.shape[0] == len(worker_indices)
 		assert value.shape[0] == len(worker_indices)
+		assert latent_state_actor.shape[0] == len(worker_indices)
 		assert indiv_dones.shape[0] == len(worker_indices)
 		assert team_dones.shape[0] == len(worker_indices)
 
@@ -945,7 +956,9 @@ class RolloutBufferShared(RolloutBuffer):
 			if time_step == 0:
 				# Do nothing in case the worker has not stored anything
 				continue
+
 			self.V_values[episode_num][time_step] = value[i]
+			self.latent_state_actor[episode_num][time_step] = latent_state_actor[i]
 			self.team_dones[episode_num][time_step] = team_dones[i]
 			self.indiv_dones[episode_num][time_step] = indiv_dones[i]
 

@@ -255,9 +255,9 @@ class MAPPO:
 				self.env.render()
 				# Advance a step and render a new image
 				with torch.no_grad():
-					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
+					actions, action_logprob, next_rnn_hidden_state_actor, latent_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
 			else:
-				actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
+				actions, action_logprob, next_rnn_hidden_state_actor, latent_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 
 			one_hot_actions = F.one_hot(torch.tensor(actions), num_classes=self.num_actions).cpu().numpy()
 
@@ -372,7 +372,7 @@ class MAPPO:
 			if self.learn:
 				self.agents.buffer.push(
 					ally_states, enemy_states, value, rnn_hidden_state_v, \
-					global_obs, local_obs, common_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+					global_obs, local_obs, common_obs, latent_state_actor, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
 					rewards_to_send, indiv_dones, dones, self.worker_step_counter
 					)
 
@@ -478,7 +478,7 @@ class MAPPO:
 
 
 						# add final time to buffer
-						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action_batch(local_obs_, last_actions_, mask_actions_, rnn_hidden_state_actor_)
+						actions, action_logprob, next_rnn_hidden_state_actor, latent_state_actor = self.agents.get_action_batch(local_obs_, last_actions_, mask_actions_, rnn_hidden_state_actor_)
 						
 						assert np.array(actions).shape == (1, self.num_agents)
 						assert action_logprob.shape == (1, self.num_agents)
@@ -491,7 +491,7 @@ class MAPPO:
 						
 						assert value.shape == (1, self.num_agents)
 
-						self.agents.buffer.end_episode(np.array([self.worker_step_counter[worker_index]]), value, np.array([indiv_dones[worker_index]]), np.array([dones[worker_index]]), np.array([worker_index]))
+						self.agents.buffer.end_episode(np.array([self.worker_step_counter[worker_index]]), value, latent_state_actor, np.array([indiv_dones[worker_index]]), np.array([dones[worker_index]]), np.array([worker_index]))
 
 						if self.use_reward_model:
 							self.agents.reward_buffer.end_episode(np.array([worker_index]))
@@ -502,6 +502,8 @@ class MAPPO:
 							self.agents.scheduler_v_critic.step()
 							if self.use_reward_model:
 								self.agents.scheduler_reward.step()
+							if self.agents.use_inverse_dynamics:
+								self.agents.scheduler_inverse_dynamics.step()
 
 						if self.eval_policy:
 							self.rewards.append(episode_reward[worker_index])
@@ -711,6 +713,12 @@ if __name__ == '__main__':
 				"update_reward_model_freq": 200, # 100
 				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
+
+				"use_inverse_dynamics": True,
+				"inverse_dynamics_lr": 5e-4,
+				"inverse_dynamics_weight_decay": 1e-5,
+				"enable_grad_clip_inverse_dynamics": True,
+				"grad_clip_inverse_dynamics": 0.5,
 
 
 				"algorithm_type": algorithm_type,
