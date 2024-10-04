@@ -858,8 +858,7 @@ class RolloutBufferShared(RolloutBuffer):
 		team_dones,
 		worker_step_counter,
 		masks=None,
-		):states, value, rnn_hidden_state_v, \
-					global_obs, local_obs, common_obs, latent_state_actor, rn
+		):
 
 		if "StarCraft" in self.environment:
 			assert ally_states.shape[0] == self.num_workers
@@ -894,8 +893,7 @@ class RolloutBufferShared(RolloutBuffer):
 
 			if episode_num >= self.num_episodes:
 				# print(f"skipping worker {worker_index} since it has collected more than needed")
-				# the workers that have costates, value, rnn_hidden_state_v, \
-					global_obs, local_obs, common_obs, latent_state_actor, rnllected all required episodes for this update should not store anything more
+				# the workers that have collected all required episodes for this update should not store anything more
 				continue
 
 			# the below condition might hold only when running train_parallel_agent_async.py 
