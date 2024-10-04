@@ -451,7 +451,7 @@ class RolloutBuffer:
 		self.V_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
 		self.local_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.local_obs_shape))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
-		self.latent_state_actor = np.zeros((num_episodes, max_time_steps, num_agents, actor_hidden_state))
+		self.latent_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.actor_hidden_state))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.one_hot_actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
@@ -667,7 +667,7 @@ class RolloutBuffer:
 		# print(actions_batch[0, 0, :, 0])
 		# print(action_prediction_dist[0, 0, :, 0, :])
 		# print(actions_batch[0, 0, :, 0])
-		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
+		action_prediction_logprobs = action_prediction_inverse_dynamic_probs.log_prob(actions_batch) # b x t x t x n_a
 		# print("action_prediction_logprobs", action_prediction_logprobs.shape)
 		# print(action_prediction_logprobs[0, 0, :, 0])
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
@@ -858,7 +858,8 @@ class RolloutBufferShared(RolloutBuffer):
 		team_dones,
 		worker_step_counter,
 		masks=None,
-		):
+		):states, value, rnn_hidden_state_v, \
+					global_obs, local_obs, common_obs, latent_state_actor, rn
 
 		if "StarCraft" in self.environment:
 			assert ally_states.shape[0] == self.num_workers
@@ -893,7 +894,8 @@ class RolloutBufferShared(RolloutBuffer):
 
 			if episode_num >= self.num_episodes:
 				# print(f"skipping worker {worker_index} since it has collected more than needed")
-				# the workers that have collected all required episodes for this update should not store anything more
+				# the workers that have costates, value, rnn_hidden_state_v, \
+					global_obs, local_obs, common_obs, latent_state_actor, rnllected all required episodes for this update should not store anything more
 				continue
 
 			# the below condition might hold only when running train_parallel_agent_async.py 
