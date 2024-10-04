@@ -177,9 +177,7 @@ class PPOAgent:
 			).to(self.device)
 		
 
-		self.network_uactions=self.num_actions, 
-			num_agents=self.num_agents, 
-			devipdate_interval_v = dictionary["network_update_interval_v"]
+		self.network_update_interval_v = dictionary["network_update_interval_v"]
 		self.soft_update_v = dictionary["soft_update_v"]
 		self.tau_v = dictionary["tau_v"]
 
