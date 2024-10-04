@@ -866,8 +866,8 @@ class PPOAgent:
 		# 	self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 		# else:
 		# 	self.buffer.calculate_targets(episode, self.V_PopArt)
-		self.buffer.calculate_targets(episode, self.V_PopArt)
-		# self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
+		# self.buffer.calculate_targets(episode, self.V_PopArt)
+		self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 
 		# Optimize policy for n epochs
 		for pp_epoch in range(self.n_epochs):
@@ -920,7 +920,7 @@ class PPOAgent:
 			critic_v_loss_2 = F.huber_loss(torch.clamp(values, values_old.to(self.device)-self.value_clip, values_old.to(self.device)+self.value_clip), target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
 
 			
-			dists, _ = self.policy_network(
+			dists, _, _ = self.policy_network(
 					local_obs.to(self.device),
 					last_actions.to(self.device),
 					hidden_state_actor.to(self.device),
