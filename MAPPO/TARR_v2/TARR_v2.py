@@ -191,7 +191,7 @@ class TARR(nn.Module):
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
 		last_state_embedding = torch.zeros(b, n_a, 1, self.emb_dim)
-		next_state_embedding = torch.stack([global_state_embeddings[:, :, 1:, :], last_state_embedding], dim=-2)
+		next_state_embedding = torch.stack((global_state_embeddings[:, :, 1:, :], last_state_embedding), dim=-2)
 		current_past_next_state_embeddings = torch.cat([global_state_embeddings, past_state_action_embeddings, next_state_embeddings], dim=-1)
 		action_prediction = self.dynamics_model(current_past_next_state_embeddings)
 
@@ -232,10 +232,17 @@ class TARR(nn.Module):
 		# action_prediction = None
 
 
-		# indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
-		# final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
-		# reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		# rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
+
+
+
+
+		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
+		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
+
+		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 		# rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))) * torch.sign(episodic_reward.to(self.device).reshape(b, 1, 1))
 		# rewards = F.relu(self.linear(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device))
 		
@@ -252,7 +259,7 @@ class TARR(nn.Module):
 		# print("SIGN", sign)
 		# rewards = reward_magnitude.clone() * sign.reshape(b, 1, 1)
 
-		rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
+		
 
 		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
