@@ -544,7 +544,7 @@ class PPOAgent:
 				probs = Categorical(dists.squeeze(1))
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
-			return actions, action_logprob, hidden_state.reshape(num_layers, num_workers, num_agents, hidden_size).permute(1,0,2,3).cpu().numpy(), , latent_state.cpu().numpy()
+			return actions, action_logprob, hidden_state.reshape(num_layers, num_workers, num_agents, hidden_size).permute(1,0,2,3).cpu().numpy(), latent_state.cpu().numpy()
 	
 
 	def should_update_agent(self, episode):
