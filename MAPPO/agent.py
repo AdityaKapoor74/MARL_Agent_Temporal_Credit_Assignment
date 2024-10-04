@@ -832,7 +832,7 @@ class PPOAgent:
 		# first update inverse dynamics model
 		if self.use_inverse_dynamics:
 			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
-			actions = torch.from_numpy(self.buffer.actions).float()
+			actions = torch.from_numpy(self.buffer.actions).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float()
 			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device))
 
