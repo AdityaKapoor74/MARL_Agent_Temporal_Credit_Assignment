@@ -852,8 +852,8 @@ class PPOAgent:
 				grad_norm_inverse_dynamics = torch.tensor([total_norm ** 0.5])
 			self.inverse_dynamic_optimizer.step()
 
-
-			self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
+			with torch.no_grad():
+				self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
 
 		
 		v_value_loss_batch = 0
