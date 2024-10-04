@@ -853,7 +853,7 @@ class PPOAgent:
 			self.inverse_dynamic_optimizer.step()
 
 
-			self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device))
+			self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
 
 		
 		v_value_loss_batch = 0
