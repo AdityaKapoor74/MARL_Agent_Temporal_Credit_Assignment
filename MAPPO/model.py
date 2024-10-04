@@ -315,7 +315,7 @@ class InverseDynamicsModel(nn.Module):
 		num_agents, 
 		device
 		):
-		super(Policy, self).__init__()
+		super(InverseDynamicsModel, self).__init__()
 
 		
 		self.num_agents = num_agents
