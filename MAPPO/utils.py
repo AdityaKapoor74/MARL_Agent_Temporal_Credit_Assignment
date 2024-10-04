@@ -665,7 +665,7 @@ class RolloutBuffer:
 		# print(actions_batch[0, 0, :, 0])
 		# print(action_prediction_dist[0, 0, :, 0, :])
 		# print(actions_batch[0, 0, :, 0])
-		action_prediction_logprobs = action_prediction_inverse_dynamic_probs.log_prob(actions_batch) # b x t x t x n_a
+		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
 		# print("action_prediction_logprobs", action_prediction_logprobs.shape)
 		# print(action_prediction_logprobs[0, 0, :, 0])
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
