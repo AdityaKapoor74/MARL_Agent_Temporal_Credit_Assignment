@@ -429,7 +429,8 @@ class PPOAgent:
 				num_actions=self.num_actions, 
 				num_agents=self.num_agents, 
 				device=self.device,
-			)
+			).to(self.device)
+			
 			self.inverse_dynamic_optimizer = optim.AdamW(self.inverse_dynamic_network.parameters(), lr=dictionary["inverse_dynamics_lr"], weight_decay=dictionary["inverse_dynamics_weight_decay"], eps=1e-5)
 			
 			if self.scheduler_need:
