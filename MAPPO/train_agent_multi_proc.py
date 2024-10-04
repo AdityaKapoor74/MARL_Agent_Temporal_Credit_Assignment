@@ -540,8 +540,8 @@ class MAPPO:
 							elif self.use_reward_model:
 								if self.num_episodes_done >= self.warm_up_period:
 									# finetune
-									sample = self.agents.buffer.sample_finetune_reward_model()
-									self.agents.update_reward_model(sample)
+									# sample = self.agents.buffer.sample_finetune_reward_model()
+									# self.agents.update_reward_model(sample)
 									
 									self.agents.buffer.rewards, self.agents.buffer.action_prediction = self.agents.reward_model_output()
 									self.agents.update(self.num_episodes_done)
@@ -645,7 +645,7 @@ if __name__ == '__main__':
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
 		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_v2_hindsight_inverse_dynamics_model_w_intermediat_emb_imp_sampling_finetune" # default setting: reward prediction loss + dynamic loss
+		experiment_name = "MAPPO_TAR^2_v2_normal_inverse_dynamics_model_w_curr_future_state_past_intermediat_emb" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -676,7 +676,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 70, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -700,7 +700,7 @@ if __name__ == '__main__':
 				"reward_batch_size": 128, # 64
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 1.0,
+				"dynamic_loss_coeffecient": 5e-2,
 				"expected_logprob_prediction_loss_coeffecient": 5e-2,
 				"temporal_score_coefficient": 0.0,
 				"agent_score_coefficient": 0.0,
