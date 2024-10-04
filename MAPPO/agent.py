@@ -836,7 +836,7 @@ class PPOAgent:
 			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device))
 
-			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction, actions.to(self.device)) * agent_masks.to(self.device).unsqueeze(1)).sum() / agent_masks.to(self.device).unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).sum() + 1e-5
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)) * agent_masks.reshape(-1).to(self.device)).sum() / agent_masks.to(self.device).unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).reshape(-1).sum() + 1e-5
 
 			self.inverse_dynamic_optimizer.zero_grad()
 			inverse_dynamic_loss.backward()
