@@ -191,7 +191,7 @@ class TARR(nn.Module):
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
 		last_state_embedding = torch.zeros(b, n_a, 1, self.emb_dim)
-		next_state_embedding = torch.stack((global_state_embeddings[:, :, 1:, :], last_state_embedding), dim=-2)
+		next_state_embedding = torch.cat([global_state_embeddings[:, :, 1:, :], last_state_embedding], dim=-2)
 		current_past_next_state_embeddings = torch.cat([global_state_embeddings, past_state_action_embeddings, next_state_embeddings], dim=-1)
 		action_prediction = self.dynamics_model(current_past_next_state_embeddings)
 
