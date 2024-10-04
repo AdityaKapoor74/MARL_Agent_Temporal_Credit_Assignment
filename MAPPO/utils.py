@@ -935,7 +935,6 @@ class RolloutBufferShared(RolloutBuffer):
 		self, 
 		t, 
 		value, 
-		latent_state_actor,
 		indiv_dones,
 		team_dones,
 		worker_indices,
@@ -943,7 +942,6 @@ class RolloutBufferShared(RolloutBuffer):
 
 		assert t.shape[0] == len(worker_indices)
 		assert value.shape[0] == len(worker_indices)
-		assert latent_state_actor.shape[0] == len(worker_indices)
 		assert indiv_dones.shape[0] == len(worker_indices)
 		assert team_dones.shape[0] == len(worker_indices)
 
@@ -956,7 +954,6 @@ class RolloutBufferShared(RolloutBuffer):
 				continue
 
 			self.V_values[episode_num][time_step] = value[i]
-			self.latent_state_actor[episode_num][time_step] = latent_state_actor[i]
 			self.team_dones[episode_num][time_step] = team_dones[i]
 			self.indiv_dones[episode_num][time_step] = indiv_dones[i]
 
