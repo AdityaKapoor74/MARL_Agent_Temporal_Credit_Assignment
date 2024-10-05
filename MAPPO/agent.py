@@ -698,7 +698,7 @@ class PPOAgent:
 				local_obs_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
 				last_actions_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents),
 				hidden_state_actor_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.rnn_num_layers_actor, self.num_agents, -1)[:, 0, :, :, :].permute(1, 0, 2, 3).reshape(self.rnn_num_layers_actor, b*data_chunks*self.num_agents, -1),
-				action_masks_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
+				action_masks_batch.to(self.device).bool().reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
 				)
 
 			b, t, n_a, _ = latent_state_actor.shape
