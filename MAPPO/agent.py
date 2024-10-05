@@ -704,13 +704,13 @@ class PPOAgent:
 			latent_state_actor = latent_state_actor.reshape(b, data_chunks*self.data_chunk_length, self.num_agents, -1)
 
 			b, t, n_a, _ = latent_state_actor.shape
-			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1).to(self.device)
 
 			actions = actions_batch.permute(0, 2, 1).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks_batch.unsqueeze(1) * upper_triangular_matrix
-			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks_batch.to(self.device)) * (agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
+			action_prediction = self.inverse_dynamic_network(latent_state_actor, latent_state_actor, agent_masks_batch) * (agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1)
 
 			weight = (1.0 / ((agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
-			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks_batch.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks_batch.to(self.device).sum()
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long()).reshape(b, t, t, n_a) * agent_masks_batch.unsqueeze(1) * upper_triangular_matrix * weight).sum() / agent_masks_batch.sum()
 
 			self.inverse_dynamic_optimizer.zero_grad()
 			inverse_dynamic_loss.backward()
