@@ -323,7 +323,7 @@ class InverseDynamicsModel(nn.Module):
 		self.device = device
 
 		self.action_prediction = nn.Sequential(
-			nn.LayerNorm(2*rnn_hidden_actor),
+			# nn.LayerNorm(2*rnn_hidden_actor),
 			init_(nn.Linear(rnn_hidden_actor*2, rnn_hidden_actor)),
 			nn.GELU(),
 			init_(nn.Linear(rnn_hidden_actor, num_actions), gain=0.01)

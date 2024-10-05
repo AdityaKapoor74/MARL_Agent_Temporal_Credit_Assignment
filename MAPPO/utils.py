@@ -655,32 +655,18 @@ class RolloutBuffer:
 		next_values = torch.from_numpy(self.V_values[:, -1, :]) * next_mask
 
 		b, t, n_a = self.actions.shape
-		# print("action_prediction_dist_output")
-		# print(torch.from_numpy(self.action_prediction).permute(0, 2, 3, 1, 4)[0, 0, :, 0])
 		action_prediction_dist = F.softmax(torch.from_numpy(self.action_prediction), dim=-1) # b x t x t x n_a x n_actions
-		# print("action_prediction_dist", action_prediction_dist.shape)
 		action_prediction_probs = Categorical(action_prediction_dist)
 		actions_batch = torch.from_numpy(self.actions).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
-		# print("actions_batch", actions_batch.shape)
-		# print(actions_batch[0, 0, :, 0])
-		# print(action_prediction_dist[0, 0, :, 0, :])
-		# print(actions_batch[0, 0, :, 0])
 		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
-		# print("action_prediction_logprobs", action_prediction_logprobs.shape)
-		# print(action_prediction_logprobs[0, 0, :, 0])
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
-		# print("action_logprobs", action_logprobs.shape)
-		# print(action_logprobs[0, 0, :, 0])
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).clamp(0, 2.0) # b x t x t x n_a
-		# print("action_importance_sampling", action_importance_sampling.shape)
-		# make diagonal elements 1
 		action_importance_sampling = action_importance_sampling.permute(0, 3, 1, 2).reshape(b*n_a, t, t)
 		action_probs = torch.exp(torch.from_numpy(self.logprobs))
 		for i in range(t):
 			action_importance_sampling[:, i, i] = action_probs[:, i, :].reshape(-1) # torch.ones(b*n_a)
 		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2, 3, 1) * upper_triangular_mask * masks.unsqueeze(1)
-		# action_importance_sampling = torch.prod(action_importance_sampling, dim=-1, keepdim=True)
 
 		print("masks")
 		print(masks[0, :, 0])
