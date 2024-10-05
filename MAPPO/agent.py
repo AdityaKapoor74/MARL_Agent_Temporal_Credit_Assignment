@@ -880,9 +880,9 @@ class PPOAgent:
 
 		# finetune update inverse dynamics model
 		if self.use_inverse_dynamics:
-		# 	latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
+			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
 		# 	b, t, n_a, _ = latent_state_actor.shape
-		# 	agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
+			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 		# 	upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 			
 
