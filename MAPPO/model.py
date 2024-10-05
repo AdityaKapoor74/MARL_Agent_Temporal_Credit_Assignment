@@ -339,4 +339,4 @@ class InverseDynamicsModel(nn.Module):
 		current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
 		logits = self.action_prediction(current_goal_latent_state)
 
-		return F.softmax(logits, dim=-1)
+		return logits
