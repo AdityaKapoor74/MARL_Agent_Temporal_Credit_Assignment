@@ -701,6 +701,8 @@ class PPOAgent:
 				action_masks_batch.to(self.device).bool().reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
 				)
 
+			latent_state_actor = latent_state_actor.reshape(b, data_chunks*self.data_chunk_length, self.num_agents, -1)
+
 			b, t, n_a, _ = latent_state_actor.shape
 			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 
