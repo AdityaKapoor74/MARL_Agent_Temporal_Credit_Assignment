@@ -650,14 +650,14 @@ class PPOAgent:
 			print("EXPERIMENT TYPE", self.experiment_type, "REWARDS:-")
 			print(rewards[0, :, 0])
 
-			# return (rewards*agent_masks_batch).cpu().numpy()
+			return (rewards*agent_masks_batch).cpu().numpy()
 
 
-			temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
-			agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
-			episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+			# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
+			# agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
+			# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
 
-			return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
+			# return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
 
 
 			
@@ -689,6 +689,40 @@ class PPOAgent:
 		team_mask_batch = torch.from_numpy(team_mask_batch).float().to(self.device)
 		agent_masks_batch = torch.from_numpy(agent_masks_batch).float().to(self.device)
 		episode_len_batch = torch.from_numpy(episode_len_batch).long().to(self.device)
+
+
+		if self.use_inverse_dynamics:
+			b, _, _, _ = ally_obs_batch.shape
+			data_chunks = self.max_time_steps // self.data_chunk_length
+			_, _, latent_state_actor = self.policy_network(
+				local_obs_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
+				last_actions_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents),
+				hidden_state_actor_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.rnn_num_layers_actor, self.num_agents, -1)[:, 0, :, :, :].permute(1, 0, 2, 3).reshape(self.rnn_num_layers_actor, b*data_chunks*self.num_agents, -1),
+				action_masks_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
+				)
+
+			b, t, n_a, _ = latent_state_actor.shape
+			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+
+			actions = actions_batch.unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks_batch.unsqueeze(1) * upper_triangular_matrix
+			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks_batch.to(self.device)) * (agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
+
+			weight = (1.0 / ((agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks_batch.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks_batch.to(self.device).sum()
+
+			self.inverse_dynamic_optimizer.zero_grad()
+			inverse_dynamic_loss.backward()
+			if self.enable_grad_clip_inverse_dynamics:
+				grad_norm_inverse_dynamics = torch.nn.utils.clip_grad_norm_(self.inverse_dynamic_network.parameters(), self.grad_clip_inverse_dynamics)
+			else:
+				total_norm = 0
+				for p in self.inverse_dynamic_network.parameters():
+					if p.grad is None:
+						continue
+					param_norm = p.grad.detach().data.norm(2)
+					total_norm += param_norm.item() ** 2
+				grad_norm_inverse_dynamics = torch.tensor([total_norm ** 0.5])
+			self.inverse_dynamic_optimizer.step()
 
 
 		if self.norm_rewards:
