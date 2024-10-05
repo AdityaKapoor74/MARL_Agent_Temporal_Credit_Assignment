@@ -832,11 +832,16 @@ class PPOAgent:
 		# first update inverse dynamics model
 		if self.use_inverse_dynamics:
 			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
-			actions = torch.from_numpy(self.buffer.actions).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float()
+			b, t, n_a = latent_state_actor.shape
 			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
-			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device))
+			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+			
 
-			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)) * agent_masks.unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).reshape(-1).to(self.device)).sum() / agent_masks.to(self.device).unsqueeze(1).repeat(1, latent_state_actor.shape[1], 1, 1).reshape(-1).sum() + 1e-5
+			actions = torch.from_numpy(self.buffer.actions).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device)
+			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device)
+
+			weight =  1.0 / (agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device)).sum(dim=-2, keepdim=True)
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum()
 
 			self.inverse_dynamic_optimizer.zero_grad()
 			inverse_dynamic_loss.backward()

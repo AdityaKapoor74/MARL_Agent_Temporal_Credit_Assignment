@@ -716,9 +716,9 @@ if __name__ == '__main__':
 
 				"use_inverse_dynamics": True,
 				"inverse_dynamics_lr": 5e-4,
-				"inverse_dynamics_weight_decay": 1e-5,
+				"inverse_dynamics_weight_decay": 0.0,
 				"enable_grad_clip_inverse_dynamics": True,
-				"grad_clip_inverse_dynamics": 0.5,
+				"grad_clip_inverse_dynamics": 10.0,
 
 
 				"algorithm_type": algorithm_type,
