@@ -545,7 +545,7 @@ class MAPPO:
 									# sample = self.agents.buffer.sample_finetune_reward_model()
 									# self.agents.update_reward_model(sample)
 									
-									self.agents.buffer.rewards, self.agents.buffer.action_prediction = self.agents.reward_model_output()
+									self.agents.buffer.rewards = self.agents.reward_model_output()
 									self.agents.update(self.num_episodes_done)
 								else:
 									self.agents.buffer.clear()
