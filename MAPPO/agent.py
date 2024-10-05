@@ -848,7 +848,6 @@ class PPOAgent:
 			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)) * (agent_masks.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
 
 			weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
-			print((1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5))[0, 0, 0])
 			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
 
 			self.inverse_dynamic_optimizer.zero_grad()
@@ -879,8 +878,8 @@ class PPOAgent:
 		# 	self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 		# else:
 		# 	self.buffer.calculate_targets(episode, self.V_PopArt)
-		self.buffer.calculate_targets(episode, self.V_PopArt)
-		# self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
+		# self.buffer.calculate_targets(episode, self.V_PopArt)
+		self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 
 		# Optimize policy for n epochs
 		for pp_epoch in range(self.n_epochs):
