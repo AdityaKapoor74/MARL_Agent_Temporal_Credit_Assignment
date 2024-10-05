@@ -704,7 +704,7 @@ class PPOAgent:
 			b, t, n_a, _ = latent_state_actor.shape
 			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
 
-			actions = actions_batch.unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks_batch.unsqueeze(1) * upper_triangular_matrix
+			actions = actions_batch.permute(0, 2, 1).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks_batch.unsqueeze(1) * upper_triangular_matrix
 			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks_batch.to(self.device)) * (agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
 
 			weight = (1.0 / ((agent_masks_batch.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
