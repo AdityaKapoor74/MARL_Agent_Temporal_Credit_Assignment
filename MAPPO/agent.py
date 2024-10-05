@@ -650,12 +650,14 @@ class PPOAgent:
 			print("EXPERIMENT TYPE", self.experiment_type, "REWARDS:-")
 			print(rewards[0, :, 0])
 
-			return (rewards*agent_masks_batch).cpu().numpy()
-			# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
-			# agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
-			# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+			# return (rewards*agent_masks_batch).cpu().numpy()
 
-			# return ((temporal_weights*agent_weights).cpu()*episodic_rewards).cpu().numpy()
+
+			temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
+			agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
+			episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+
+			return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
 
 
 			
