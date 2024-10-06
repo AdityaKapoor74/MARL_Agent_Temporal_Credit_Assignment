@@ -388,7 +388,7 @@ class InverseDynamicsModel(nn.Module):
 		# mask dead agent actions 
 		logits = torch.where(agent_masks.reshape(batch, 1, timesteps, n_a, 1).repeat(1, timesteps, 1, 1, self.num_actions))
 		# mask actions that are not valid
-		logits = torch.where(mask_actions, logits, self.mask_value)
+		logits = torch.where(mask_actions.unsqueeze(2).repeat(1, 1, timesteps, 1, 1), logits, self.mask_value)
 
 		return logits
 
