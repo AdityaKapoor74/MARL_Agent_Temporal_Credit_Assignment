@@ -531,6 +531,19 @@ class RolloutBuffer:
 		self.time_step = 0
 
 
+	def sample_inverse_dynamics(self):
+
+		first_last_actions = np.zeros((self.num_episodes, 1, self.num_agents), dtype=int) + self.num_actions
+
+		local_obs = torch.from_numpy(self.local_obs).float()
+		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long()
+		hidden_state_inverse_dynamics = torch.from_numpy(np.zeros((self.rnn_num_layers_actor, self.num_episodes*self.num_agents, self.actor_hidden_state))).float()
+		agent_masks = 1-torch.from_numpy(self.indiv_dones[:, :-1]).float()
+		actions = torch.from_numpy(self.actions).long()
+
+		return local_obs, last_actions, hidden_state_inverse_dynamics, agent_masks, actions
+
+
 	def sample_recurrent_policy(self):
 
 		data_chunks = self.max_time_steps // self.data_chunk_length
@@ -909,6 +922,7 @@ class RolloutBufferShared(RolloutBuffer):
 			self.rewards[episode_num][time_step] = rewards[worker_index]
 			self.indiv_dones[episode_num][time_step] = indiv_dones[worker_index]
 			self.team_dones[episode_num][time_step] = team_dones[worker_index]
+			
 
 			# print(f"Filled for {worker_index}")
 			if time_step < self.max_time_steps-1:

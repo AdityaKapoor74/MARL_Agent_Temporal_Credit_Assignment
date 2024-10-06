@@ -241,6 +241,11 @@ class MAPPO:
 		rnn_hidden_state_v = np.zeros((self.num_workers, self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
 		rnn_hidden_state_actor = np.zeros((self.num_workers, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
+		if self.use_inverse_dynamics:
+			inverse_dynamics_hidden_state = np.zeros((self.num_workers, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
+		else:
+			inverse_dynamics_hidden_state = None
+
 		# we don't want the models to be updated by each thread -- first thread that finishes performs the update
 		self.update_agent = False
 		self.update_reward_model = False
@@ -258,6 +263,11 @@ class MAPPO:
 					actions, action_logprob, next_rnn_hidden_state_actor, latent_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
 			else:
 				actions, action_logprob, next_rnn_hidden_state_actor, latent_state_actor = self.agents.get_action_batch(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
+
+			if self.use_inverse_dynamics:
+				inverse_dynamics_action_logprob, next_inverse_dynamics_hidden_state = self.agents.get_inverse_dynamics_output_batch(local_obs, last_actions, indiv_dones, inverse_dynamics_hidden_state, actions):
+			else:
+				inverse_dynamics_action_logprob, next_inverse_dynamics_hidden_state = None, None
 
 			one_hot_actions = F.one_hot(torch.tensor(actions), num_classes=self.num_actions).cpu().numpy()
 
@@ -373,6 +383,7 @@ class MAPPO:
 				self.agents.buffer.push(
 					ally_states, enemy_states, value, rnn_hidden_state_v, \
 					global_obs, local_obs, common_obs, latent_state_actor, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+					inverse_dynamics_hidden_state, inverse_dynamics_action_logprob, \
 					rewards_to_send, indiv_dones, dones, self.worker_step_counter
 					)
 
@@ -386,6 +397,7 @@ class MAPPO:
 			global_obs, local_obs, last_actions, mask_actions = next_global_obs, next_local_obs, actions, next_mask_actions
 			indiv_dones, dones = _combine_indiv_dones(info), next_dones
 			rnn_hidden_state_v, rnn_hidden_state_actor = next_rnn_hidden_state_v, next_rnn_hidden_state_actor
+			inverse_dynamics_hidden_state = next_inverse_dynamics_hidden_state
 
 			
 			for worker_index in range(self.num_workers):  # TODO for later: vectorize this loop if possible
