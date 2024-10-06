@@ -921,8 +921,9 @@ class PPOAgent:
 
 			local_obs, last_actions, hidden_state_inverse_dynamics, action_masks, agent_masks, actions = self.buffer.sample_inverse_dynamics()
 			b, t, n_a, _ = local_obs.shape
-			actions = actions.unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
 			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+			actions = actions.unsqueeze(-2).repeat(1, 1, t, 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
+			
 			dists = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)) * agent_masks.unsqueeze(1) * upper_triangular_matrix
 
 			weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
