@@ -863,7 +863,7 @@ class PPOAgent:
 		if "AREL" in self.experiment_type:
 			return reward_loss.item(), rewards_var.item(), grad_norm_value_reward.item()
 		elif "TAR^2" in self.experiment_type:
-			return reward_loss.item(), reward_prediction_loss.item(), dynamic_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item(), inverse_dynamic_loss.item(), grad_norm_inverse_dynamics.item()
+			return reward_loss.item(), reward_prediction_loss.item(), dynamic_loss.item(), entropy_temporal_weights.item(), entropy_agent_weights.item(), grad_norm_value_reward.item()#, inverse_dynamic_loss.item(), grad_norm_inverse_dynamics.item()
 		elif "STAS" in self.experiment_type:
 			return reward_loss.item(), grad_norm_value_reward.item()
 

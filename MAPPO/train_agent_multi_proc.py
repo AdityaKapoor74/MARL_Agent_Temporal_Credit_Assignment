@@ -563,7 +563,7 @@ class MAPPO:
 								elif "TAR^2" in self.experiment_type:
 									entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 									reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
-									inverse_dynamic_loss_batch, grad_norm_inverse_dynamics_batch = 0.0, 0.0
+									# inverse_dynamic_loss_batch, grad_norm_inverse_dynamics_batch = 0.0, 0.0
 								
 								for i in range(self.reward_model_update_epochs):
 
@@ -573,13 +573,13 @@ class MAPPO:
 										reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
 										reward_var_batch += (reward_var/self.reward_model_update_epochs)
 									elif "TAR^2" in self.experiment_type:
-										reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward, inverse_dynamic_loss, grad_norm_inverse_dynamics = self.agents.update_reward_model(sample)
+										reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
 										entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
 										entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
 										reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
 										dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
-										inverse_dynamic_loss_batch += (inverse_dynamic_loss/self.reward_model_update_epochs)
-										grad_norm_inverse_dynamics_batch += (grad_norm_inverse_dynamics/self.reward_model_update_epochs)
+										# inverse_dynamic_loss_batch += (inverse_dynamic_loss/self.reward_model_update_epochs)
+										# grad_norm_inverse_dynamics_batch += (grad_norm_inverse_dynamics/self.reward_model_update_epochs)
 									elif "STAS" in self.experiment_type:
 										reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
 
@@ -604,8 +604,8 @@ class MAPPO:
 										self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, self.num_episodes_done)
 										self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, self.num_episodes_done)
 
-										self.comet_ml.log_metric('Inverse Dynamic Loss', inverse_dynamic_loss_batch, self.num_episodes_done)
-										self.comet_ml.log_metric('Grad Norm Inverse Dynamic', grad_norm_inverse_dynamics_batch, self.num_episodes_done)
+										# self.comet_ml.log_metric('Inverse Dynamic Loss', inverse_dynamic_loss_batch, self.num_episodes_done)
+										# self.comet_ml.log_metric('Grad Norm Inverse Dynamic', grad_norm_inverse_dynamics_batch, self.num_episodes_done)
 									
 						
 
