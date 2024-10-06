@@ -358,7 +358,7 @@ class InverseDynamicsModel(nn.Module):
 			)
 
 
-	def forward(self, local_observations, last_actions, hidden_state, action_masks, agent_masks):
+	def forward(self, local_observations, last_actions, hidden_state, mask_actions, agent_masks):
 
 		batch, timesteps, n_a, _ = local_observations.shape
 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
