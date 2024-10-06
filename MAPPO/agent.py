@@ -919,10 +919,11 @@ class PPOAgent:
 			# with torch.no_grad():
 			# 	self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
 
-			local_obs, last_actions, hidden_state_inverse_dynamics, agent_masks, actions = self.buffer.sample_inverse_dynamics()
+			local_obs, last_actions, hidden_state_inverse_dynamics, action_masks, agent_masks, actions = self.buffer.sample_inverse_dynamics()
 			b, t, n_a, _ = local_obs.shape
+			actions = actions.unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
 			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-			dists = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), agent_masks.to(self.device))
+			dists = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)) * agent_masks.unsqueeze(1) * upper_triangular_matrix
 
 			weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
 			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(dists.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
@@ -942,7 +943,7 @@ class PPOAgent:
 			self.inverse_dynamic_optimizer.step()
 
 			with torch.no_grad():
-				self.buffer.action_prediction = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), agent_masks.to(self.device)).cpu().numpy()
+				self.buffer.action_prediction = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)).cpu().numpy()
 			
 
 		

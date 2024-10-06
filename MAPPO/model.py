@@ -358,9 +358,9 @@ class InverseDynamicsModel(nn.Module):
 			)
 
 
-	def forward(self, local_observations, last_actions, hidden_state, agent_masks):
+	def forward(self, local_observations, last_actions, hidden_state, action_masks, agent_masks):
 
-		batch, timesteps, _, _ = local_observations.shape
+		batch, timesteps, n_a, _ = local_observations.shape
 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
 		last_action_embedding = self.action_embedding(last_actions.long())
 		obs_embedding = self.obs_embedding(local_observations)
@@ -377,13 +377,18 @@ class InverseDynamicsModel(nn.Module):
 			goal_latent_state = output.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
 			current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
 
-			logits = self.final_layer(current_goal_latent_state)
+			logits = self.final_layer(current_goal_latent_state) # b x t x t x n_a x n_actions
 		else:
 			current_latent_state = local_observations.unsqueeze(2).repeat(1, 1, timesteps, 1, 1)
 			goal_latent_state = local_observations.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
 			current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
 
-			logits = self.final_layer(current_goal_latent_state)
+			logits = self.final_layer(current_goal_latent_state) # b x t x t x n_a x n_actions
+
+		# mask dead agent actions 
+		logits = torch.where(agent_masks.reshape(batch, 1, timesteps, n_a, 1).repeat(1, timesteps, 1, 1, self.num_actions))
+		# mask actions that are not valid
+		logits = torch.where(mask_actions, logits, self.mask_value)
 
 		return logits
 

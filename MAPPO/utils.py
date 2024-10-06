@@ -539,9 +539,10 @@ class RolloutBuffer:
 		last_actions = torch.from_numpy(np.concatenate((first_last_actions, self.actions[:, :-1, :]), axis=1)).long()
 		hidden_state_inverse_dynamics = torch.from_numpy(np.zeros((self.rnn_num_layers_actor, self.num_episodes*self.num_agents, self.actor_hidden_state))).float()
 		agent_masks = 1-torch.from_numpy(self.indiv_dones[:, :-1]).float()
+		action_masks = torch.from_numpy(self.action_masks).bool()
 		actions = torch.from_numpy(self.actions).long()
 
-		return local_obs, last_actions, hidden_state_inverse_dynamics, agent_masks, actions
+		return local_obs, last_actions, hidden_state_inverse_dynamics, action_masks, agent_masks, actions
 
 
 	def sample_recurrent_policy(self):
@@ -674,9 +675,12 @@ class RolloutBuffer:
 		action_prediction_logprobs = action_prediction_probs.log_prob(actions_batch) # b x t x t x n_a
 		action_logprobs = torch.from_numpy(self.logprobs).unsqueeze(-2).repeat(1, 1, t, 1) # b x t x t x n_a
 		upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-		action_importance_sampling = torch.exp(action_prediction_logprobs-action_logprobs).sum(dim=-1, keepdim=True).repeat(1, 1, 1, n_a).clamp(0, 2.0) # b x t x t x n_a
+		# clamp indiv agent action prediction
+		# action_importance_sampling = torch.exp((action_prediction_logprobs-action_logprobs)).clamp(0, 2.0) # b x t x t x n_a
+		# clamp joint action prediction
+		action_importance_sampling = torch.exp(((action_prediction_logprobs-action_logprobs)*masks.unsqueeze(1)).sum(dim=-1, keepdim=True).repeat(1, 1, 1, n_a)).clamp(0, 2.0) # b x t x t x n_a
 		action_importance_sampling = action_importance_sampling.permute(0, 3, 1, 2).reshape(b*n_a, t, t)
-		action_probs = torch.exp(torch.from_numpy(self.logprobs))
+		action_probs = torch.exp(torch.from_numpy(self.logprobs) - 1e9 * masks)
 		for i in range(t):
 			action_importance_sampling[:, i, i] = action_probs[:, i, :].reshape(-1) # torch.ones(b*n_a)
 		action_importance_sampling = action_importance_sampling.reshape(b, n_a, t, t).permute(0, 2, 3, 1) * upper_triangular_mask * masks.unsqueeze(1)
