@@ -879,8 +879,9 @@ class PPOAgent:
 		self.comet_ml.log_metric('V_Value_Loss',self.plotting_dict["v_value_loss"],episode)
 		self.comet_ml.log_metric('Grad_Norm_V_Value',self.plotting_dict["grad_norm_value_v"],episode)
 
-		self.comet_ml.log_metric("Inverse Dynamic Loss", self.plotting_dict["inverse_dynamic_loss"], episode)
-		self.comet_ml.log_metric("Grad Norm Inverse Dynamic", self.plotting_dict["grad_norm_inverse_dynamics"], episode)	
+		if self.use_inverse_dynamics:
+			self.comet_ml.log_metric("Inverse Dynamic Loss", self.plotting_dict["inverse_dynamic_loss"], episode)
+			self.comet_ml.log_metric("Grad Norm Inverse Dynamic", self.plotting_dict["grad_norm_inverse_dynamics"], episode)	
 
 
 	def update_parameters(self):
@@ -1104,9 +1105,11 @@ class PPOAgent:
 		"entropy": entropy_batch,
 		"grad_norm_policy": grad_norm_policy_batch,
 		"grad_norm_value_v": grad_norm_value_v_batch,
-		"inverse_dynamic_loss": inverse_dynamic_loss,
-		"grad_norm_inverse_dynamics": grad_norm_inverse_dynamics
 		}
+
+		if self.use_inverse_dynamics:
+			self.plotting_dict["inverse_dynamic_loss"] = inverse_dynamic_loss
+			self.plotting_dict["grad_norm_inverse_dynamics"] = grad_norm_inverse_dynamics
 		
 		if self.comet_ml is not None:
 			self.plot(agent_masks, episode)
