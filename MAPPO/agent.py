@@ -424,22 +424,22 @@ class PPOAgent:
 
 		if self.use_inverse_dynamics:
 			# Inverse Dynamics Model
-			# self.inverse_dynamic_network = InverseDynamicsModel(
-			# 	rnn_hidden_actor=self.rnn_hidden_actor, 
-			# 	num_actions=self.num_actions, 
-			# 	num_agents=self.num_agents, 
-			# 	device=self.device,
-			# ).to(self.device)
-
 			self.inverse_dynamic_network = InverseDynamicsModel(
-				use_recurrent_policy=self.use_recurrent_policy,
-				obs_input_dim=self.local_observation_shape, 
-				num_agents=self.num_agents, 
+				rnn_hidden_actor=self.rnn_hidden_actor, 
 				num_actions=self.num_actions, 
-				rnn_num_layers=self.rnn_num_layers_actor,
-				rnn_hidden_actor=self.rnn_hidden_actor,
-				device=self.device
-				).to(self.device)
+				num_agents=self.num_agents, 
+				device=self.device,
+			).to(self.device)
+
+			# self.inverse_dynamic_network = InverseDynamicsModel(
+			# 	use_recurrent_policy=self.use_recurrent_policy,
+			# 	obs_input_dim=self.local_observation_shape, 
+			# 	num_agents=self.num_agents, 
+			# 	num_actions=self.num_actions, 
+			# 	rnn_num_layers=self.rnn_num_layers_actor,
+			# 	rnn_hidden_actor=self.rnn_hidden_actor,
+			# 	device=self.device
+			# 	).to(self.device)
 
 			self.inverse_dynamic_optimizer = optim.AdamW(self.inverse_dynamic_network.parameters(), lr=dictionary["inverse_dynamics_lr"], weight_decay=dictionary["inverse_dynamics_weight_decay"], eps=1e-5)
 			
@@ -890,44 +890,16 @@ class PPOAgent:
 
 		# finetune update inverse dynamics model
 		if self.use_inverse_dynamics:
-			# latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
-		# 	b, t, n_a, _ = latent_state_actor.shape
-			# agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
-		# 	upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-			
-
-		# 	actions = torch.from_numpy(self.buffer.actions).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
-		# 	action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)) * (agent_masks.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
-
-		# 	weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
-		# 	inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
-
-		# 	self.inverse_dynamic_optimizer.zero_grad()
-		# 	inverse_dynamic_loss.backward()
-		# 	if self.enable_grad_clip_inverse_dynamics:
-		# 		grad_norm_inverse_dynamics = torch.nn.utils.clip_grad_norm_(self.inverse_dynamic_network.parameters(), self.grad_clip_inverse_dynamics)
-		# 	else:
-		# 		total_norm = 0
-		# 		for p in self.inverse_dynamic_network.parameters():
-		# 			if p.grad is None:
-		# 				continue
-		# 			param_norm = p.grad.detach().data.norm(2)
-		# 			total_norm += param_norm.item() ** 2
-		# 		grad_norm_inverse_dynamics = torch.tensor([total_norm ** 0.5])
-		# 	self.inverse_dynamic_optimizer.step()
-
-			# with torch.no_grad():
-			# 	self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
-
-			local_obs, last_actions, hidden_state_inverse_dynamics, action_masks, agent_masks, actions = self.buffer.sample_inverse_dynamics()
-			b, t, n_a, _ = local_obs.shape
+			latent_state_actor = torch.from_numpy(self.buffer.latent_state_actor).float()
+			b, t, n_a, _ = latent_state_actor.shape
+			agent_masks = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float()
 			upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
-			actions = actions.unsqueeze(-2).repeat(1, 1, t, 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
 			
-			dists = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)) * (agent_masks.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
+			actions = torch.from_numpy(self.buffer.actions).unsqueeze(-2).repeat(1, 1, latent_state_actor.shape[1], 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
+			action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)) * (agent_masks.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
 
 			weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
-			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(dists.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
+			inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(action_prediction.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
 
 			self.inverse_dynamic_optimizer.zero_grad()
 			inverse_dynamic_loss.backward()
@@ -944,7 +916,34 @@ class PPOAgent:
 			self.inverse_dynamic_optimizer.step()
 
 			with torch.no_grad():
-				self.buffer.action_prediction = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)).cpu().numpy()
+				self.buffer.action_prediction = self.inverse_dynamic_network(latent_state_actor.to(self.device), latent_state_actor.to(self.device), agent_masks.to(self.device)).cpu().numpy()
+
+			# local_obs, last_actions, hidden_state_inverse_dynamics, action_masks, agent_masks, actions = self.buffer.sample_inverse_dynamics()
+			# b, t, n_a, _ = local_obs.shape
+			# upper_triangular_matrix = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t).permute(0, 2, 3, 1)
+			# actions = actions.unsqueeze(-2).repeat(1, 1, t, 1).float() * agent_masks.unsqueeze(1) * upper_triangular_matrix
+			
+			# dists = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)) * (agent_masks.unsqueeze(1) * upper_triangular_matrix).unsqueeze(-1).to(self.device)
+
+			# weight = (1.0 / ((agent_masks.unsqueeze(1) * upper_triangular_matrix).sum(dim=-2, keepdim=True) + 1e-5)).repeat(1, 1, t, 1)
+			# inverse_dynamic_loss = (self.inverse_dynamic_cross_entropy_loss(dists.reshape(-1, self.num_actions), actions.reshape(-1).long().to(self.device)).reshape(b, t, t, n_a) * agent_masks.unsqueeze(1).to(self.device) * upper_triangular_matrix.to(self.device) * weight.to(self.device)).sum() / agent_masks.to(self.device).sum()
+
+			# self.inverse_dynamic_optimizer.zero_grad()
+			# inverse_dynamic_loss.backward()
+			# if self.enable_grad_clip_inverse_dynamics:
+			# 	grad_norm_inverse_dynamics = torch.nn.utils.clip_grad_norm_(self.inverse_dynamic_network.parameters(), self.grad_clip_inverse_dynamics)
+			# else:
+			# 	total_norm = 0
+			# 	for p in self.inverse_dynamic_network.parameters():
+			# 		if p.grad is None:
+			# 			continue
+			# 		param_norm = p.grad.detach().data.norm(2)
+			# 		total_norm += param_norm.item() ** 2
+			# 	grad_norm_inverse_dynamics = torch.tensor([total_norm ** 0.5])
+			# self.inverse_dynamic_optimizer.step()
+
+			# with torch.no_grad():
+			# 	self.buffer.action_prediction = self.inverse_dynamic_network(local_obs.to(self.device), last_actions.to(self.device), hidden_state_inverse_dynamics.to(self.device), action_masks.to(self.device), agent_masks.to(self.device)).cpu().numpy()
 			
 
 		
