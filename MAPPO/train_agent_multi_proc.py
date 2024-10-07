@@ -653,7 +653,7 @@ if __name__ == '__main__':
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
 		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_v2" # default setting: reward prediction loss + dynamic loss
+		experiment_name = "MAPPO_TAR^2_v2_hindsight_ratio_on_team_policy" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -678,8 +678,8 @@ if __name__ == '__main__':
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": True,
-				"save_model": True,
+				"eval_policy": False,
+				"save_model": False,
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
@@ -720,8 +720,8 @@ if __name__ == '__main__':
 				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
 
-				"use_inverse_dynamics": False,
-				"inverse_dynamics_lr": 1e-3,
+				"use_inverse_dynamics": True,
+				"inverse_dynamics_lr": 5e-4,
 				"inverse_dynamics_weight_decay": 0.0,
 				"enable_grad_clip_inverse_dynamics": True,
 				"grad_clip_inverse_dynamics": 10.0,
