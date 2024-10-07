@@ -762,7 +762,7 @@ class RolloutBuffer:
 		advantage_mean = torch.nanmean(advantage_copy)
 		advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 
-		advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
+		advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*masks.view(*shape)
 
 		print("-----------------------------NORM ADVANTAGES-------------------------------------")
 		print(advantage[0, :, 0])
