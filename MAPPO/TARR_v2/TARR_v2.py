@@ -99,7 +99,7 @@ class TARR(nn.Module):
 
 
 		self.reward_prediction = nn.Sequential(
-			nn.Linear(emb_dim*self.n_layer, emb_dim),
+			nn.Linear(emb_dim*self.n_layer*2, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
 			)
@@ -173,13 +173,13 @@ class TARR(nn.Module):
 		current_past_memory_state_embeddings = torch.cat([global_state_embeddings, past_state_action_embeddings], dim=-1)
 		action_prediction = self.dynamics_model(current_past_memory_state_embeddings)
 
-		rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
+		# rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
-		# indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
-		# final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
+		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
+		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
 
-		# reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).detach().unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-		# rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
+		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).detach().unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
 		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
 
