@@ -959,8 +959,8 @@ class PPOAgent:
 		# 	self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 		# else:
 		# 	self.buffer.calculate_targets(episode, self.V_PopArt)
-		# self.buffer.calculate_targets(episode, self.V_PopArt)
-		self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
+		self.buffer.calculate_targets(episode, self.V_PopArt)
+		# self.buffer.calculate_targets_hindsight(episode, self.V_PopArt)
 
 		# Optimize policy for n epochs
 		for pp_epoch in range(self.n_epochs):
