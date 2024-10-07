@@ -708,12 +708,14 @@ class PPOAgent:
 			data_chunks = self.max_time_steps // self.data_chunk_length
 
 			with torch.no_grad():
-				curr_pol_actions, _, latent_state_actor = self.policy_network(
+				curr_pol_dists, _, latent_state_actor = self.policy_network(
 					local_obs_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
 					last_actions_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.num_agents),
 					hidden_state_actor_batch.to(self.device).reshape(b*data_chunks, self.data_chunk_length, self.rnn_num_layers_actor, self.num_agents, -1)[:, 0, :, :, :].permute(1, 0, 2, 3).reshape(self.rnn_num_layers_actor, b*data_chunks*self.num_agents, -1),
 					action_masks_batch.to(self.device).bool().reshape(b*data_chunks, self.data_chunk_length, self.num_agents, -1),
 					)
+
+				curr_pol_actions = Categorical(F.softmax(curr_pol_dists, dim=-1)).sample()
 
 			latent_state_actor = latent_state_actor.reshape(b, data_chunks*self.data_chunk_length, self.num_agents, -1)
 
