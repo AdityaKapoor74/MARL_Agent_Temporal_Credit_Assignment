@@ -751,21 +751,21 @@ class RolloutBuffer:
 		# advantages = (target_values - upper_triangular_mask*values).detach()
 		advantages = torch.diagonal(advantages.permute(0, 3, 1, 2).reshape(-1, t_, t_), offset=0, dim1=-2, dim2=-1).reshape(b, n_a, t_).permute(0, 2, 1)
 
-		print("-------------------------------------- ADVANTAGES --------------------------------------")
-		print(advantages[0, :, 0])
+		# print("-------------------------------------- ADVANTAGES --------------------------------------")
+		# print(advantages[0, :, 0])
 
-		import copy
-		shape = advantage.shape
+		# import copy
+		# shape = advantage.shape
 
-		advantage_copy = copy.deepcopy(advantage)
-		advantage_copy[masks.view(*shape) == 0.0] = float('nan')
-		advantage_mean = torch.nanmean(advantage_copy)
-		advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
+		# advantage_copy = copy.deepcopy(advantage)
+		# advantage_copy[masks.view(*shape) == 0.0] = float('nan')
+		# advantage_mean = torch.nanmean(advantage_copy)
+		# advantage_std = torch.from_numpy(np.array(np.nanstd(advantage_copy.cpu().numpy()))).float()
 
-		advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*masks.view(*shape)
+		# advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*masks.view(*shape)
 
-		print("-----------------------------NORM ADVANTAGES-------------------------------------")
-		print(advantage[0, :, 0])
+		# print("-----------------------------NORM ADVANTAGES-------------------------------------")
+		# print(advantage[0, :, 0])
 
 		return advantages * masks.squeeze(1)
 		
