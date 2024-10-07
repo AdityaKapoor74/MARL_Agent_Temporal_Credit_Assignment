@@ -979,10 +979,6 @@ class PPOAgent:
 
 				advantage = ((advantage - advantage_mean) / (advantage_std + 1e-5))*agent_masks.view(*shape)
 
-				print("-----------------------------NORM ADVANTAGES-------------------------------------")
-				print(advantage[0, :, 0])
-
-
 			values_old *= agent_masks
 
 			target_shape = values_old.shape
