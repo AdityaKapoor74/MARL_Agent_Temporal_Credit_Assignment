@@ -720,7 +720,7 @@ if __name__ == '__main__':
 				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
 
-				"use_inverse_dynamics": False,
+				"use_inverse_dynamics": True,
 				"inverse_dynamics_lr": 5e-4,
 				"inverse_dynamics_weight_decay": 0.0,
 				"enable_grad_clip_inverse_dynamics": True,
