@@ -666,8 +666,8 @@ if __name__ == '__main__':
 				"reward_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_network/',
 				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"n_epochs": 15,
-				"ppo_eps_elapse_update_freq": 30, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+				"n_epochs": 5,
+				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
 				"experiment_name": experiment_name,
 				"test_num": test_num,
@@ -684,7 +684,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -737,7 +737,7 @@ if __name__ == '__main__':
 				"use_recurrent_critic": True,
 				"rnn_num_layers_v": 1,
 				"rnn_hidden_v": 64,
-				"v_value_lr": 5e-4, #1e-3
+				"v_value_lr": 1e-3, #1e-3
 				"v_weight_decay": 0.0,
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
