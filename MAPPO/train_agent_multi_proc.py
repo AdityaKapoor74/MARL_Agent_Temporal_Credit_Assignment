@@ -737,7 +737,7 @@ if __name__ == '__main__':
 				"use_recurrent_critic": True,
 				"rnn_num_layers_v": 1,
 				"rnn_hidden_v": 64,
-				"v_value_lr": 1e-3, #1e-3
+				"v_value_lr": 5e-4, #1e-3
 				"v_weight_decay": 0.0,
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
