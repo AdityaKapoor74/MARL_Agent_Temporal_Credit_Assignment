@@ -542,8 +542,8 @@ class MAPPO:
 							elif self.use_reward_model:
 								if self.num_episodes_done >= self.warm_up_period:
 									# finetune
-									# sample = self.agents.buffer.sample_finetune_reward_model()
-									# self.agents.update_reward_model(sample)
+									sample = self.agents.buffer.sample_finetune_reward_model()
+									self.agents.update_reward_model(sample)
 									
 									self.agents.buffer.rewards = self.agents.reward_model_output()
 									self.agents.update(self.num_episodes_done)
@@ -666,8 +666,8 @@ if __name__ == '__main__':
 				"reward_dir": '../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/reward_network/',
 				"gif_dir": '../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"n_epochs": 5,
-				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+				"n_epochs": 15,
+				"ppo_eps_elapse_update_freq": 30, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
 				"environment": environment,
 				"experiment_name": experiment_name,
 				"test_num": test_num,
