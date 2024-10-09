@@ -654,6 +654,7 @@ class PPOAgent:
 					temporal_rewards_copy[(1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()).bool()] = float('nan')
 					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
 					max_temporal_rewards, _ = torch_nanmax(temporal_rewards_copy, dim=-2, keepdim=True)
+					print(min_temporal_rewards, max_temporal_rewards)
 					temporal_weights = ((temporal_rewards-min_temporal_rewards) * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int())) / (max_temporal_rewards-min_temporal_rewards)
 
 					agent_rewards_copy = copy.deepcopy(rewards)
