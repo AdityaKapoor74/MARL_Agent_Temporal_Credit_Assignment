@@ -662,6 +662,9 @@ class PPOAgent:
 					max_agent_rewards, _ = torch_nanmax(agent_rewards_copy, dim=-1, keepdim=True)
 					agent_weights = ((rewards-min_agent_rewards)*agent_masks_batch) / (max_agent_rewards-min_agent_rewards + 1e-5)
 
+					print(temporal_weights.sum(dim=-2))
+					print(agent_weights.sum(dim=-1))
+
 					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
 					episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
 
