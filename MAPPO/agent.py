@@ -652,14 +652,14 @@ class PPOAgent:
 					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
 					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
 					temporal_rewards_copy[(1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()).bool()] = float('nan')
-					min_temporal_rewards = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
-					max_temporal_rewards = torch_nanmax(temporal_rewards_copy, dim=-2, keepdim=True)
+					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+					max_temporal_rewards, _ = torch_nanmax(temporal_rewards_copy, dim=-2, keepdim=True)
 					temporal_weights = ((temporal_rewards-min_temporal_rewards) * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int())) / (max_temporal_rewards-min_temporal_rewards)
 
 					agent_rewards_copy = copy.deepcopy(rewards)
 					agent_rewards_copy[agent_masks_batch.bool()] = float('nan')
-					min_agent_rewards = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
-					max_agent_rewards = torch_nanmax(agent_rewards_copy, dim=-1, keepdim=True)
+					min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+					max_agent_rewards, _ = torch_nanmax(agent_rewards_copy, dim=-1, keepdim=True)
 					agent_weights = ((rewards-min_agent_rewards)*agent_masks_batch) / (max_agent_rewards-min_agent_rewards)
 
 					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
