@@ -6,6 +6,18 @@ from torch.distributions import Categorical
 import numpy as np
 
 
+def torch_nanmax(tensor, dim=None, keepdim=False):
+	min_value = torch.finfo(tensor.dtype).min
+	output = tensor.nan_to_num(min_value).max(dim=dim, keepdim=keepdim)
+	return output
+
+
+def torch_nanmin(tensor, dim=None, keepdim=False):
+	max_value = torch.finfo(tensor.dtype).max
+	output = tensor.nan_to_num(max_value).min(dim=dim, keepdim=keepdim)
+	return output
+
+
 def gumbel_sigmoid(logits: Tensor, tau: float = 1, hard: bool = False, threshold: float = 0.5) -> Tensor:
 	"""
 	Samples from the Gumbel-Sigmoid distribution and optionally discretizes.

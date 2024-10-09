@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 from model import Policy, V_network, PopArt, InverseDynamicsModel
-from utils import RolloutBuffer, RewardRolloutBuffer, RolloutBufferShared, RewardRolloutBufferShared
+from utils import RolloutBuffer, RewardRolloutBuffer, RolloutBufferShared, RewardRolloutBufferShared, torch_nanmin, torch_nanmax
 
 class PPOAgent:
 
@@ -643,10 +643,27 @@ class PPOAgent:
 
 					action_prediction = action_prediction.cpu().numpy()
 
-					temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
-					agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
-					episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
-					# episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
+					# USING SOFTMAX
+					# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
+					# agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
+					
+
+					# USING MIN-MAX NORMALIZATION
+					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
+					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
+					temporal_rewards_copy[(1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()).bool()] = float('nan')
+					min_temporal_rewards = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+					max_temporal_rewards = torch_nanmax(temporal_rewards_copy, dim=-2, keepdim=True)
+					temporal_weights = ((temporal_rewards-min_temporal_rewards) * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int())) / (max_temporal_rewards-min_temporal_rewards)
+
+					agent_rewards_copy = copy.deepcopy(rewards)
+					agent_rewards_copy[agent_masks_batch.bool()] = float('nan')
+					min_agent_rewards = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+					max_agent_rewards = torch_nanmax(agent_rewards_copy, dim=-1, keepdim=True)
+					agent_weights = ((rewards-min_agent_rewards)*agent_masks_batch) / (max_agent_rewards-min_agent_rewards)
+
+					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+					episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
 
 					return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
 
