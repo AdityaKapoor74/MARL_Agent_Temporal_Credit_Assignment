@@ -277,7 +277,7 @@ class MAPPO:
 
 			next_local_obs = np.array(next_local_obs)
 			for i, d in enumerate(dones):
-				if not d: #and self.worker_step_counter[i]<self.max_time_steps-1:
+				if not d:
 					self.worker_step_counter[i] += 1
 
 
@@ -296,7 +296,7 @@ class MAPPO:
 				next_global_obs = next_local_obs
 				next_indiv_dones = info["indiv_dones"]
 				indiv_rewards = info["indiv_rewards"]
-				next_mask_actions = np.ones((self.num_workers, self.num_agents, self.num_actions)) # np.array(info["mask_actions"], dtype=int)
+				next_mask_actions = np.ones((self.num_workers, self.num_agents, self.num_actions))
 
 				next_enemy_states = None
 			
@@ -307,19 +307,6 @@ class MAPPO:
 					rewards_to_send.append(np.array([rewards[worker_index]] * self.num_agents))
 			
 			elif self.experiment_type == "temporal_agent":
-				# rewards_to_send = []
-				# for worker_index in range(self.num_workers):
-				# 	if "indiv_rewards" in info.keys():
-				# 		if info["indiv_rewards"][worker_index]:
-				# 			rewards_to_send.append(info["indiv_rewards"][worker_index])
-				# 		else:  # this is only possible if the environment resets
-				# 			assert info["did_reset"]
-				# 			last_info = info["last_info"]
-				# 			rewards_to_send.append(last_info["indiv_rewards"][worker_index])
-				# 	else:
-				# 		assert info["did_reset"]
-				# 		last_info = info["last_info"]
-				# 		rewards_to_send.append(last_info["indiv_rewards"][worker_index])
 				rewards_to_send = indiv_rewards
 		
 			elif self.experiment_type in ["episodic_team", "uniform_team_redistribution", "AREL", "TAR^2", "STAS", "TAR^2_v2", "TAR^2_HindSight"]:
@@ -333,30 +320,7 @@ class MAPPO:
 			
 			elif self.experiment_type == "episodic_agent":
 				rewards_to_send = []
-				# for worker_index in range(self.num_workers):
-				# 	if "_indiv_rewards" in info.keys:
-				# 		individual_rewards = info["indiv_rewards"][worker_index] if info["_indiv_rewards"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]  # the last info is inside info["last_info"]
-				# 	else:
-				# 		assert info["did_reset"][worker_index]
-				# 		individual_rewards = info["last_info"]["indiv_rewards"][worker_index]
-				# 	episodic_agent_reward[worker_index] = [a_r+r for a_r, r in zip(episodic_agent_reward[worker_index], individual_rewards)]
-				# 	if (not next_dones[worker_index]) and (self.worker_step_counter[worker_index] == self.max_time_steps):
-				# 		rewards_to_send.append(np.array(episodic_agent_reward[worker_index]))
-				# 	else:
-				# 		rewards_to_send_worker = []
-				# 		if "_indiv_dones" in info.keys():
-				# 			next_individual_dones = info["indiv_dones"][worker_index] if info["_indiv_dones"][worker_index] else info["last_info"]["indiv_rewards"][worker_index]
-				# 		else:
-				# 			assert info["did_reset"][worker_index]
-				# 			next_individual_dones = info["last_info"]["indiv_rewards"][worker_index]
-				# 		for i, d in enumerate(next_individual_dones):
-				# 			if d:
-				# 				rewards_to_send_worker.append(episodic_agent_reward[worker_index][i])
-				# 				# once reward is allocated to agent, make future rewards 0
-				# 				episodic_agent_reward[worker_index][i] = 0
-				# 			else:
-				# 				rewards_to_send_worker.append(0.0)
-				# 		rewards_to_send.append(np.array(rewards_to_send_worker))
+				
 				for worker_index in range(self.num_workers):
 					episodic_agent_reward[worker_index] = np.array(episodic_agent_reward[worker_index]) + np.array(indiv_rewards[worker_index])
 					if next_dones[worker_index] or self.worker_step_counter[worker_index] == self.max_time_steps:
@@ -438,10 +402,6 @@ class MAPPO:
 						if "StarCraft" in self.environment:
 							print("Num Allies Alive: {} | Num Enemies Alive: {} \n".format(info["last_info"]["num_allies"][worker_index], info["last_info"]["num_enemies"][worker_index]))
 
-						# if self.use_reward_model:
-						# 	predicted_episode_reward = self.agents.reward_model_output()
-							# print(action_list)
-
 						if self.save_comet_ml_plot:
 							self.comet_ml.log_metric('Episode_Length', step, self.num_episodes_done)
 							self.comet_ml.log_metric('Reward', episode_reward[worker_index], self.num_episodes_done)
@@ -452,9 +412,6 @@ class MAPPO:
 								self.comet_ml.log_metric('All Allies Dead', info["last_info"]["all_allies_dead"][worker_index], self.num_episodes_done)
 							elif self.environment == "GFootball":
 								self.comet_ml.log_metric('Agents Done', dones[worker_index], self.num_episodes_done)
-
-							# if self.use_reward_model:
-							# 	self.comet_ml.log_metric('Predicted Reward', predicted_episode_reward, self.num_episodes_done)
 
 						# update entropy params
 						self.agents.update_parameters()
@@ -483,10 +440,7 @@ class MAPPO:
 						assert np.array(actions).shape == (1, self.num_agents)
 						assert action_logprob.shape == (1, self.num_agents)
 						assert next_rnn_hidden_state_actor.shape == (1, self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor)
-						# actions -> list; np.array(actions).shape = (1, 5)
-						# action_logprob.shape = (1, 5)
-						# next_rnn_hidden_state_actor.shape = (1, rnn_num_layers_actor, 5, 64)
-
+						
 						value, _ = self.agents.get_values_batch(local_obs_, global_obs_, ally_states_, enemy_states_, actions, rnn_hidden_state_v_, indiv_dones_)
 						
 						assert value.shape == (1, self.num_agents)
@@ -650,10 +604,10 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ GFootball
-		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_TAR^2_v2" # default setting: reward prediction loss + dynamic loss
+		environment = "GFootball" # StarCraft/ GFootball
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "temporal_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
+		experiment_name = "MAPPO_temporal_agent" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -684,7 +638,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -760,7 +714,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
-				"policy_lr": 1e-3, # prd 1e-4
+				"policy_lr": 5e-4, # prd 1e-4
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 1e-2, # 8e-3
 				"entropy_pen_final": 1e-2,

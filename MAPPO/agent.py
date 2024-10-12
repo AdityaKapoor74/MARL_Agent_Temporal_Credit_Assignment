@@ -662,9 +662,6 @@ class PPOAgent:
 					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
 					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
 
-					print(temporal_weights.sum(dim=-2))
-					print(agent_weights.sum(dim=-1))
-
 					episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
 					# episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
 
