@@ -421,7 +421,7 @@ class MAPPO:
 						last_actions_ = np.expand_dims(info["__last_actions"][worker_index], axis=0)
 						rnn_hidden_state_actor_ = np.expand_dims(info["__rnn_hidden_state_actor"][worker_index], axis=0)
 						rnn_hidden_state_v_ = np.expand_dims(info["__rnn_hidden_state_v"][worker_index], axis=0)
-						indiv_dones_ = np.expand_dims(info["last_info"]["indiv_dones"], axis=0)
+						indiv_dones_ = np.expand_dims(info["last_info"]["indiv_dones"][worker_index], axis=0)
 						if "StarCraft" in self.environment:
 							ally_states_ = np.expand_dims(info["last_info"]["ally_states"][worker_index], axis=0)
 							enemy_states_ = np.expand_dims(info["last_info"]["enemy_states"][worker_index], axis=0)
@@ -604,10 +604,10 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_pass_and_shoot_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
-		experiment_type = "temporal_agent" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
-		experiment_name = "MAPPO_temporal_agent" # default setting: reward prediction loss + dynamic loss
+		environment = "StarCraft" # StarCraft/ GFootball
+		env_name = "5m_vs_6m" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_pass_and_shoot_with_keeper, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper
+		experiment_type = "TAR^2_v2" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2, TAR^2_v2, TAR^2_HindSight
+		experiment_name = "MAPPO_TAR^2_v2" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
 		dictionary = {
@@ -638,7 +638,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 50000 (GFootball)
-				"max_time_steps": 100, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
+				"max_time_steps": 50, # 50 (StarCraft environments -- 100 for 3s5z)/ 100 (GFootball -- entropy: 4e-3 3v1/ 1e-2 pass_&_shoot/ 2e-3 ca_easy)
 				"experiment_type": experiment_type,
 				"parallel_training": True,
 				"num_workers": 5,
@@ -714,9 +714,9 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
-				"policy_lr": 5e-4, # prd 1e-4
+				"policy_lr": 1e-3, # prd 1e-4
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 1e-2, # 8e-3
+				"entropy_pen": 8e-3, # 8e-3
 				"entropy_pen_final": 1e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
