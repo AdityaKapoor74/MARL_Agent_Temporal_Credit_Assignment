@@ -641,7 +641,7 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
-					action_prediction = action_prediction.cpu().numpy()
+					# action_prediction = action_prediction.cpu().numpy()
 
 					# USING SOFTMAX
 					# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
