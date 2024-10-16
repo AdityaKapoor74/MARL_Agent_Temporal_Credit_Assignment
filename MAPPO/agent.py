@@ -641,7 +641,7 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
-					action_prediction = action_prediction.cpu().numpy()
+					# action_prediction = action_prediction.cpu().numpy()
 
 					# USING SOFTMAX
 					# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
@@ -649,28 +649,26 @@ class PPOAgent:
 					
 
 					# USING MIN-MAX NORMALIZATION
-					# temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
-					# temporal_rewards_copy = copy.deepcopy(temporal_rewards)
-					# temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
-					# min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
-					# temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
-					# temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
+					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
+					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
+					temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
+					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+					temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
+					temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
 
-					# agent_rewards_copy = copy.deepcopy(rewards)
-					# agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
-					# min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
-					# agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
-					# agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
+					agent_rewards_copy = copy.deepcopy(rewards)
+					agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
+					min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
+					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
 
-					# print(temporal_weights.sum(dim=-2))
-					# print(agent_weights.sum(dim=-1))
+					print(temporal_weights.sum(dim=-2))
+					print(agent_weights.sum(dim=-1))
 
-					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
-					# # episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
+					episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+					# episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
 
-					# return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
-
-					return rewards.cpu().numpy()
+					return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
 
 			elif "STAS" in self.experiment_type:
 
@@ -843,14 +841,14 @@ class PPOAgent:
 			elif self.experiment_type == "TAR^2_HindSight" or self.experiment_type == "TAR^2_v2":
 				reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 
-				dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+				# dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 
 				# b, t, n_a = rewards.shape
 				# upper_triangular_mask = torch.triu(torch.ones(b*n_a, t, t)).reshape(b, n_a, t, t, 1).to(self.device)
 				# actions_batch = actions_batch.unsqueeze(-2).repeat(1, 1, t, 1)
 				# dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * upper_triangular_mask.reshape(-1) * agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1)).sum() / (agent_masks_batch.unsqueeze(1).repeat(1, t, 1, 1).permute(0, 3, 1, 2).reshape(-1).sum() + 1e-5)
 				
-				# dynamic_loss = torch.tensor([0.0]).to(self.device)
+				dynamic_loss = torch.tensor([0.0]).to(self.device)
 				
 				reward_loss = reward_prediction_loss + dynamic_loss
 
