@@ -649,26 +649,28 @@ class PPOAgent:
 					
 
 					# USING MIN-MAX NORMALIZATION
-					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
-					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
-					temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
-					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
-					temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
-					temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
+					# temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
+					# temporal_rewards_copy = copy.deepcopy(temporal_rewards)
+					# temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
+					# min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+					# temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
+					# temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
 
-					agent_rewards_copy = copy.deepcopy(rewards)
-					agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
-					min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
-					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
-					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
+					# agent_rewards_copy = copy.deepcopy(rewards)
+					# agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
+					# min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+					# agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
+					# agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
 
-					print(temporal_weights.sum(dim=-2))
-					print(agent_weights.sum(dim=-1))
+					# print(temporal_weights.sum(dim=-2))
+					# print(agent_weights.sum(dim=-1))
 
-					episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
-					# episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
+					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+					# # episodic_rewards = (rewards*agent_masks_batch).reshape(-1, self.max_time_steps*self.num_agents).sum(dim=1, keepdim=True).unsqueeze(-1).cpu()
 
-					return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
+					# return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
+
+					return rewards.cpu().numpy()
 
 			elif "STAS" in self.experiment_type:
 
