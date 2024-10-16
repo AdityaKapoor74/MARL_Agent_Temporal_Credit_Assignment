@@ -172,6 +172,7 @@ class TARR(nn.Module):
 		# past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
 		# current_past_memory_state_embeddings = torch.cat([global_state_embeddings, past_state_action_embeddings], dim=-1)
 		# action_prediction = self.dynamics_model(current_past_memory_state_embeddings)
+		action_prediction = None
 
 		# rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
