@@ -492,7 +492,6 @@ class PPOAgent:
 				enemy_obs_batch, 
 				actions_batch, 
 				episode_len_batch,
-				episodic_reward_batch,
 				agent_masks_batch,
 				)
 
