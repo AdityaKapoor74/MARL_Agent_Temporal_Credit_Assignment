@@ -227,7 +227,6 @@ class PPOAgent:
 					n_agents=self.num_agents, 
 					sample_num=5,
 					device=self.device, 
-					dropout=0.3, 
 					emb_dropout=0.0, 
 					action_space='discrete'
 					).to(self.device)
@@ -246,7 +245,6 @@ class PPOAgent:
 					n_agents=self.num_agents, 
 					sample_num=5,
 					device=self.device, 
-					dropout=0.3, 
 					emb_dropout=0.0, 
 					action_space='discrete'
 					).to(self.device)

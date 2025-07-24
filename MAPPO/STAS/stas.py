@@ -49,7 +49,7 @@ class ShapelyAttention(nn.Module):
 
 class STAS_ML(nn.Module):
 	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
-				device, emb_dropout=0.5):
+				device, dropout=0.0, emb_dropout=0.5):
 		super().__init__()
 
 		self.environment = environment
