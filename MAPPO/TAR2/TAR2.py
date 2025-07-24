@@ -47,7 +47,7 @@ class ShapelyAttention(nn.Module):
 		
 
 
-class TARR(nn.Module):
+class TAR2(nn.Module):
 	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
 				device, dropout=0.0, emb_dropout=0.5, action_space='discrete'):
 		super().__init__()

@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import math
-import copy
 
 
 class PopArt(nn.Module):
@@ -189,13 +187,11 @@ class Policy(nn.Module):
 
 
 
-class V_network(nn.Module):
+class Value(nn.Module):
 	def __init__(
 		self, 
 		environment,
 		use_recurrent_critic,
-		centralized,
-		local_observation_input_dim,
 		global_observation_input_dim,
 		ally_obs_input_dim, 
 		enemy_obs_input_dim,
@@ -207,11 +203,10 @@ class V_network(nn.Module):
 		device,
 		):
 		
-		super(V_network, self).__init__()
+		super(Value, self).__init__()
 		
 		self.environment = environment
 		self.use_recurrent_critic = use_recurrent_critic
-		self.centralized = centralized
 		self.num_agents = num_agents
 		self.num_enemies = num_enemies
 		self.num_actions = num_actions
@@ -219,13 +214,10 @@ class V_network(nn.Module):
 		self.comp_emb_shape = comp_emb_shape
 		self.device = device
 
-		if self.centralized:
-			if "StarCraft" in self.environment:
-				input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
-			elif self.environment in ["Alice_and_Bob", "GFootball"]:
-				input_dim = global_observation_input_dim+self.num_agents+self.num_actions*self.num_agents
-		else:
-			input_dim = local_observation_input_dim
+		if "StarCraft" in self.environment:
+			input_dim = (self.num_agents+ally_obs_input_dim+self.num_actions)*self.num_agents + enemy_obs_input_dim*self.num_enemies
+		elif "GFootball" in self.environment:
+			input_dim = global_observation_input_dim+self.num_agents+self.num_actions*self.num_agents
 
 		self.embedding = nn.Sequential(
 			init_(nn.Linear(input_dim, comp_emb_shape*2, bias=True), activate=True),
@@ -260,42 +252,27 @@ class V_network(nn.Module):
 
 
 	def forward(self, local_observations, global_observations, ally_states, enemy_states, actions, rnn_hidden_state, agent_masks):
-		if self.centralized:
-			if "StarCraft" in self.environment:
-				batch, timesteps, _, _ = ally_states.shape
-				one_hot_actions = self.one_hot_actions[actions.long()]
-				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
-				ally_states = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
-				ally_states = torch.stack([torch.roll(ally_states, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
-				ally_states = ally_states.permute(1, 2, 0, 3, 4)
-				ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions).to(self.device)
-				ally_states = ally_states.reshape(batch, timesteps, self.num_agents, -1)
-				enemy_states = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
-				final_state_embedding = self.embedding(torch.cat([ally_states, enemy_states], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
-			elif "Alice_and_Bob" in self.environment:
-				batch, timesteps,  _ = global_observations.shape
-				global_observations = global_observations.unsqueeze(-2).repeat(1, 1, self.num_agents, 1)
-				one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
-				one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
-				for i in range(self.num_agents):
-					one_hot_actions[:, :, i, i, :] = torch.zeros(batch, timesteps, self.num_actions).to(self.device)
-				one_hot_actions = one_hot_actions.reshape(batch, timesteps, self.num_agents, self.num_agents*self.num_actions)
-				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
-				global_observations = torch.cat([agent_ids, global_observations, one_hot_actions], dim=-1)
-				final_state_embedding = self.embedding(global_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
-			elif "GFootball" in self.environment:
-				batch, timesteps, _, _ = global_observations.shape
-				one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
-				one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
-				for i in range(self.num_agents):
-					one_hot_actions[:, :, i, i, :] = torch.zeros(batch, timesteps, self.num_actions).to(self.device)
-				one_hot_actions = one_hot_actions.reshape(batch, timesteps, self.num_agents, self.num_agents*self.num_actions)
-				agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
-				global_observations = torch.cat([agent_ids, global_observations, one_hot_actions], dim=-1)
-				final_state_embedding = self.embedding(global_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
-		else:
-			batch, timesteps, _, _ = local_observations.shape
-			final_state_embedding = self.embedding(local_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+		if "StarCraft" in self.environment:
+			batch, timesteps, _, _ = ally_states.shape
+			one_hot_actions = self.one_hot_actions[actions.long()]
+			agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+			ally_states = torch.cat([agent_ids, ally_states, one_hot_actions], dim=-1)
+			ally_states = torch.stack([torch.roll(ally_states, shifts=-i, dims=2) for i in range(self.num_agents)], dim=0).to(self.device)
+			ally_states = ally_states.permute(1, 2, 0, 3, 4)
+			ally_states[:, :, :, 0, -self.num_actions:] = torch.zeros(batch, timesteps, self.num_agents, self.num_actions).to(self.device)
+			ally_states = ally_states.reshape(batch, timesteps, self.num_agents, -1)
+			enemy_states = enemy_states.reshape(batch, timesteps, 1, -1).repeat(1, 1, self.num_agents, 1)
+			final_state_embedding = self.embedding(torch.cat([ally_states, enemy_states], dim=-1)).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
+		elif "GFootball" in self.environment:
+			batch, timesteps, _, _ = global_observations.shape
+			one_hot_actions = self.one_hot_actions[actions.long()].unsqueeze(-3)
+			one_hot_actions = one_hot_actions.repeat(1, 1, self.num_agents, 1, 1)
+			for i in range(self.num_agents):
+				one_hot_actions[:, :, i, i, :] = torch.zeros(batch, timesteps, self.num_actions).to(self.device)
+			one_hot_actions = one_hot_actions.reshape(batch, timesteps, self.num_agents, self.num_agents*self.num_actions)
+			agent_ids = self.agent_ids.reshape(1, 1, self.num_agents, self.num_agents).repeat(batch, timesteps, 1, 1)
+			global_observations = torch.cat([agent_ids, global_observations, one_hot_actions], dim=-1)
+			final_state_embedding = self.embedding(global_observations).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
 		
 		if self.use_recurrent_critic:
 			final_state_embedding, h = self.RNN(final_state_embedding, rnn_hidden_state)
@@ -304,126 +281,3 @@ class V_network(nn.Module):
 		Value = self.value_layer(final_state_embedding)
 
 		return Value.squeeze(-1), h
-
-
-# class InverseDynamicsModel(nn.Module):
-# 	def __init__(
-# 		self, 
-# 		use_recurrent_policy,
-# 		obs_input_dim, 
-# 		num_actions, 
-# 		num_agents, 
-# 		rnn_num_layers, 
-# 		rnn_hidden_actor,
-# 		device
-# 		):
-# 		super(InverseDynamicsModel, self).__init__()
-
-# 		self.use_recurrent_policy = use_recurrent_policy
-# 		self.rnn_num_layers = rnn_num_layers
-# 		self.rnn_hidden_actor = rnn_hidden_actor
-
-		
-# 		self.num_agents = num_agents
-# 		self.num_actions = num_actions
-# 		self.device = device
-
-# 		self.mask_value = torch.tensor(
-# 				torch.finfo(torch.float).min, dtype=torch.float
-# 			).to(self.device)
-
-# 		self.agent_embedding = nn.Embedding(self.num_agents, self.rnn_hidden_actor)
-# 		self.action_embedding = nn.Embedding(self.num_actions+1, self.rnn_hidden_actor) # we assume the first "last action" to be NON-EXISTENT so one of the embedding represents that
-
-# 		if self.use_recurrent_policy:
-			
-# 			self.RNN = nn.GRU(input_size=rnn_hidden_actor, hidden_size=rnn_hidden_actor, num_layers=rnn_num_layers, batch_first=True)
-# 			for name, param in self.RNN.named_parameters():
-# 				if 'bias' in name:
-# 					nn.init.constant_(param, 0)
-# 				elif 'weight' in name:
-# 					nn.init.orthogonal_(param)
-
-			
-# 		self.obs_embedding = nn.Sequential(
-# 				init_(nn.Linear(obs_input_dim, rnn_hidden_actor), activate=True),
-# 				nn.GELU(),
-# 				)
-
-# 		self.obs_embed_layer_norm = nn.LayerNorm(self.rnn_hidden_actor)
-
-# 		self.final_layer = nn.Sequential(
-# 			nn.LayerNorm(2*rnn_hidden_actor),
-# 			init_(nn.Linear(2*rnn_hidden_actor, num_actions), gain=0.01)
-# 			)
-
-
-# 	def forward(self, local_observations, last_actions, hidden_state, mask_actions, agent_masks):
-
-# 		batch, timesteps, n_a, _ = local_observations.shape
-# 		agent_embedding = self.agent_embedding(torch.arange(self.num_agents).to(self.device))[None, None, :, :].expand(batch, timesteps, self.num_agents, self.rnn_hidden_actor)
-# 		last_action_embedding = self.action_embedding(last_actions.long())
-# 		obs_embedding = self.obs_embedding(local_observations)
-# 		final_obs_embedding = self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1) # self.obs_embed_layer_norm(obs_embedding + last_action_embedding + agent_embedding).permute(0, 2, 1, 3).reshape(batch*self.num_agents, timesteps, -1)
-
-# 		upper_triangular_matrix = torch.triu(torch.ones(batch*self.num_agents, timesteps, timesteps)).reshape(batch, self.num_agents, timesteps, timesteps, 1).permute(0, 2, 3, 1, 4)
-
-# 		if self.use_recurrent_policy:
-# 			hidden_state = hidden_state.reshape(self.rnn_num_layers, batch*self.num_agents, -1)
-# 			output, h = self.RNN(final_obs_embedding, hidden_state)
-# 			output = output.reshape(batch, self.num_agents, timesteps, -1).permute(0, 2, 1, 3)
-
-# 			current_latent_state = output.unsqueeze(2).repeat(1, 1, timesteps, 1, 1)
-# 			goal_latent_state = output.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
-# 			current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
-
-# 			logits = self.final_layer(current_goal_latent_state) # b x t x t x n_a x n_actions
-# 		else:
-# 			current_latent_state = local_observations.unsqueeze(2).repeat(1, 1, timesteps, 1, 1)
-# 			goal_latent_state = local_observations.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
-# 			current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
-
-# 			logits = self.final_layer(current_goal_latent_state) # b x t x t x n_a x n_actions
-
-# 		# mask dead agent actions 
-# 		logits = torch.where(agent_masks.bool().reshape(batch, 1, timesteps, n_a, 1).repeat(1, timesteps, 1, 1, self.num_actions), logits, self.mask_value)
-# 		# mask actions that are not valid
-# 		logits = torch.where(mask_actions.unsqueeze(2).repeat(1, 1, timesteps, 1, 1), logits, self.mask_value)
-
-# 		return logits
-
-
-
-class InverseDynamicsModel(nn.Module):
-	def __init__(
-		self, 
-		rnn_hidden_actor, 
-		num_actions, 
-		num_agents, 
-		device
-		):
-		super(InverseDynamicsModel, self).__init__()
-
-		
-		self.num_agents = num_agents
-		self.num_actions = num_actions
-		self.device = device
-
-		self.action_prediction = nn.Sequential(
-			nn.LayerNorm(2*rnn_hidden_actor),
-			init_(nn.Linear(rnn_hidden_actor*2, rnn_hidden_actor)),
-			nn.GELU(),
-			init_(nn.Linear(rnn_hidden_actor, num_actions))
-			)
-
-
-	def forward(self, current_latent_state, goal_latent_state, agent_masks):
-
-		batch, timesteps, _, _ = current_latent_state.shape
-		upper_triangular_matrix = torch.triu(torch.ones(batch*self.num_agents, timesteps, timesteps)).reshape(batch, self.num_agents, timesteps, timesteps, 1).permute(0, 2, 3, 1, 4)
-		current_latent_state = current_latent_state.unsqueeze(2).repeat(1, 1, timesteps, 1, 1)
-		goal_latent_state = goal_latent_state.unsqueeze(1).repeat(1, timesteps, 1, 1, 1)
-		current_goal_latent_state = torch.cat([current_latent_state, goal_latent_state], dim=-1) * agent_masks.unsqueeze(1).unsqueeze(-1) * upper_triangular_matrix.to(self.device)
-		logits = self.action_prediction(current_goal_latent_state)
-
-		return logits

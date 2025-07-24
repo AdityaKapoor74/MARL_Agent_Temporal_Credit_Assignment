@@ -19,12 +19,10 @@ class MAPPO:
 			self.device = "cpu"
 		self.env = env
 		self.environment = dictionary["environment"]
-		self.gif = dictionary["gif"]
 		self.save_model = dictionary["save_model"]
 		self.save_model_checkpoint = dictionary["save_model_checkpoint"]
 		self.save_comet_ml_plot = dictionary["save_comet_ml_plot"]
 		self.learn = dictionary["learn"]
-		self.gif_checkpoint = dictionary["gif_checkpoint"]
 		self.eval_policy = dictionary["eval_policy"]
 		self.num_agents = dictionary["num_agents"]
 
@@ -91,16 +89,6 @@ class MAPPO:
 			
 			self.critic_model_path = critic_dir+"critic"
 			self.actor_model_path = actor_dir+"actor"
-			
-
-		if self.gif:
-			gif_dir = dictionary["gif_dir"]
-			try: 
-				os.makedirs(gif_dir, exist_ok = True) 
-				print("Gif Directory created successfully") 
-			except OSError as error: 
-				print("Gif Directory can not be created")
-			self.gif_path = gif_dir+self.env_name+'.gif'
 
 
 		if self.eval_policy:
@@ -110,39 +98,6 @@ class MAPPO:
 				print("Policy Eval Directory created successfully") 
 			except OSError as error: 
 				print("Policy Eval Directory can not be created")
-
-
-	def make_gif(self,images,fname,fps=10, scale=1.0):
-		from moviepy.editor import ImageSequenceClip
-		"""Creates a gif given a stack of images using moviepy
-		Notes
-		-----
-		works with current Github version of moviepy (not the pip version)
-		https://github.com/Zulko/moviepy/commit/d4c9c37bc88261d8ed8b5d9b7c317d13b2cdf62e
-		Usage
-		-----
-		>>> X = randn(100, 64, 64)
-		>>> gif('test.gif', X)
-		Parameters
-		----------
-		filename : string
-			The filename of the gif to write to
-		array : array_like
-			A numpy array that contains a sequence of images
-		fps : int
-			frames per second (default: 10)
-		scale : float
-			how much to rescale each image by (default: 1.0)
-		"""
-
-		# copy into the color dimension if the images are black and white
-		if images.ndim == 3:
-			images = images[..., np.newaxis] * np.ones(3)
-
-		# make the moviepy clip
-		clip = ImageSequenceClip(list(images), fps=fps).resize(scale)
-		clip.write_gif(fname, fps=fps)
-
 
 
 	def run(self):  
@@ -167,12 +122,6 @@ class MAPPO:
 				mask_actions = np.ones([self.num_agents, self.num_actions])
 				ally_states, enemy_states = None, None
 				info = {}
-			else:
-				local_obs = self.env.reset()
-				global_obs = self.env.get_state()
-				mask_actions = np.ones([self.num_agents, self.num_actions])
-				ally_states, enemy_states = None, None
-				info = {}
 			
 
 			last_actions = np.zeros((self.num_agents)) + self.num_actions
@@ -180,8 +129,6 @@ class MAPPO:
 			indiv_dones = [0]*self.num_agents
 			indiv_dones = np.array(indiv_dones)
 			dones = all(indiv_dones)
-			
-			images = []
 
 			episode_reward = 0
 			episodic_team_reward = 0
@@ -194,22 +141,9 @@ class MAPPO:
 
 			for step in range(1, self.max_time_steps+1):
 
-				if self.gif:
-					# At each step, append an image to list
-					# import time
-					# time.sleep(0.1)
-					self.env.render()
-					# Advance a step and render a new image
-					with torch.no_grad():
-						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor, greedy=False)
-				else:
-					actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
+				actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 
-				one_hot_actions = np.zeros((self.num_agents, self.num_actions))
-				for i, act in enumerate(actions):
-					one_hot_actions[i][act] = 1
-
-				value, next_rnn_hidden_state_v = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+				value, next_rnn_hidden_state_v = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 				
 				next_local_obs, rewards, next_dones, next_info = self.env.step(actions)
 				next_local_obs = np.array(next_local_obs)
@@ -222,18 +156,6 @@ class MAPPO:
 					indiv_rewards = next_info["indiv_rewards"]
 
 					next_global_obs = None
-
-				elif "Alice_and_Bob" in self.environment:
-					next_global_obs = self.env.get_state()
-
-					next_ally_states = None
-					next_enemy_states = None
-					next_mask_actions = np.ones([self.num_agents, self.num_actions])
-					# next_dones and rewards is a list: [global_val]*num_agents
-					next_indiv_dones = next_dones
-					next_dones = all(next_indiv_dones)
-					indiv_rewards = rewards
-					rewards = indiv_rewards[0]
 
 				elif "GFootball" in self.environment:
 					next_ally_states, next_enemy_states = None, None
@@ -250,7 +172,7 @@ class MAPPO:
 
 				if self.experiment_type == "temporal_team":
 					rewards_to_send = [rewards]*self.num_agents
-				elif self.experiment_type == "episodic_team" or self.experiment_type == "uniform_team_redistribution" or "AREL" in self.experiment_type or "TAR^2" in self.experiment_type or "STAS" in self.experiment_type:
+				elif self.experiment_type == "episodic_team" or self.experiment_type == "Uniform" or "AREL" in self.experiment_type or "TAR^2" in self.experiment_type or "STAS" in self.experiment_type:
 					episodic_team_reward = episodic_team_reward+rewards
 					if all(next_indiv_dones) or step == self.max_time_steps:
 						rewards_to_send = episodic_team_reward
@@ -260,7 +182,7 @@ class MAPPO:
 				if self.learn:
 					self.agents.buffer.push(
 						ally_states, enemy_states, value, rnn_hidden_state_v, \
-						global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, one_hot_actions, mask_actions, \
+						global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, mask_actions, \
 						rewards_to_send, indiv_dones, dones
 						)
 
@@ -283,7 +205,7 @@ class MAPPO:
 						# add final time to buffer
 						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
 					
-						value, _ = self.agents.get_values(local_obs, global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+						value, _ = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 						
 						self.agents.buffer.end_episode(final_timestep, value, indiv_dones, dones)
 
@@ -333,17 +255,13 @@ class MAPPO:
 				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
 
 			if self.learn and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0:
-				if self.experiment_type == "uniform_team_redistribution":
-					b, t, n_a = self.agents.buffer.rewards.shape
+				if self.experiment_type == "Uniform":
+					_, t, n_a = self.agents.buffer.rewards.shape
 					episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
 					self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
 					self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
 					self.agents.update(episode)
 				elif self.use_reward_model and episode > self.warm_up_period:
-					# finetune
-					# sample = self.agents.buffer.reward_model_obs, self.agents.buffer.actions, self.agents.buffer.one_hot_actions, self.agents.buffer.rewards[:, :, 0], 1-self.agents.buffer.team_dones[:, :-1], 1-self.agents.buffer.agent_dones[:, :-1, :], self.agents.buffer.episode_length
-					# self.agents.update_reward_model(sample)
-					
 					self.agents.buffer.rewards = self.agents.reward_model_output().numpy()
 					self.agents.update(episode)
 				elif not self.use_reward_model:
@@ -410,9 +328,9 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ Alice_and_Bob/ GFootball
-		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_counterattack_hard, academy_cornery, academy_run_and_pass_with_keeper, academy_run_pass_and_shoot_with_keeper/ Alice_and_Bob/ 
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, uniform_team_redistribution, AREL, STAS, TAR^2
+		environment = "GFootball" # StarCraft/ GFootball
+		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
+		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
 		algorithm_type = "MAPPO"
 
@@ -422,7 +340,6 @@ if __name__ == '__main__':
 				"device": "gpu",
 				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
 				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-				"gif_dir": '../../../tests/'+test_num+'/gifs/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
 				"n_epochs": 5,
 				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
@@ -431,8 +348,6 @@ if __name__ == '__main__':
 				"test_num": test_num,
 				"extension": extension,
 				"gamma": 0.99,
-				"gif": False,
-				"gif_checkpoint":1,
 				"load_models": False,
 				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
 				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
@@ -441,10 +356,9 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 120000, # 30000 (StarCraft environments)/ 50000 (Alice_and_Bob)/ 120000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments)/ 40 (Alice_and_Bob)/ 200 (GFootball)
+				"max_episodes": 120000, # 30000 (StarCraft environments)/ 120000 (GFootball)
+				"max_time_steps": 200, # 50 (StarCraft environments)/ 200 (GFootball)
 				"experiment_type": experiment_type,
-				"parallel_training": False,
 				"scheduler_need": False,
 				"norm_rewards": False,
 				"clamp_rewards": False,
@@ -466,9 +380,6 @@ if __name__ == '__main__':
 				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
-				"expected_logprob_prediction_loss_coeffecient": 5e-2,
-				"temporal_score_coefficient": 0.0,
-				"agent_score_coefficient": 0.0,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
@@ -494,13 +405,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_critic_v": True,
 				"grad_clip_critic_v": 0.5,
 				"value_clip": 0.2,
-				"enable_hard_attention": False,
-				"target_calc_style": "GAE", # GAE, N_steps
-				"n_steps": 5,
 				"norm_returns_v": True,
-				"soft_update_v": False,
-				"tau_v": 0.05,
-				"network_update_interval_v": 1,
 				
 
 				# ACTOR
@@ -535,16 +440,6 @@ if __name__ == '__main__':
 			dictionary["num_agents"] = env.n_agents
 			dictionary["num_enemies"] = env.n_enemies
 			dictionary["num_actions"] = env.action_space[0].n
-		elif "Alice_and_Bob" in dictionary["environment"]:
-			sys.path.append("../../../environments/alice_and_bob/") # local
-			sys.path.append("../../environments/alice_and_bob/") # remote
-			from alice_and_bob import *
-
-			env = Alice_and_Bob()
-			dictionary["num_agents"] = env.agent_num
-			dictionary["local_observation_shape"] = env.obs_dim
-			dictionary["global_observation_shape"] = env.state_dim
-			dictionary["num_actions"] = env.n_action
 		elif "GFootball" in dictionary["environment"]:
 			import random
 
@@ -678,9 +573,3 @@ if __name__ == '__main__':
 
 		ma_controller = MAPPO(env, dictionary)
 		ma_controller.run()
-
-
-
-
-
-# visa@manchester.ac.uk --- For VISA || international@manchester.ac.uk
