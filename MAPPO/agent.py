@@ -344,7 +344,6 @@ class PPOAgent:
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
 			if "StarCraft" in self.environment:
-				state_batch = None
 				ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
 				enemy_state_batch = torch.from_numpy(self.buffer.enemy_states[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
 			elif "GFootball" in self.environment:
@@ -357,7 +356,6 @@ class PPOAgent:
 			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0).to(self.device)
 		else:
 			if "StarCraft" in self.environment:	
-				state_batch = None
 				ally_state_batch = torch.from_numpy(self.buffer.ally_states).float().permute(0, 2, 1, 3).to(self.device)
 				enemy_state_batch = torch.from_numpy(self.buffer.enemy_states).float().permute(0, 2, 1, 3).to(self.device)
 			elif "GFootball" in self.environment:

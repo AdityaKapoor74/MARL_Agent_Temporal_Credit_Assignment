@@ -185,7 +185,7 @@ class MAPPO:
 
 				if self.use_reward_model:
 					self.agents.reward_buffer.push(
-						ally_states, enemy_states, local_obs, global_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
+						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
 						)
 
 					ally_states, enemy_states = next_ally_states, next_enemy_states
