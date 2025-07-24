@@ -251,7 +251,7 @@ class Value(nn.Module):
 		self.agent_ids = torch.eye(self.num_agents).to(self.device)
 
 
-	def forward(self, global_observations, ally_states, enemy_states, actions, rnn_hidden_state, agent_masks):
+	def forward(self, global_observations, ally_states, enemy_states, actions, rnn_hidden_state):
 		if "StarCraft" in self.environment:
 			batch, timesteps, _, _ = ally_states.shape
 			one_hot_actions = self.one_hot_actions[actions.long()]

@@ -311,7 +311,7 @@ class PPOAgent:
 			actions = torch.FloatTensor(actions).unsqueeze(0).unsqueeze(0).to(self.device)
 			rnn_hidden_state_v = torch.FloatTensor(rnn_hidden_state_v).to(self.device)
 			
-			Value, rnn_hidden_state_v = self.critic_network_v(global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v, indiv_masks)
+			Value, rnn_hidden_state_v = self.critic_network_v(global_obs, state_allies, state_enemies, actions, rnn_hidden_state_v)
 				
 			return Value.squeeze(0).cpu().numpy(), rnn_hidden_state_v.cpu().numpy()
 
@@ -483,7 +483,7 @@ class PPOAgent:
 
 		elif "TAR^2" in self.experiment_type:
 
-			rewards, temporal_weights, agent_weights, _, _, action_prediction = self.reward_model(
+			scores, temporal_weights, agent_weights, _, _, action_prediction = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
 				actions_batch, 
@@ -494,7 +494,10 @@ class PPOAgent:
 			entropy_temporal_weights = -torch.sum(temporal_weights * torch.log(torch.clamp(temporal_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			
-			reward_prediction_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			total_scores = scores.reshape(actions_batch.shape[0], -1).sum(dim=-1)  # Sum all c_i,t
+			log_episodic_rewards = torch.log(episodic_reward_batch + 1e-8)  # log R(s_T)
+			reward_prediction_loss = F.mse_loss(total_scores, log_episodic_rewards)
+			# reward_prediction_loss = F.mse_loss(total_scores, episodic_reward_batch)
 
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 
@@ -593,13 +596,11 @@ class PPOAgent:
 				global_obs = global_obs.to(self.device)
 
 			values, h_v = self.critic_network_v(
-												local_obs.to(self.device),
 												global_obs,
 												ally_states,
 												enemy_states,
 												actions.to(self.device),
 												hidden_state_v.to(self.device),
-												agent_masks.to(self.device),
 												)
 			
 			values = values.reshape(*target_shape)
