@@ -325,8 +325,8 @@ if __name__ == '__main__':
 	for i in range(1, 6):
 		extension = "MAPPO_"+str(i)
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "GFootball" # StarCraft/ GFootball
-		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
+		environment = "StarCraft" # StarCraft/ GFootball
+		env_name = "3s5z" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
 		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
 		experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
 
@@ -352,8 +352,8 @@ if __name__ == '__main__':
 				"save_model_checkpoint": 1000,
 				"save_comet_ml_plot": True,
 				"learn":True,
-				"max_episodes": 120000, # 30000 (StarCraft environments)/ 120000 (GFootball)
-				"max_time_steps": 200, # 50 (StarCraft environments)/ 200 (GFootball)
+				"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
+				"max_time_steps": 50, # 50 (StarCraft environments)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"scheduler_need": False,
 				"norm_rewards": False,
@@ -409,7 +409,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
-				"policy_lr": 5e-4, #prd 1e-4
+				"policy_lr": 5e-4, 
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 4e-3, #8e-3
 				"entropy_pen_final": 4e-3,
