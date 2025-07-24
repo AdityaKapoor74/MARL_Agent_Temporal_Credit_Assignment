@@ -1,6 +1,4 @@
 import os
-import sys
-import time
 from comet_ml import Experiment
 import numpy as np
 from agent import PPOAgent
@@ -26,7 +24,6 @@ class MAPPO:
 		self.eval_policy = dictionary["eval_policy"]
 		self.num_agents = dictionary["num_agents"]
 
-		self.algorithm_type = dictionary["algorithm_type"]
 		self.use_reward_model = dictionary["use_reward_model"]
 		self.warm_up_period = dictionary["warm_up_period"]
 		
@@ -330,9 +327,8 @@ if __name__ == '__main__':
 		test_num = "Learning_Reward_Func_for_Credit_Assignment"
 		environment = "GFootball" # StarCraft/ GFootball
 		env_name = "academy_3_vs_1_with_keeper" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
-		experiment_type = "temporal_team" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_temporal_team" # default setting: reward prediction loss + dynamic loss
-		algorithm_type = "MAPPO"
+		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
+		experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
 
 		dictionary = {
 				# TRAINING
@@ -387,9 +383,6 @@ if __name__ == '__main__':
 				"update_reward_model_freq": 100, # 100
 				"reward_model_update_epochs": 200, # 200
 				"norm_rewards": False,
-
-
-				"algorithm_type": algorithm_type,
 
 
 				# ENVIRONMENT
