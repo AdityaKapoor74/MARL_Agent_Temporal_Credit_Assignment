@@ -337,7 +337,7 @@ class PPOAgent:
 			mask_actions = torch.BoolTensor(mask_actions).unsqueeze(0).unsqueeze(1).to(self.device)
 			hidden_state = torch.FloatTensor(hidden_state).to(self.device)
 
-			dists, hidden_state, latent_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
+			dists, hidden_state = self.policy_network(state_policy, last_actions, hidden_state, mask_actions)
 
 			if greedy:
 				actions = [dist.argmax().detach().cpu().item() for dist in dists.squeeze(0).squeeze(0)]
@@ -348,7 +348,7 @@ class PPOAgent:
 				probs = Categorical(dists)
 				action_logprob = probs.log_prob(torch.FloatTensor(actions).to(self.device)).cpu().numpy()
 
-			return actions, action_logprob, hidden_state.cpu().numpy(), latent_state.cpu().numpy()
+			return actions, action_logprob, hidden_state.cpu().numpy()
 
 
 	def reward_model_output(self, eval_reward_model=False):

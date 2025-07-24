@@ -181,9 +181,9 @@ class Policy(nn.Module):
 		logits = torch.where(mask_actions, logits, self.mask_value)
 
 		if self.use_recurrent_policy:
-			return F.softmax(logits, dim=-1), h, output
+			return F.softmax(logits, dim=-1), h
 		else:
-			return F.softmax(logits, dim=-1), h, local_observations
+			return F.softmax(logits, dim=-1), h
 
 
 
