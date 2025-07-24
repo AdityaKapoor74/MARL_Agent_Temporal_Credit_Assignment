@@ -187,7 +187,6 @@ class PPOAgent:
 				ally_obs_shape=self.ally_observation_shape,
 				enemy_obs_shape=self.enemy_observation_shape,
 				local_obs_shape=self.local_observation_shape,
-				common_information_obs_shape=self.common_information_observation_shape,
 				rnn_num_layers_actor=self.rnn_num_layers_actor,
 				actor_hidden_state=self.rnn_hidden_actor,
 				action_shape = self.num_actions,
