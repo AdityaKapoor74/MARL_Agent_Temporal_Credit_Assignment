@@ -228,7 +228,6 @@ class PPOAgent:
 					sample_num=5,
 					device=self.device, 
 					emb_dropout=0.0, 
-					action_space='discrete'
 					).to(self.device)
 
 			elif "STAS" in self.experiment_type:
@@ -246,7 +245,6 @@ class PPOAgent:
 					sample_num=5,
 					device=self.device, 
 					emb_dropout=0.0, 
-					action_space='discrete'
 					).to(self.device)
 
 			if self.norm_rewards:
