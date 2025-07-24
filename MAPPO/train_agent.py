@@ -193,6 +193,7 @@ class MAPPO:
 					
 				global_obs, local_obs, last_actions, mask_actions, indiv_dones, dones = next_global_obs, next_local_obs, actions, next_mask_actions, next_indiv_dones, next_dones
 				rnn_hidden_state_v, rnn_hidden_state_actor = next_rnn_hidden_state_v, next_rnn_hidden_state_actor
+				info = next_info
 
 				if all(indiv_dones) or step == self.max_time_steps:
 
@@ -364,7 +365,7 @@ if __name__ == '__main__':
 
 
 				# REWARD MODEL
-				"use_reward_model": False,
+				"use_reward_model": True,
 				"reward_n_heads": 4, # 3
 				"reward_depth": 3, # 3
 				"reward_agent_attn": True,
