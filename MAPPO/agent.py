@@ -375,7 +375,6 @@ class PPOAgent:
 						ally_state_batch, 
 						enemy_state_batch, 
 						actions_batch, 
-						episodic_reward_batch,
 						team_masks=team_mask_batch,
 						agent_masks=agent_masks_batch,
 						)
@@ -389,7 +388,6 @@ class PPOAgent:
 						enemy_state_batch, 
 						actions_batch, 
 						episode_len_batch,
-						episodic_reward_batch,
 						agent_masks_batch,
 						)
 
