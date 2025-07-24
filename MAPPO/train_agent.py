@@ -354,7 +354,7 @@ if __name__ == '__main__':
 				"save_comet_ml_plot": True,
 				"learn":True,
 				"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
-				"max_time_steps": 50, # 50 (StarCraft environments)/ 200 (GFootball)
+				"max_time_steps": 100, # 50 (StarCraft environments)/ 200 (GFootball)
 				"experiment_type": experiment_type,
 				"scheduler_need": False,
 				"norm_rewards": False,
