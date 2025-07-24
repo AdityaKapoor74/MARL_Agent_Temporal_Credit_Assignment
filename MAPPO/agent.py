@@ -387,7 +387,6 @@ class PPOAgent:
 					rewards, temporal_weights, agent_weights, _, _, action_prediction = self.reward_model(
 						ally_state_batch, 
 						enemy_state_batch, 
-						state_batch,
 						actions_batch, 
 						episode_len_batch,
 						episodic_reward_batch,
@@ -429,7 +428,6 @@ class PPOAgent:
 					rewards = self.reward_model( 
 						ally_state_batch, 
 						enemy_state_batch,
-						state_batch, 
 						actions_batch, 
 						episode_len_batch,
 						agent_masks_batch,
