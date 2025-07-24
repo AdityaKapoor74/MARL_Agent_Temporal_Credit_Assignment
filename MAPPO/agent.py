@@ -110,7 +110,6 @@ class PPOAgent:
 		self.critic_network_v = Value(
 			environment=self.environment,
 			use_recurrent_critic=self.use_recurrent_critic,
-			local_observation_input_dim=self.local_observation_shape,
 			global_observation_input_dim=self.global_observation_shape,
 			ally_obs_input_dim=self.ally_observation_shape, 
 			enemy_obs_input_dim=self.enemy_observation_shape,
@@ -597,7 +596,7 @@ class PPOAgent:
 
 			# SAMPLE DATA FROM BUFFER
 			ally_states, enemy_states, hidden_state_v, global_obs, local_obs, hidden_state_actor, logprobs_old, \
-			last_actions, actions, action_masks, agent_masks, team_masks, values_old, target_values, advantage  = self.buffer.sample_recurrent_policy()
+			last_actions, actions, action_masks, agent_masks, _, values_old, target_values, advantage  = self.buffer.sample_recurrent_policy()
 			
 			if self.norm_adv:
 				shape = advantage.shape
