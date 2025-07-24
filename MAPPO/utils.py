@@ -29,7 +29,6 @@ class RewardRolloutBuffer:
 		ally_obs_shape,
 		enemy_obs_shape,
 		local_obs_shape,
-		common_information_obs_shape,
 		rnn_num_layers_actor,
 		actor_hidden_state,
 		action_shape,
@@ -47,7 +46,6 @@ class RewardRolloutBuffer:
 		self.ally_obs_shape = ally_obs_shape
 		self.enemy_obs_shape = enemy_obs_shape
 		self.local_obs_shape = local_obs_shape
-		self.common_information_obs_shape = common_information_obs_shape
 		self.rnn_num_layers_actor = rnn_num_layers_actor
 		self.actor_hidden_state = actor_hidden_state
 		self.action_shape = action_shape
@@ -59,8 +57,7 @@ class RewardRolloutBuffer:
 			self.buffer['enemy_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_enemies, self.enemy_obs_shape), dtype=np.float32)
 		elif "GFootball" in self.environment:
 			self.buffer['ally_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.ally_obs_shape), dtype=np.float32)
-			self.buffer['common_obs'] = np.zeros((self.capacity, self.max_episode_len, self.common_information_obs_shape))
-
+			
 		self.buffer['actions'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['logprobs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['reward'] = np.zeros((self.capacity, self.max_episode_len), dtype=np.float32)
@@ -74,13 +71,12 @@ class RewardRolloutBuffer:
 		self.episode_len = np.zeros(self.capacity)
 
 	# push once per step
-	def push(self, ally_obs, enemy_obs, local_obs, common_obs, actions, action_masks, hidden_state_actor, logprobs, reward, done, indiv_dones):
+	def push(self, ally_obs, enemy_obs, local_obs, actions, action_masks, hidden_state_actor, logprobs, reward, done, indiv_dones):
 		if "StarCraft" in self.environment:
 			self.buffer['ally_obs'][self.episode][self.t] = ally_obs
 			self.buffer['enemy_obs'][self.episode][self.t] = enemy_obs
 		elif "GFootball" in self.environment:
 			self.buffer['ally_obs'][self.episode][self.t] = ally_obs
-			self.buffer['common_obs'][self.episode][self.t] = common_obs
 		self.buffer['local_obs'][self.episode][self.t] = local_obs
 		self.buffer['actions'][self.episode][self.t] = actions
 		self.buffer['action_masks'][self.episode][self.t] = action_masks
@@ -106,7 +102,6 @@ class RewardRolloutBuffer:
 			enemy_obs_batch = np.take(self.buffer['enemy_obs'], batch_indices, axis=0)
 		elif "GFootball" in self.environment:
 			ally_obs_batch = np.take(self.buffer['ally_obs'], batch_indices, axis=0)
-			common_obs_batch = np.take(self.buffer['common_obs'], batch_indices, axis=0)
 		local_obs_batch = np.take(self.buffer['local_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
 		action_masks_batch = np.take(self.buffer['action_masks'], batch_indices, axis=0)
@@ -123,7 +118,7 @@ class RewardRolloutBuffer:
 		if "StarCraft" in self.environment:
 			return ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 		elif "GFootball" in self.environment:
-			return ally_obs_batch, local_obs_batch, common_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+			return ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 
 	def __len__(self):
@@ -144,7 +139,6 @@ class RolloutBuffer:
 		enemy_state_shape, 
 		local_obs_shape, 
 		global_obs_shape,
-		common_information_obs_shape,
 		rnn_num_layers_actor,
 		actor_hidden_state,
 		rnn_num_layers_v,
@@ -171,7 +165,6 @@ class RolloutBuffer:
 		elif self.environment == "GFootball":
 			self.ally_state_shape = ally_state_shape
 			self.global_obs_shape = global_obs_shape
-			self.common_information_obs_shape = common_information_obs_shape
 
 		self.local_obs_shape = local_obs_shape
 		self.rnn_num_layers_actor = rnn_num_layers_actor
@@ -198,12 +191,10 @@ class RolloutBuffer:
 		elif "GFootball" in self.environment:
 			self.ally_states = np.zeros((num_episodes, max_time_steps, num_agents, ally_state_shape))
 			self.global_obs = np.zeros((num_episodes, max_time_steps, num_agents, global_obs_shape))
-			self.common_obs = np.zeros((num_episodes, max_time_steps, common_information_obs_shape))
 		self.hidden_state_v = np.zeros((num_episodes, max_time_steps, rnn_num_layers_v, num_agents, v_hidden_state))
 		self.V_values = np.zeros((num_episodes, max_time_steps+1, num_agents))
 		self.local_obs = np.zeros((num_episodes, max_time_steps, num_agents, local_obs_shape))
 		self.hidden_state_actor = np.zeros((num_episodes, max_time_steps, rnn_num_layers_actor, num_agents, actor_hidden_state))
-		self.latent_state_actor = np.zeros((num_episodes, max_time_steps, num_agents, actor_hidden_state))
 		self.logprobs = np.zeros((num_episodes, max_time_steps, num_agents))
 		self.actions = np.zeros((num_episodes, max_time_steps, num_agents), dtype=int)
 		self.action_masks = np.zeros((num_episodes, max_time_steps, num_agents, num_actions))
@@ -224,12 +215,10 @@ class RolloutBuffer:
 		elif "GFootball" in self.environment:
 			self.ally_states = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.ally_state_shape))
 			self.global_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.global_obs_shape))
-			self.common_obs = np.zeros((self.num_episodes, self.max_time_steps, self.common_information_obs_shape))
 		self.hidden_state_v = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_v, self.num_agents, self.v_hidden_state))
 		self.V_values = np.zeros((self.num_episodes, self.max_time_steps+1, self.num_agents))
 		self.local_obs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.local_obs_shape))
 		self.hidden_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.rnn_num_layers_actor, self.num_agents, self.actor_hidden_state))
-		self.latent_state_actor = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.actor_hidden_state))
 		self.logprobs = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents))
 		self.actions = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents), dtype=int)
 		self.action_masks = np.zeros((self.num_episodes, self.max_time_steps, self.num_agents, self.num_actions))
@@ -253,8 +242,6 @@ class RolloutBuffer:
 		hidden_state_v,
 		global_obs,
 		local_obs, 
-		common_obs,
-		latent_state_actor,
 		hidden_state_actor, 
 		logprobs, 
 		actions, 
@@ -271,13 +258,11 @@ class RolloutBuffer:
 		elif self.environment == "GFootball":
 			self.ally_states[self.episode_num][self.time_step] = ally_states
 			self.global_obs[self.episode_num][self.time_step] = global_obs
-			self.common_obs[self.episode_num][self.time_step] = common_obs
 
 		self.V_values[self.episode_num][self.time_step] = value
 		self.hidden_state_v[self.episode_num][self.time_step] = hidden_state_v
 		
 		self.local_obs[self.episode_num][self.time_step] = local_obs
-		self.latent_state_actor[self.episode_num][self.time_step] = latent_state_actor
 		self.hidden_state_actor[self.episode_num][self.time_step] = hidden_state_actor
 		self.logprobs[self.episode_num][self.time_step] = logprobs
 		self.actions[self.episode_num][self.time_step] = actions

@@ -31,13 +31,11 @@ class Time_Agent_Transformer(nn.Module):
 		environment,
 		ally_obs_shape, 
 		enemy_obs_shape, 
-		obs_shape,
 		action_shape,
 		heads, 
 		depth, 
 		seq_length, 
 		n_agents, 
-		n_enemies,
 		n_actions,
 		agent=True, 
 		dropout=0.0, 
@@ -54,7 +52,6 @@ class Time_Agent_Transformer(nn.Module):
 		self.depth = depth
 		self.environment = environment
 
-		self.obs_shape = obs_shape
 		self.action_shape = action_shape
 		self.seq_length = seq_length
 		self.comp_emb = linear_compression_dim
@@ -73,9 +70,6 @@ class Time_Agent_Transformer(nn.Module):
 		elif "GFootball" in self.environment:
 			self.ally_obs_compress_input = nn.Sequential(
 				init_(nn.Linear(ally_obs_shape, self.comp_emb), activate=False),
-				)
-			self.common_obs_compress_input = nn.Sequential(
-				init_(nn.Linear(obs_shape, self.comp_emb), activate=False),
 				)
 
 		self.action_embedding = nn.Embedding(n_actions, self.comp_emb)
@@ -124,8 +118,6 @@ class Time_Agent_Transformer(nn.Module):
 		elif "GFootball" in self.environment:
 			b, n_a, t, _ = ally_obs.size()
 			ally_obs_embedding = self.ally_obs_compress_input(ally_obs)
-			common_obs_embedding = self.common_obs_compress_input(obs)
-			ally_obs_embedding = ally_obs_embedding + common_obs_embedding.unsqueeze(1)
 
 		position_embedding = self.position_embedding(torch.arange(t, device=self.device))[None, None, :, :].expand(b, n_a, t, self.comp_emb)
 		agent_embedding = self.agent_embedding(torch.arange(self.n_agents, device=self.device))[None, :, None, :].expand(b, n_a, t, self.comp_emb)

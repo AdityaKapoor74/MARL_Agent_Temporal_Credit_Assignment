@@ -48,14 +48,13 @@ class ShapelyAttention(nn.Module):
 
 
 class STAS_ML(nn.Module):
-	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
-				device, dropout=0.0, emb_dropout=0.5, action_space='discrete'):
+	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
+				device, emb_dropout=0.5):
 		super().__init__()
 
 		self.environment = environment
 		self.ally_obs_shape = ally_obs_shape
 		self.enemy_obs_shape = enemy_obs_shape
-		self.obs_shape = obs_shape
 		self.emb_dim = emb_dim
 		self.n_heads = n_heads
 		self.n_layer = n_layer
@@ -77,14 +76,8 @@ class STAS_ML(nn.Module):
 			self.ally_obs_compress_input = nn.Sequential(
 				nn.Linear(ally_obs_shape, self.emb_dim),
 				)
-			self.common_obs_compress_input = nn.Sequential(
-				nn.Linear(obs_shape, self.emb_dim),
-				)
 
-		if not action_space == 'discrete':
-			self.action_emb = nn.Linear(input_dim, emb_dim)
-		else:
-			self.action_emb = nn.Embedding(n_actions+1, emb_dim)
+		self.action_emb = nn.Embedding(n_actions+1, emb_dim)
 
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
 
@@ -118,8 +111,6 @@ class STAS_ML(nn.Module):
 		elif "GFootball" in self.environment:
 			b, n_a, t, _ = ally_states.size()
 			ally_obs_embedding = self.ally_obs_compress_input(ally_states)
-			common_obs_embedding = self.common_obs_compress_input(states)
-			ally_obs_embedding = ally_obs_embedding + common_obs_embedding.unsqueeze(1)
 
 		
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
@@ -144,8 +135,3 @@ class STAS_ML(nn.Module):
 		shapley_reward = self.linear(torch.cat(shapley_rewards, dim=-1).reshape(b, n_a, t, -1)).squeeze()
 		
 		return shapley_reward
-
-
-
-# reward_predictor = STAS_ML(input_dim=10, n_actions=12, emb_dim=64, n_heads=4, n_layer=3, seq_length=50, n_agents=5, sample_num=5,
-# 				device=torch.device('cpu'), dropout=0.0, emb_dropout=0.3)

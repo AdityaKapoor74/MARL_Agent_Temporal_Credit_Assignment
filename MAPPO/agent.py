@@ -45,11 +45,9 @@ class PPOAgent:
 			self.enemy_observation_shape = dictionary["enemy_observation_shape"]
 
 			self.global_observation_shape = None
-			self.common_information_observation_shape = None
 		elif self.environment == "GFootball":
 			self.global_observation_shape = dictionary["global_observation_shape"]
 			self.ally_observation_shape = dictionary["ally_observation_shape"]
-			self.common_information_observation_shape = dictionary["common_information_observation_shape"]
 
 			self.num_enemies = None
 			self.enemy_observation_shape = None
@@ -145,7 +143,6 @@ class PPOAgent:
 				enemy_state_shape=self.enemy_observation_shape, 
 				local_obs_shape=self.local_observation_shape, 
 				global_obs_shape=self.global_observation_shape,
-				common_information_obs_shape=self.common_information_observation_shape,
 				rnn_num_layers_actor=self.rnn_num_layers_actor,
 				actor_hidden_state=self.rnn_hidden_actor,
 				rnn_num_layers_v=self.rnn_num_layers_v,
@@ -203,13 +200,11 @@ class PPOAgent:
 					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape,
-					obs_shape=self.common_information_observation_shape,
 					action_shape=self.num_actions, 
 					heads=dictionary["reward_n_heads"], 
 					depth=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
-					n_enemies=self.num_enemies,
 					n_actions=self.num_actions,
 					agent=dictionary["reward_agent_attn"], 
 					dropout=dictionary["reward_dropout"], 
@@ -225,14 +220,12 @@ class PPOAgent:
 					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape, 
-					obs_shape=self.common_information_observation_shape,
 					n_actions=self.num_actions, 
 					emb_dim=dictionary["reward_linear_compression_dim"], 
 					n_heads=dictionary["reward_n_heads"], 
 					n_layer=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
-					n_enemies=self.num_enemies,
 					sample_num=5,
 					device=self.device, 
 					dropout=0.3, 
@@ -246,14 +239,12 @@ class PPOAgent:
 					environment=dictionary["environment"],
 					ally_obs_shape=self.ally_observation_shape,
 					enemy_obs_shape=self.enemy_observation_shape, 
-					obs_shape=self.common_information_observation_shape,
 					n_actions=self.num_actions, 
 					emb_dim=dictionary["reward_linear_compression_dim"], 
 					n_heads=dictionary["reward_n_heads"], 
 					n_layer=dictionary["reward_depth"], 
 					seq_length=dictionary["max_time_steps"], 
 					n_agents=self.num_agents, 
-					n_enemies=self.num_enemies,
 					sample_num=5,
 					device=self.device, 
 					dropout=0.3, 
@@ -364,7 +355,6 @@ class PPOAgent:
 			elif "GFootball" in self.environment:
 				enemy_state_batch = None
 				ally_state_batch = torch.from_numpy(self.buffer.ally_states[latest_sample_index]).float().unsqueeze(0).permute(0, 2, 1, 3).to(self.device)
-				state_batch = torch.from_numpy(self.buffer.common_obs[latest_sample_index]).float().unsqueeze(0).to(self.device)
 			actions_batch = torch.from_numpy(self.buffer.actions[latest_sample_index]).long().unsqueeze(0).permute(0, 2, 1).to(self.device)
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0).to(self.device)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0).to(self.device)
@@ -378,7 +368,6 @@ class PPOAgent:
 			elif "GFootball" in self.environment:
 				enemy_state_batch = None
 				ally_state_batch = torch.from_numpy(self.buffer.ally_states).float().permute(0, 2, 1, 3).to(self.device)
-				state_batch = torch.from_numpy(self.buffer.common_obs).float().to(self.device)
 			actions_batch = torch.from_numpy(self.buffer.actions).long().permute(0, 2, 1).to(self.device)
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float().to(self.device)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float().to(self.device)
@@ -392,7 +381,6 @@ class PPOAgent:
 					_, _ = self.reward_model(
 						ally_state_batch, 
 						enemy_state_batch, 
-						state_batch,
 						actions_batch, 
 						episodic_reward_batch,
 						team_masks=team_mask_batch,
@@ -464,17 +452,15 @@ class PPOAgent:
 		if "StarCraft" in self.environment:
 			ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		elif "GFootball" in self.environment:
-			ally_obs_batch, local_obs_batch, common_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+			ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		
 		# convert numpy array to tensor
 		if "StarCraft" in self.environment:
-			common_obs_batch = None
 			ally_obs_batch = torch.from_numpy(ally_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
 			enemy_obs_batch = torch.from_numpy(enemy_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
 		else:
 			enemy_obs_batch = None
 			ally_obs_batch = torch.from_numpy(ally_obs_batch).float().permute(0, 2, 1, 3).to(self.device)
-			common_obs_batch = torch.from_numpy(common_obs_batch).float().to(self.device)
 		local_obs_batch = torch.from_numpy(local_obs_batch).float().to(self.device)
 		actions_batch = torch.from_numpy(actions_batch).long().permute(0, 2, 1).to(self.device)
 		last_actions_batch = torch.from_numpy(last_actions_batch).long().to(self.device)
@@ -495,7 +481,6 @@ class PPOAgent:
 			rewards, temporal_weights, agent_weights, _, _ = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
-				common_obs_batch,
 				actions_batch, 
 				episodic_reward_batch,
 				team_masks=team_mask_batch,
@@ -512,7 +497,6 @@ class PPOAgent:
 			rewards, temporal_weights, agent_weights, _, _, action_prediction = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
-				common_obs_batch,
 				actions_batch, 
 				episode_len_batch,
 				episodic_reward_batch,
@@ -534,7 +518,6 @@ class PPOAgent:
 			rewards = self.reward_model(
 				ally_obs_batch, 
 				enemy_obs_batch, 
-				common_obs_batch,
 				actions_batch, 
 				episode_len_batch,
 				agent_masks_batch,

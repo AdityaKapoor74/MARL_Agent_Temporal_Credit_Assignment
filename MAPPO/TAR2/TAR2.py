@@ -22,7 +22,7 @@ class ShapelyAttention(nn.Module):
 
 		return mask.to(self.device)
 
-	def forward(self, input, agent_temporal_mask):
+	def forward(self, input):
 		"""
 		:param input: A (batch, number of agents, sequence length, emb dimension) tensor of input sequences.
 		:return: deltas, the encoding of time-adjacent states and actions along the agents. (batch, number of agents, sequence length, action dimension).
@@ -36,7 +36,7 @@ class ShapelyAttention(nn.Module):
 		shapley_reward = []
 
 		for i in range(self.sample_num):
-			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1) #* agent_temporal_mask.reshape(b*t, n_a, 1) * agent_temporal_mask.reshape(b*t, 1, n_a)
+			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1)
 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
 			shapley_reward.append(marginal_reward)
 
@@ -48,14 +48,13 @@ class ShapelyAttention(nn.Module):
 
 
 class TAR2(nn.Module):
-	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, n_enemies, sample_num,
-				device, dropout=0.0, emb_dropout=0.5, action_space='discrete'):
+	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
+				device, emb_dropout=0.5):
 		super().__init__()
 
 		self.environment = environment
 		self.ally_obs_shape = ally_obs_shape
 		self.enemy_obs_shape = enemy_obs_shape
-		self.obs_shape = obs_shape
 		self.emb_dim = emb_dim
 		self.n_heads = n_heads
 		self.n_layer = n_layer
@@ -77,14 +76,8 @@ class TAR2(nn.Module):
 			self.ally_obs_compress_input = nn.Sequential(
 				nn.Linear(ally_obs_shape, self.emb_dim),
 				)
-			self.common_obs_compress_input = nn.Sequential(
-				nn.Linear(obs_shape, self.emb_dim),
-				)
 
-		if not action_space == 'discrete':
-			self.action_emb = nn.Linear(input_dim, emb_dim)
-		else:
-			self.action_emb = nn.Embedding(n_actions+1, emb_dim)
+		self.action_emb = nn.Embedding(n_actions+1, emb_dim)
 
 		self.pos_embedding = nn.Embedding(seq_length, emb_dim)
 
@@ -110,8 +103,7 @@ class TAR2(nn.Module):
 		return mask
 
 
-	def forward(self, ally_states, enemy_states, states, actions, episode_length, episodic_reward, agent_temporal_mask):
-		# b, n_a, t, e = ally_states.size()
+	def forward(self, ally_states, enemy_states, actions, episode_length, agent_temporal_mask):
 
 		if "StarCraft" in self.environment:
 			b, n_a, t, _ = ally_states.size()
@@ -121,8 +113,6 @@ class TAR2(nn.Module):
 		elif "GFootball" in self.environment:
 			b, n_a, t, _ = ally_states.size()
 			ally_obs_embedding = self.ally_obs_compress_input(ally_states)
-			common_obs_embedding = self.common_obs_compress_input(states)
-			ally_obs_embedding = ally_obs_embedding + common_obs_embedding.unsqueeze(1)
 
 		positions = self.pos_embedding(torch.arange(self.seq_length, device=self.device))[None, None, :, :].expand(b, n_a, self.seq_length, self.emb_dim)
 		actions_embed = self.action_emb(actions.long()).squeeze()
@@ -149,7 +139,7 @@ class TAR2(nn.Module):
 			x = x.reshape(b, n_a, t, -1)
 			# if i == 0:
 			# 	only_agent_specific_temporal_x_intermediate = x
-			x = layer[1](x, agent_temporal_mask=None)
+			x = layer[1](x)
 			agent_scores.append(layer[1].phi.agent_scores)
 			agent_weights.append(layer[1].phi.agent_weights)
 			x = x.reshape(b*n_a, t, -1).squeeze()
