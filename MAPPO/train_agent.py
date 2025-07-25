@@ -374,9 +374,9 @@ if __name__ == '__main__':
 				"version": "temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
 				"reward_batch_size": 64, # 128
-				"reward_lr": 1e-4,
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
+				"dynamic_loss_coeffecient": 0.0,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
