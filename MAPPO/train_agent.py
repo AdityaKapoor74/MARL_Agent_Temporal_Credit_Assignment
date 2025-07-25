@@ -372,9 +372,9 @@ if __name__ == '__main__':
 				"reward_dropout": 0.0,
 				"reward_attn_net_wide": True,
 				"version": "temporal", # temporal, agent_temporal ---- For AREL
-				"reward_linear_compression_dim": 32, # 16 for TAR^2_agent_temporal
-				"reward_batch_size": 32, # 128
-				"reward_lr": 1e-4,
+				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
+				"reward_batch_size": 64, # 128
+				"reward_lr": 5e-4,
 				"reward_weight_decay": 0.0,
 				"dynamic_loss_coeffecient": 5e-2,
 				"variance_loss_coeff": 0.0,
@@ -412,8 +412,8 @@ if __name__ == '__main__':
 				"policy_clip": 0.2,
 				"policy_lr": 5e-4, 
 				"policy_weight_decay": 0.0,
-				"entropy_pen": 4e-3, #8e-3
-				"entropy_pen_final": 4e-3,
+				"entropy_pen": 2e-2, #8e-3
+				"entropy_pen_final": 2e-2,
 				"entropy_pen_steps": 20000,
 				"gae_lambda": 0.95,
 				"norm_adv": True,
