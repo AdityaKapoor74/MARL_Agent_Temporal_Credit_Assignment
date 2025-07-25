@@ -520,7 +520,7 @@ class PPOAgent:
 			elif self.env_name == "GFootball":
 				total_scores = total_scores + 2
 			log_episodic_rewards = torch.log(episodic_reward_batch + 1e-8)  # log R(s_T)
-			reward_prediction_loss = F.mse_loss(total_scores, log_episodic_rewards)
+			reward_prediction_loss = F.huber_loss(total_scores, log_episodic_rewards)
 			# reward_prediction_loss = F.mse_loss(total_scores, episodic_reward_batch)
 
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
