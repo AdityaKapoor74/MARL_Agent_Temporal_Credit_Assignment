@@ -95,8 +95,9 @@ class TAR2(nn.Module):
 			nn.Linear(2*emb_dim*self.n_layer, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
-			# nn.ReLU()
 			)
+		
+		init_model(self)
 
 	def get_time_mask(self, episode_length):
 		mask = (torch.arange(self.seq_length)[None, :].to(self.device) < episode_length[:, None]).float()

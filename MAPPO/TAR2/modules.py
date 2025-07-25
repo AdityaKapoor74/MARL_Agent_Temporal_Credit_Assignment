@@ -3,6 +3,60 @@ from torch import nn
 import torch.nn.functional as F
 import math
 
+def init_model(model):
+    """
+    Initialization with attention-specific handling
+    """
+    
+    # Count transformer depth for scaling
+    depth = 0
+    for name, module in model.named_modules():
+        if 'layers.' in name and ('EncoderLayer' in str(type(module)) or hasattr(module, 'self_attn')):
+            depth += 1
+    
+    depth_scale = math.sqrt(2.0 / max(depth, 1)) if depth > 2 else 1.0
+    
+    def init_fn(m):
+        if isinstance(m, nn.Linear):
+            nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+            m.weight.data *= depth_scale
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        
+        elif isinstance(m, nn.Embedding):
+            nn.init.normal_(m.weight, 0, 0.01)  # Smaller for deep networks
+        
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
+    
+    model.apply(init_fn)
+    
+    # Special attention module handling
+    for name, module in model.named_modules():
+        if hasattr(module, 'W_Q') and hasattr(module, 'W_K'):
+            # Custom attention initialization
+            scale = 0.5 * depth_scale  # Smaller for attention
+            
+            if hasattr(module, 'W_Q'):
+                if isinstance(module.W_Q, nn.ModuleList):
+                    for q in module.W_Q:
+                        q.weight.data *= scale
+                else:
+                    module.W_Q.weight.data *= scale
+            
+            for attr in ['W_K', 'W_V', 'linear']:
+                if hasattr(module, attr):
+                    getattr(module, attr).weight.data *= scale
+    
+    # Even smaller output layers
+    for name, module in model.named_modules():
+        if 'reward_prediction' in name.lower():
+            if isinstance(module, nn.Linear):
+                module.weight.data *= 0.05  # Very small for reward prediction
+    
+    print(f"TAR² v2 initialization complete (depth={depth}, scale={depth_scale:.3f})")
+
 """ encoder layer """
 class EncoderLayer(nn.Module):
 	def __init__(self, d_hidden, n_head, d_ff, dropout, layer_norm_epsilon=1e-12):
