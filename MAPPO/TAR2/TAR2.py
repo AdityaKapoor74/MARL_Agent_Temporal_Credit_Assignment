@@ -95,7 +95,7 @@ class TAR2(nn.Module):
 			nn.Linear(2*emb_dim*self.n_layer, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
-			nn.ReLU()
+			# nn.ReLU()
 			)
 
 	def get_time_mask(self, episode_length):
