@@ -374,9 +374,9 @@ if __name__ == '__main__':
 				"version": "temporal", # temporal, agent_temporal ---- For AREL
 				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
 				"reward_batch_size": 64, # 128
-				"reward_lr": 5e-4,
+				"reward_lr": 1e-3,
 				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
+				"dynamic_loss_coeffecient": 0.1,
 				"variance_loss_coeff": 0.0,
 				"enable_reward_grad_clip": True,
 				"reward_grad_clip_value": 0.5,
@@ -393,7 +393,7 @@ if __name__ == '__main__':
 				"use_recurrent_critic": True,
 				"rnn_num_layers_v": 1,
 				"rnn_hidden_v": 64,
-				"v_value_lr": 5e-4, #1e-3
+				"v_value_lr": 1e-3, #1e-3
 				"v_weight_decay": 0.0,
 				"v_comp_emb_shape": 64,
 				"enable_grad_clip_critic_v": True,
@@ -410,7 +410,7 @@ if __name__ == '__main__':
 				"enable_grad_clip_actor": True,
 				"grad_clip_actor": 0.5,
 				"policy_clip": 0.2,
-				"policy_lr": 5e-4, 
+				"policy_lr": 1e-3, 
 				"policy_weight_decay": 0.0,
 				"entropy_pen": 4e-3, #8e-3
 				"entropy_pen_final": 4e-3,
