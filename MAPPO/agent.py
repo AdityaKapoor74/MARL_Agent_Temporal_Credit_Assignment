@@ -409,22 +409,22 @@ class PPOAgent:
 					# temporal_weights = F.softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), dim=-2)
 					# agent_weights = F.softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), dim=-1) * agent_masks_batch
 					
-					# temporal_weights = self.stable_softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), 2.0, dim=-2)
-					# agent_weights = self.stable_softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), 2.0, dim=-1) * agent_masks_batch
+					temporal_weights = self.stable_softmax((rewards*agent_masks_batch).sum(dim=-1, keepdim=True) - 1e9 * (1-(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()), 2.0, dim=-2)
+					agent_weights = self.stable_softmax((rewards*agent_masks_batch) - 1e9 * (1-agent_masks_batch), 2.0, dim=-1) * agent_masks_batch
 
 					# USING MIN-MAX NORMALIZATION
-					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
-					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
-					temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
-					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
-					temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
-					temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
+					# temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
+					# temporal_rewards_copy = copy.deepcopy(temporal_rewards)
+					# temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
+					# min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+					# temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
+					# temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
 
-					agent_rewards_copy = copy.deepcopy(rewards)
-					agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
-					min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
-					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
-					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
+					# agent_rewards_copy = copy.deepcopy(rewards)
+					# agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
+					# min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+					# agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
+					# agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
 
 					# print(temporal_weights.sum(dim=-2))
 					# print(agent_weights.sum(dim=-1))
@@ -515,13 +515,13 @@ class PPOAgent:
 			and for Google Research Football, we use log(R(s_T) + 2) to shift the reward range into the positive domain. This 
 			standard practice ensures a well-defined learning target without altering the preference ordering of the outcomes.
 			'''
-			# if self.env_name == "StarCraft":
-			# 	total_scores = total_scores + 1
-			# elif self.env_name == "GFootball":
-			# 	total_scores = total_scores + 2
-			# log_episodic_rewards = torch.log(episodic_reward_batch + 1e-8)  # log R(s_T)
-			# reward_prediction_loss = F.mse_loss(total_scores, log_episodic_rewards)
-			reward_prediction_loss = F.mse_loss(total_scores, episodic_reward_batch)
+			if self.env_name == "StarCraft":
+				total_scores = total_scores + 1
+			elif self.env_name == "GFootball":
+				total_scores = total_scores + 2
+			log_episodic_rewards = torch.log(episodic_reward_batch + 1e-8)  # log R(s_T)
+			reward_prediction_loss = F.mse_loss(total_scores, log_episodic_rewards)
+			# reward_prediction_loss = F.mse_loss(total_scores, episodic_reward_batch)
 
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
 

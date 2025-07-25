@@ -95,6 +95,7 @@ class TAR2(nn.Module):
 			nn.Linear(2*emb_dim*self.n_layer, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
+			nn.ReLU()
 			)
 
 	def get_time_mask(self, episode_length):
@@ -164,8 +165,8 @@ class TAR2(nn.Module):
 
 		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2)-1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim*self.n_layer).long() # subtracting 1 for indexing purposes
 		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
-
 		reward_prediction_embeddings = torch.cat([x_intermediate, final_x.mean(dim=1, keepdim=True).detach().unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		
 		rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
 		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction
