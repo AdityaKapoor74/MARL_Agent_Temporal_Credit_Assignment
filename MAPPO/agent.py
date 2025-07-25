@@ -340,10 +340,10 @@ class PPOAgent:
 		"""Temperature-scaled softmax with numerical stability"""
 		
 		# Prevent temperature from becoming too small
-		safe_temp = torch.clamp(temperature, min=0.1, max=10.0)
+		# safe_temp = torch.clamp(temperature, min=0.1, max=10.0)
 		
 		# Numerical stability: subtract max before softmax
-		logits_scaled = logits / safe_temp
+		logits_scaled = logits / temperature
 		logits_stable = logits_scaled - logits_scaled.max(dim=dim, keepdim=True)[0]
 		
 		return F.softmax(logits_stable, dim=dim)
