@@ -84,8 +84,10 @@ class TAR2(nn.Module):
 		self.layers = nn.ModuleList([nn.ModuleList([EncoderLayer(self.emb_dim, self.n_heads, self.emb_dim, emb_dropout),
 								ShapelyAttention(emb_dim, n_heads, self.n_agents, self.sample_num, device, emb_dropout)]) for _ in range(self.n_layer)])
 
+		# The input is now [current_global_state, next_global_state, past_state_action_embedding]
+        # Dimensions:      [emb_dim,            emb_dim,            emb_dim*n_layer]
 		self.dynamics_model = nn.Sequential(
-			nn.Linear(self.emb_dim*(self.n_layer+1), self.emb_dim),
+			nn.Linear(self.emb_dim*(self.n_layer+2), self.emb_dim), # CHANGED: n_layer+1 -> n_layer+2
 			nn.GELU(),
 			nn.Linear(self.emb_dim, n_actions),
 			)
@@ -156,11 +158,22 @@ class TAR2(nn.Module):
 		x_intermediate = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 
 		# normal inverse dynamics model
+		# 1. Calculate the global state embedding (pre-attention) for each timestep.
 		global_state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim)
-		past_state_action_embeddings = torch.cat([first_past_state_action_embedding.to(self.device), x_intermediate[:, :, :-1, :]], dim=-2)
-		current_past_memory_state_embeddings = torch.cat([global_state_embeddings, past_state_action_embeddings], dim=-1)
-		action_prediction = self.dynamics_model(current_past_memory_state_embeddings)
+
+		# 2. Get the next global state embedding by shifting the tensor.
+		# For the last timestep, there is no "next" state, so we pad with zeros.
+		next_global_state_embeddings = torch.cat([global_state_embeddings[:, :, 1:, :], torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)], dim=-2) # ADDED
+
+		# 3. Get the agent-specific state-action context from the previous timestep (post-attention).
+		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim).to(self.device)
+		past_state_action_embeddings = torch.cat([first_past_state_action_embedding, x_intermediate[:, :, :-1, :]], dim=-2)
+
+		# 4. Concatenate all three embeddings to form the input.
+		dynamics_model_input = torch.cat([global_state_embeddings, next_global_state_embeddings, past_state_action_embeddings], dim=-1) # CHANGED
+
+		# 5. Predict the action.
+		action_prediction = self.dynamics_model(dynamics_model_input) # CHANGED
 
 		# rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
