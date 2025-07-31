@@ -87,14 +87,16 @@ class TAR2(nn.Module):
 		# The input is now [current_global_state, next_global_state, past_state_action_embedding]
         # Dimensions:      [emb_dim,            emb_dim,            emb_dim*n_layer]
 		self.dynamics_model = nn.Sequential(
-			nn.Linear(self.emb_dim*(self.n_layer+2), self.emb_dim), # CHANGED: n_layer+1 -> n_layer+2
+			nn.Linear(self.emb_dim*(self.n_layer+2), self.emb_dim), 
+			nn.GELU(),
+			nn.Linear(self.emb_dim, self.emb_dim), 
 			nn.GELU(),
 			nn.Linear(self.emb_dim, n_actions),
 			)
 
 
 		self.reward_prediction = nn.Sequential(
-			nn.Linear(2*emb_dim*self.n_layer, emb_dim),
+			nn.Linear(2*self.emb_dim*self.n_layer, emb_dim),
 			nn.GELU(),
 			nn.Linear(emb_dim, 1),
 			)
@@ -163,17 +165,17 @@ class TAR2(nn.Module):
 
 		# 2. Get the next global state embedding by shifting the tensor.
 		# For the last timestep, there is no "next" state, so we pad with zeros.
-		next_global_state_embeddings = torch.cat([global_state_embeddings[:, :, 1:, :], torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)], dim=-2) # ADDED
+		next_global_state_embeddings = torch.cat([global_state_embeddings[:, :, 1:, :], torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)], dim=-2)
 
 		# 3. Get the agent-specific state-action context from the previous timestep (post-attention).
 		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim).to(self.device)
 		past_state_action_embeddings = torch.cat([first_past_state_action_embedding, x_intermediate[:, :, :-1, :]], dim=-2)
 
 		# 4. Concatenate all three embeddings to form the input.
-		dynamics_model_input = torch.cat([global_state_embeddings, next_global_state_embeddings, past_state_action_embeddings], dim=-1) # CHANGED
+		dynamics_model_input = torch.cat([global_state_embeddings, next_global_state_embeddings, past_state_action_embeddings], dim=-1)
 
 		# 5. Predict the action.
-		action_prediction = self.dynamics_model(dynamics_model_input) # CHANGED
+		action_prediction = self.dynamics_model(dynamics_model_input)
 
 		# rewards = self.reward_prediction(x_intermediate).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 

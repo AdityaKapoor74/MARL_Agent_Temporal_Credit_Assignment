@@ -509,18 +509,7 @@ class PPOAgent:
 			entropy_agent_weights = -torch.sum(agent_weights * torch.log(torch.clamp(agent_weights, 1e-10, 1.0)))/((agent_masks_batch.sum()+1e-5)*self.reward_depth)
 			
 			total_scores = scores.reshape(actions_batch.shape[0], -1).sum(dim=-1)  # Sum all c_i,t
-			'''
-			To ensure numerical stability when training our reward model, which predicts the logarithm of the episodic return, 
-			we first apply a monotonic transformation to the raw environment reward R(s_T). For SMACLite, we use log(R(s_T) + 1), 
-			and for Google Research Football, we use log(R(s_T) + 2) to shift the reward range into the positive domain. This 
-			standard practice ensures a well-defined learning target without altering the preference ordering of the outcomes.
-			'''
-			# if self.env_name == "StarCraft":
-			# 	total_scores = total_scores + 1
-			# elif self.env_name == "GFootball":
-			# 	total_scores = total_scores + 2
-			# log_episodic_rewards = torch.log(episodic_reward_batch + 1e-8)  # log R(s_T)
-			# reward_prediction_loss = F.huber_loss(total_scores, log_episodic_rewards)
+			
 			reward_prediction_loss = F.huber_loss(total_scores, episodic_reward_batch)
 
 			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
