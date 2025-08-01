@@ -80,6 +80,7 @@ class PPOAgent:
 		self.entropy_pen_decay = (dictionary["entropy_pen"] - dictionary["entropy_pen_final"])/dictionary["entropy_pen_steps"]
 
 		# Reward setup
+		self.reward_depth = dictionary["reward_depth"]
 		self.norm_rewards = dictionary["norm_rewards"]
 		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
 		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
