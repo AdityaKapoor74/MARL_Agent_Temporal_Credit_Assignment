@@ -85,6 +85,7 @@ class PPOAgent:
 		self.gae_lambda = dictionary["gae_lambda"]
 		self.policy_clip = dictionary["policy_clip"]
 		self.norm_adv = dictionary["norm_adv"]
+		self.entropy_pen_decay = (dictionary["entropy_pen"] - dictionary["entropy_pen_final"])/dictionary["entropy_pen_steps"]
 
 
 		# Arguments for the Critic (Value) network
