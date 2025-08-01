@@ -1,112 +1,112 @@
+"""
+This script serves as the main entry point for training the MAPPO agent with various
+credit assignment methods, including TAR², AREL, STAS, and other baselines.
+
+It defines the MAPPO class, which orchestrates the entire training process:
+- Initializes the environment, agent, and necessary buffers.
+- Manages the main training loop, including episode rollouts and data collection.
+- Coordinates the updates for the policy networks (MAPPO) and, if applicable, the
+  credit assignment model (e.g., TAR²).
+- Handles logging, model saving, and evaluation.
+
+The script is configured via a dictionary and can be run for different environments
+like StarCraft II (via SMACLite) and Google Research Football.
+"""
 import os
 from comet_ml import Experiment
 import numpy as np
 from agent import PPOAgent
 import torch
-import datetime
-
-
 
 class MAPPO:
-
+	"""
+	Main controller for the Multi-Agent Proximal Policy Optimization (MAPPO) training process.
+	"""
 	def __init__(self, env, dictionary):
+		"""
+		Initializes the training environment, agent, and all necessary components.
 
+		Args:
+			env: The multi-agent environment instance.
+			dictionary (dict): A dictionary containing all hyperparameters and configuration settings.
+		"""
+		# --- Basic Setup ---
 		if dictionary["device"] == "gpu":
 			self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 		else:
 			self.device = "cpu"
 		self.env = env
 		self.environment = dictionary["environment"]
-		self.save_model = dictionary["save_model"]
-		self.save_model_checkpoint = dictionary["save_model_checkpoint"]
-		self.save_comet_ml_plot = dictionary["save_comet_ml_plot"]
-		self.learn = dictionary["learn"]
-		self.eval_policy = dictionary["eval_policy"]
-		self.num_agents = dictionary["num_agents"]
-
-		self.use_reward_model = dictionary["use_reward_model"]
-		self.warm_up_period = dictionary["warm_up_period"]
-		
-		if "StarCraft" in self.environment:
-			self.num_enemies = self.env.n_enemies
-
-			self.enemy_ids = []
-			for i in range(self.num_enemies):
-				enemy_id = np.array([0 for i in range(self.num_enemies)])
-				enemy_id[i] = 1
-				self.enemy_ids.append(enemy_id)
-			self.enemy_ids = np.array(self.enemy_ids)
-		else:
-			self.num_enemies = 1
-
-		self.num_actions = dictionary["num_actions"]
-		self.date_time = f"{datetime.datetime.now():%d-%m-%Y}"
 		self.env_name = dictionary["env"]
-		self.test_num = dictionary["test_num"]
+		self.num_agents = dictionary["num_agents"]
+		self.num_actions = dictionary["num_actions"]
+		
+		# --- Experiment Configuration ---
+		self.learn = dictionary["learn"]
 		self.max_episodes = dictionary["max_episodes"]
 		self.max_time_steps = dictionary["max_time_steps"]
 		self.experiment_type = dictionary["experiment_type"]
 		self.ppo_eps_elapse_update_freq = dictionary["ppo_eps_elapse_update_freq"]
 
-		# RNN HIDDEN
-		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
-		self.rnn_hidden_v = dictionary["rnn_hidden_v"]
-		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
-		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
-
+		# --- Logging and Saving ---
+		self.save_model = dictionary["save_model"]
+		self.save_model_checkpoint = dictionary["save_model_checkpoint"]
+		self.eval_policy = dictionary["eval_policy"]
+		
+		# --- Credit Assignment Model Setup ---
+		self.use_reward_model = dictionary["use_reward_model"]
+		self.warm_up_period = dictionary["warm_up_period"]
 		if self.use_reward_model:
 			self.reward_batch_size = dictionary["reward_batch_size"]
 			self.update_reward_model_freq = dictionary["update_reward_model_freq"]
 			self.reward_model_update_epochs = dictionary["reward_model_update_epochs"]
 
+		# --- Environment-Specific Setup ---
+		if "StarCraft" in self.environment:
+			self.num_enemies = self.env.n_enemies
+		else:
+			self.num_enemies = 1
+
+		# --- RNN Hidden State Dimensions ---
+		self.rnn_num_layers_v = dictionary["rnn_num_layers_v"]
+		self.rnn_hidden_v = dictionary["rnn_hidden_v"]
+		self.rnn_num_layers_actor = dictionary["rnn_num_layers_actor"]
+		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
+
+		# --- Comet.ml Logging ---
 		self.comet_ml = None
-		if self.save_comet_ml_plot:
+		if dictionary["save_comet_ml_plot"]:
 			self.comet_ml = Experiment("im5zK8gFkz6j07uflhc3hXk8I", project_name=dictionary["test_num"])
 			self.comet_ml.set_name(dictionary["experiment_name"])
 			self.comet_ml.log_parameters(dictionary)
 
-
+		# --- Agent Initialization ---
 		self.agents = PPOAgent(dictionary, self.comet_ml)
-		# self.init_critic_hidden_state(np.zeros((1, self.num_agents, 256)))
 
+		# --- Model Saving Directories ---
 		if self.save_model:
 			critic_dir = dictionary["critic_dir"]
-			try: 
-				os.makedirs(critic_dir, exist_ok = True) 
-				print("Critic Directory created successfully") 
-			except OSError as error: 
-				print("Critic Directory can not be created") 
 			actor_dir = dictionary["actor_dir"]
-			try: 
-				os.makedirs(actor_dir, exist_ok = True) 
-				print("Actor Directory created successfully") 
-			except OSError as error: 
-				print("Actor Directory can not be created")
-
-			
-			self.critic_model_path = critic_dir+"critic"
-			self.actor_model_path = actor_dir+"actor"
-
+			os.makedirs(critic_dir, exist_ok=True)
+			os.makedirs(actor_dir, exist_ok=True)
+			self.critic_model_path = os.path.join(critic_dir, "critic")
+			self.actor_model_path = os.path.join(actor_dir, "actor")
 
 		if self.eval_policy:
 			self.policy_eval_dir = dictionary["policy_eval_dir"]
-			try: 
-				os.makedirs(self.policy_eval_dir, exist_ok = True) 
-				print("Policy Eval Directory created successfully") 
-			except OSError as error: 
-				print("Policy Eval Directory can not be created")
+			os.makedirs(self.policy_eval_dir, exist_ok=True)
 
-
-	def run(self):  
+	def run(self):
+		"""
+		Executes the main training loop for the specified number of episodes.
+		"""
 		if self.eval_policy:
 			self.rewards = []
-			self.rewards_mean_per_1000_eps = []
 			self.timesteps = []
-			self.timesteps_mean_per_1000_eps = []
 
-
-		for episode in range(1,self.max_episodes+1):
-
+		# --- Main Training Loop ---
+		for episode in range(1, self.max_episodes + 1):
+			# --- Episode Initialization ---
 			if "StarCraft" in self.environment:
 				local_obs, info = self.env.reset(return_info=True)
 				mask_actions = np.array(info["avail_actions"], dtype=int)
@@ -120,203 +120,116 @@ class MAPPO:
 				ally_states, enemy_states = None, None
 				info = {}
 			
-
 			last_actions = np.zeros((self.num_agents)) + self.num_actions
 			local_obs = np.array(local_obs)
-			indiv_dones = [0]*self.num_agents
-			indiv_dones = np.array(indiv_dones)
-			dones = all(indiv_dones)
-
+			indiv_dones = np.zeros(self.num_agents)
+			
 			episode_reward = 0
 			episodic_team_reward = 0
-			episode_indiv_rewards = [0 for i in range(self.num_agents)]
-			final_timestep = self.max_time_steps
-
 			
 			rnn_hidden_state_v = np.zeros((self.rnn_num_layers_v, self.num_agents, self.rnn_hidden_v))
 			rnn_hidden_state_actor = np.zeros((self.rnn_num_layers_actor, self.num_agents, self.rnn_hidden_actor))
 
-			for step in range(1, self.max_time_steps+1):
-
+			# --- Episode Rollout Loop ---
+			for step in range(1, self.max_time_steps + 1):
+				# Get actions and value estimates from the agent
 				actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
-
 				value, next_rnn_hidden_state_v = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 				
+				# Step the environment
 				next_local_obs, rewards, next_dones, next_info = self.env.step(actions)
 				next_local_obs = np.array(next_local_obs)
 
+				# Process environment-specific outputs
 				if "StarCraft" in self.environment:
 					next_ally_states = np.array(next_info["ally_states"])
 					next_enemy_states = np.array(next_info["enemy_states"])
 					next_mask_actions = np.array(next_info["avail_actions"], dtype=int)
 					next_indiv_dones = next_info["indiv_dones"]
-					indiv_rewards = next_info["indiv_rewards"]
-
-					next_global_obs = None
-
 				elif "GFootball" in self.environment:
 					next_ally_states, next_enemy_states = None, None
 					next_global_obs = next_local_obs
 					next_indiv_dones = next_dones
-					next_dones = all(next_indiv_dones)
-					indiv_rewards = rewards[0]*self.num_agents
-					rewards = indiv_rewards[0]
+					rewards = rewards[0] * self.num_agents
 					next_mask_actions = np.ones([self.num_agents, self.num_actions])
 				
-				
 				episode_reward += np.sum(rewards)
-				episode_indiv_rewards = [r+indiv_rewards[i] for i, r in enumerate(episode_indiv_rewards)]
 
-				if self.experiment_type == "temporal_team":
-					rewards_to_send = [rewards]*self.num_agents
-				elif self.experiment_type == "episodic_team" or self.experiment_type == "Uniform" or "AREL" in self.experiment_type or "TAR^2" in self.experiment_type or "STAS" in self.experiment_type:
-					episodic_team_reward = episodic_team_reward+rewards
+				# --- Reward Shaping for Episodic Tasks ---
+				# Accumulate the dense rewards to form a single episodic signal.
+				rewards_to_send = 0
+				if "episodic_team" in self.experiment_type or "Uniform" in self.experiment_type or "AREL" in self.experiment_type or "TAR" in self.experiment_type or "STAS" in self.experiment_type:
+					episodic_team_reward += np.sum(rewards)
 					if all(next_indiv_dones) or step == self.max_time_steps:
 						rewards_to_send = episodic_team_reward
-					else:
-						rewards_to_send = 0
+				else: # For dense reward settings
+					rewards_to_send = rewards
 
+				# --- Store data in buffers ---
 				if self.learn:
 					self.agents.buffer.push(
-						ally_states, enemy_states, value, rnn_hidden_state_v, \
-						global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, mask_actions, \
-						rewards_to_send, indiv_dones, dones
-						)
-
+						ally_states, enemy_states, value, rnn_hidden_state_v,
+						global_obs, local_obs, rnn_hidden_state_actor, action_logprob, actions, mask_actions,
+						rewards_to_send, indiv_dones, all(indiv_dones)
+					)
 				if self.use_reward_model:
 					self.agents.reward_buffer.push(
-						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, dones, indiv_dones
-						)
+						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, all(indiv_dones), indiv_dones
+					)
 
-					ally_states, enemy_states = next_ally_states, next_enemy_states
-
-					
-				global_obs, local_obs, last_actions, mask_actions, indiv_dones, dones = next_global_obs, next_local_obs, actions, next_mask_actions, next_indiv_dones, next_dones
+				# Update states for the next iteration
+				global_obs, local_obs, last_actions, mask_actions, indiv_dones = next_global_obs, next_local_obs, actions, next_mask_actions, next_indiv_dones
 				rnn_hidden_state_v, rnn_hidden_state_actor = next_rnn_hidden_state_v, next_rnn_hidden_state_actor
+				if "StarCraft" in self.environment:
+					ally_states, enemy_states = next_ally_states, next_enemy_states
 				info = next_info
 
+				# --- End of Episode Handling ---
 				if all(indiv_dones) or step == self.max_time_steps:
-
-					final_timestep = step
-
 					if self.learn:
-						# add final time to buffer
-						actions, action_logprob, next_rnn_hidden_state_actor = self.agents.get_action(local_obs, last_actions, mask_actions, rnn_hidden_state_actor)
-					
-						value, _ = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
-						
-						self.agents.buffer.end_episode(final_timestep, value, indiv_dones, dones)
+						# Get final value estimate for GAE calculation
+						_, final_value_v = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+						self.agents.buffer.end_episode(step, final_value_v, indiv_dones, all(indiv_dones))
 
+					# During warmup, clear the on-policy buffer to only use shaped rewards later
 					if self.use_reward_model and episode <= self.warm_up_period:
 						self.agents.buffer.clear()
 
-					print("*"*100)
-					print("EPISODE: {} | REWARD: {} | TIME TAKEN: {} / {} | INDIV REWARD STREAMS: {} \n".format(episode, np.round(episode_reward,decimals=4), step, self.max_time_steps, episode_indiv_rewards))
-					if "StarCraft" in self.environment:
-						print("Num Allies Alive: {} | Num Enemies Alive: {} | AGENTS DEAD: {} \n".format(info["num_allies"], info["num_enemies"], info["indiv_dones"]))
-					elif "Alice_and_Bob" in self.environment:
-						print("AGENTS DONE: {} \n".format(indiv_dones))
-					print("*"*100)
-
+					print(f"Episode: {episode} | Reward: {episode_reward:.2f} | Timesteps: {step}/{self.max_time_steps}")
+					
 					if self.save_comet_ml_plot:
-						self.comet_ml.log_metric('Episode_Length', step, episode)
 						self.comet_ml.log_metric('Reward', episode_reward, episode)
-						if "StarCraft" in self.environment:
-							self.comet_ml.log_metric('Num Enemies', info["num_enemies"], episode)
-							self.comet_ml.log_metric('Num Allies', info["num_allies"], episode)
-							self.comet_ml.log_metric('All Enemies Dead', info["all_enemies_dead"], episode)
-							self.comet_ml.log_metric('All Allies Dead', info["all_allies_dead"], episode)
-						elif self.environment in ["Alice_and_Bob", "GFootball"]:
-							self.comet_ml.log_metric('Agents Done', dones, episode)
-						
 					break
 
 			if self.use_reward_model:
 				self.agents.reward_buffer.end_episode()
 
+			# --- Agent and Model Updates ---
+			# Update the main MAPPO agent
+			if self.learn and (episode % self.ppo_eps_elapse_update_freq == 0) and episode > 0:
+				if self.use_reward_model and episode > self.warm_up_period:
+					# Replace buffer rewards with the output of the credit assignment model
+					self.agents.buffer.rewards = self.agents.reward_model_output()
+				self.agents.update(episode)
 
-			if self.agents.scheduler_need:
-				self.agents.scheduler_policy.step()
-				self.agents.scheduler_v_critic.step()
+			# Update the credit assignment model
+			if self.learn and self.use_reward_model and self.reward_batch_size <= self.agents.reward_buffer.length and (episode % self.update_reward_model_freq == 0) and episode > 0:
+				for _ in range(self.reward_model_update_epochs):
+					sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
+					# The update_reward_model function handles the specific loss for each model type
+					self.agents.update_reward_model(sample)
 
+			# --- Saving and Logging ---
 			if self.eval_policy:
 				self.rewards.append(episode_reward)
-				self.timesteps.append(final_timestep)
-
-			if episode > self.save_model_checkpoint and self.eval_policy:
-				self.rewards_mean_per_1000_eps.append(sum(self.rewards[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
-				self.timesteps_mean_per_1000_eps.append(sum(self.timesteps[episode-self.save_model_checkpoint:episode])/self.save_model_checkpoint)
-
-				
-			if not(episode%self.save_model_checkpoint) and episode!=0 and self.save_model:	
-				torch.save(self.agents.critic_network_v.state_dict(), self.critic_model_path+'_V_epsiode'+str(episode)+'.pt')
-				torch.save(self.agents.policy_network.state_dict(), self.actor_model_path+'_epsiode'+str(episode)+'.pt')  
-
-			if self.learn and not(episode%self.ppo_eps_elapse_update_freq) and episode != 0:
-				if self.experiment_type == "Uniform":
-					_, t, n_a = self.agents.buffer.rewards.shape
-					episodic_avg_reward = np.sum(self.agents.buffer.rewards[:, :, 0], axis=1)/self.agents.buffer.episode_length
-					self.agents.buffer.rewards[:, :, :] = np.repeat(np.expand_dims(np.repeat(np.expand_dims(episodic_avg_reward, axis=-1), repeats=t, axis=-1), axis=-1), repeats=n_a, axis=-1)
-					self.agents.buffer.rewards *= (1-self.agents.buffer.indiv_dones[:, :-1, :])
-					self.agents.update(episode)
-				elif self.use_reward_model and episode > self.warm_up_period:
-					self.agents.buffer.rewards = self.agents.reward_model_output()
-					self.agents.update(episode)
-				elif not self.use_reward_model:
-					self.agents.update(episode)
-
-			if self.learn:
-				if self.use_reward_model and self.reward_batch_size <= self.agents.reward_buffer.length and episode != 0 and episode % self.update_reward_model_freq == 0:
-					reward_loss_batch, grad_norm_reward_batch = 0.0, 0.0
-					if "AREL" in self.experiment_type:
-						reward_var_batch = 0.0
-					elif "TAR^2" in self.experiment_type:
-						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
-						reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
-					
-					for i in range(self.reward_model_update_epochs):
-						sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
-						if "AREL" in self.experiment_type:
-							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)
-							reward_var_batch += (reward_var/self.reward_model_update_epochs)
-						elif "TAR^2" in self.experiment_type:
-							reward_loss, reward_prediction_loss, dynamic_loss, entropy_temporal_weights, entropy_agent_weights, grad_norm_value_reward = self.agents.update_reward_model(sample)
-							entropy_temporal_weights_batch += (entropy_temporal_weights/self.reward_model_update_epochs)
-							entropy_agent_weights_batch += (entropy_agent_weights/self.reward_model_update_epochs)
-							reward_prediction_loss_batch += (reward_prediction_loss/self.reward_model_update_epochs)
-							dynamic_loss_batch += (dynamic_loss/self.reward_model_update_epochs)
-						elif "STAS" in self.experiment_type:
-							reward_loss, grad_norm_value_reward = self.agents.update_reward_model(sample)
-
-						reward_loss_batch += (reward_loss/self.reward_model_update_epochs)
-						grad_norm_reward_batch += (grad_norm_value_reward/self.reward_model_update_epochs)
-
-						if self.agents.scheduler_need:
-							self.agents.scheduler_reward.step()
-
-					if self.comet_ml is not None:
-						self.comet_ml.log_metric('Reward_Loss', reward_loss_batch, episode)
-						self.comet_ml.log_metric('Reward_Grad_Norm', grad_norm_reward_batch, episode)
-
-						if "AREL" in self.experiment_type:
-							self.comet_ml.log_metric('Reward_Var', reward_var_batch, episode)
-						elif "TAR^2" in self.experiment_type:
-							self.comet_ml.log_metric('Entropy_Temporal_Weights', entropy_temporal_weights_batch, episode)
-							self.comet_ml.log_metric('Entropy_Agent_Weights', entropy_agent_weights_batch, episode)
-
-							self.comet_ml.log_metric('Reward Prediction Loss', reward_prediction_loss_batch, episode)
-							self.comet_ml.log_metric('Reward Dynamic Loss', dynamic_loss_batch, episode)
-							
-			if self.eval_policy and not(episode%self.save_model_checkpoint) and episode!=0:
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"reward_list"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_rewards_per_1000_eps"), np.array(self.rewards_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"timestep_list"), np.array(self.timesteps), allow_pickle=True, fix_imports=True)
-				np.save(os.path.join(self.policy_eval_dir,self.test_num+"mean_timestep_per_1000_eps"), np.array(self.timesteps_mean_per_1000_eps), allow_pickle=True, fix_imports=True)
-				
+			if (episode % self.save_model_checkpoint == 0) and self.save_model:
+				torch.save(self.agents.critic_network_v.state_dict(), f'{self.critic_model_path}_V_episode{episode}.pt')
+				torch.save(self.agents.policy_network.state_dict(), f'{self.actor_model_path}_episode{episode}.pt')
 				
 
 if __name__ == '__main__':
-
+	# This block sets up the configuration dictionary and launches the training run.
+	# It allows for easy configuration of different environments, baselines, and hyperparameters.
 	RENDER = False
 	USE_CPP_RVO2 = False
 
