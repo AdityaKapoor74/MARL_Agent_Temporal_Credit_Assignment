@@ -229,59 +229,86 @@ class MAPPO:
 				
 
 def parse_args():
-	"""
-	Parses command-line arguments for the training script.
-	"""
-	parser = argparse.ArgumentParser(description="Train MAPPO with various credit assignment methods.")
-	
-	# --- General Training Arguments ---
-	parser.add_argument("--iteration", type=int, default=1, help="Seed and iteration number for the run.")
-	parser.add_argument("--device", type=str, default="gpu", choices=["gpu", "cpu"], help="Device to use for training.")
-	parser.add_argument("--n_epochs", type=int, default=5, help="Number of PPO update epochs.")
-	parser.add_argument("--ppo_eps_elapse_update_freq", type=int, default=10, help="Update PPO agent after this many episodes.")
-	parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
-	parser.add_argument("--learn", action="store_true", default=True, help="Flag to enable learning.")
-	parser.add_argument("--max_episodes", type=int, default=30000, help="Maximum number of training episodes.")
-	parser.add_argument("--warm_up_period", type=int, default=200, help="Number of episodes to warm up the reward buffer.")
+    """
+    Parses command-line arguments for the training script.
+    """
+    parser = argparse.ArgumentParser(description="Train MAPPO with various credit assignment methods.")
+    
+    # --- General Training Arguments ---
+    parser.add_argument("--iteration", type=int, default=1, help="Seed and iteration number for the run.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["gpu", "cpu"], help="Device to use for training.")
+    parser.add_argument("--n_epochs", type=int, default=5, help="Number of PPO update epochs.")
+    parser.add_argument("--ppo_eps_elapse_update_freq", type=int, default=10, help="Update PPO agent after this many episodes.")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
+    parser.add_argument("--learn", action="store_true", default=True, help="Flag to enable learning.")
+    parser.add_argument("--max_episodes", type=int, default=30000, help="Maximum number of training episodes.")
+    parser.add_argument("--warm_up_period", type=int, default=200, help="Number of episodes to warm up the reward buffer.")
+    parser.add_argument("--scheduler_need", action="store_true", default=False, help="Flag to use a learning rate scheduler.")
 
-	# --- Environment Arguments ---
-	parser.add_argument("--environment", type=str, default="StarCraft", choices=["StarCraft", "GFootball"], help="Environment to use.")
-	parser.add_argument("--env", type=str, default="3s5z", help="Specific map or scenario name.")
-	parser.add_argument("--max_time_steps", type=int, default=100, help="Maximum timesteps per episode.")
+    # --- Environment Arguments ---
+    parser.add_argument("--environment", type=str, default="StarCraft", choices=["StarCraft", "GFootball"], help="Environment to use.")
+    parser.add_argument("--env", type=str, default="3s5z", help="Specific map or scenario name.")
+    parser.add_argument("--max_time_steps", type=int, default=100, help="Maximum timesteps per episode.")
 
-	# --- Credit Assignment Arguments ---
-	parser.add_argument("--experiment_type", type=str, default="TAR^2", choices=["episodic_team", "Uniform", "AREL", "STAS", "TAR^2"], help="Credit assignment method to use.")
-	parser.add_argument("--use_reward_model", action="store_true", default=True, help="Flag to use a credit assignment model.")
-	parser.add_argument("--reward_n_heads", type=int, default=4, help="Number of attention heads in the reward model.")
-	parser.add_argument("--reward_depth", type=int, default=3, help="Number of layers in the reward model.")
-	parser.add_argument("--reward_linear_compression_dim", type=int, default=64, help="Embedding dimension in the reward model.")
-	parser.add_argument("--reward_batch_size", type=int, default=64, help="Batch size for reward model updates.")
-	parser.add_argument("--reward_lr", type=float, default=1e-4, help="Learning rate for the reward model.")
-	parser.add_argument("--dynamic_loss_coeffecient", type=float, default=5e-2, help="Coefficient for the inverse dynamics loss.")
-	parser.add_argument("--replay_buffer_size", type=int, default=5000, help="Capacity of the off-policy reward buffer.")
-	parser.add_argument("--update_reward_model_freq", type=int, default=100, help="Frequency of reward model updates (in episodes).")
-	parser.add_argument("--reward_model_update_epochs", type=int, default=200, help="Number of gradient steps per reward model update.")
-	
-	# --- Actor Arguments ---
-	parser.add_argument("--policy_lr", type=float, default=5e-4, help="Actor learning rate.")
-	parser.add_argument("--entropy_pen", type=float, default=6e-3, help="Entropy bonus coefficient.")
-	parser.add_argument("--gae_lambda", type=float, default=0.95, help="GAE lambda parameter.")
-	parser.add_argument("--norm_adv", action="store_true", default=True, help="Flag to normalize advantages.")
-	parser.add_argument("--policy_clip", type=float, default=0.2, help="PPO clipping parameter.")
-	
-	# --- Critic Arguments ---
-	parser.add_argument("--v_value_lr", type=float, default=5e-4, help="Critic learning rate.")
-	parser.add_argument("--norm_returns_v", action="store_true", default=True, help="Flag to use PopArt normalization for returns.")
-	
-	# --- Logging and Saving Arguments ---
-	parser.add_argument("--save_model", action="store_true", default=True, help="Flag to save model checkpoints.")
-	parser.add_argument("--save_model_checkpoint", type=int, default=1000, help="Frequency of model saving (in episodes).")
-	parser.add_argument("--save_comet_ml_plot", action="store_true", default=True, help="Flag to enable Comet.ml logging.")
-	parser.add_argument("--eval_policy", action="store_true", default=True, help="Flag to enable evaluation data saving.")
-	parser.add_argument("--test_num", type=str, default="Learning_Reward_Func_for_Credit_Assignment", help="Test name for logging.")
-	
-	args = parser.parse_args()
-	return vars(args) # Return as a dictionary
+    # --- Credit Assignment Arguments ---
+    parser.add_argument("--experiment_type", type=str, default="TAR^2", choices=["episodic_team", "Uniform", "AREL", "STAS", "TAR^2"], help="Credit assignment method to use.")
+    parser.add_argument("--use_reward_model", action="store_true", default=True, help="Flag to use a credit assignment model.")
+    parser.add_argument("--reward_n_heads", type=int, default=4, help="Number of attention heads in the reward model.")
+    parser.add_argument("--reward_depth", type=int, default=3, help="Number of layers in the reward model.")
+    parser.add_argument("--reward_linear_compression_dim", type=int, default=64, help="Embedding dimension in the reward model.")
+    parser.add_argument("--reward_batch_size", type=int, default=64, help="Batch size for reward model updates.")
+    parser.add_argument("--reward_lr", type=float, default=1e-4, help="Learning rate for the reward model.")
+    parser.add_argument("--reward_weight_decay", type=float, default=0.0, help="Weight decay for the reward model optimizer.")
+    parser.add_argument("--dynamic_loss_coeffecient", type=float, default=5e-2, help="Coefficient for the inverse dynamics loss.")
+    parser.add_argument("--variance_loss_coeff", type=float, default=0.0, help="Coefficient for the variance loss (AREL specific).")
+    parser.add_argument("--replay_buffer_size", type=int, default=5000, help="Capacity of the off-policy reward buffer.")
+    parser.add_argument("--update_reward_model_freq", type=int, default=100, help="Frequency of reward model updates (in episodes).")
+    parser.add_argument("--reward_model_update_epochs", type=int, default=200, help="Number of gradient steps per reward model update.")
+    parser.add_argument("--reward_agent_attn", action="store_true", default=True, help="Flag to use agent attention in AREL.")
+    parser.add_argument("--reward_dropout", type=float, default=0.0, help="Dropout in AREL.")
+    parser.add_argument("--reward_attn_net_wide", action="store_true", default=True, help="Flag to use wide attention in AREL.")
+    parser.add_argument("--version", type=str, default="temporal", choices=["temporal", "agent_temporal"], help="Version of AREL to use.")
+
+    # --- Actor Arguments ---
+    parser.add_argument("--use_recurrent_policy", action="store_true", default=True, help="Flag to use a recurrent policy.")
+    parser.add_argument("--data_chunk_length", type=int, default=10, help="Length of chunks for recurrent policy training.")
+    parser.add_argument("--rnn_num_layers_actor", type=int, default=1, help="Number of RNN layers in the actor.")
+    parser.add_argument("--rnn_hidden_actor", type=int, default=64, help="Hidden dimension of the actor's RNN.")
+    parser.add_argument("--policy_lr", type=float, default=5e-4, help="Actor learning rate.")
+    parser.add_argument("--policy_weight_decay", type=float, default=0.0, help="Weight decay for the actor optimizer.")
+    parser.add_argument("--entropy_pen", type=float, default=6e-3, help="Entropy bonus coefficient.")
+    parser.add_argument("--entropy_pen_final", type=float, default=6e-3, help="Final entropy bonus coefficient.")
+    parser.add_argument("--entropy_pen_steps", type=int, default=20000, help="Steps over which to decay the entropy bonus.")
+    parser.add_argument("--gae_lambda", type=float, default=0.95, help="GAE lambda parameter.")
+    parser.add_argument("--norm_adv", action="store_true", default=True, help="Flag to normalize advantages.")
+    parser.add_argument("--policy_clip", type=float, default=0.2, help="PPO clipping parameter.")
+    parser.add_argument("--enable_grad_clip_actor", action="store_true", default=True, help="Flag to enable gradient clipping for the actor.")
+    parser.add_argument("--grad_clip_actor", type=float, default=0.5, help="Gradient clipping value for the actor.")
+
+    # --- Critic Arguments ---
+    parser.add_argument("--use_recurrent_critic", action="store_true", default=True, help="Flag to use a recurrent critic.")
+    parser.add_argument("--rnn_num_layers_v", type=int, default=1, help="Number of RNN layers in the critic.")
+    parser.add_argument("--rnn_hidden_v", type=int, default=64, help="Hidden dimension of the critic's RNN.")
+    parser.add_argument("--v_comp_emb_shape", type=int, default=64, help="Embedding dimension for the critic's input.")
+    parser.add_argument("--v_value_lr", type=float, default=5e-4, help="Critic learning rate.")
+    parser.add_argument("--v_weight_decay", type=float, default=0.0, help="Weight decay for the critic optimizer.")
+    parser.add_argument("--value_clip", type=float, default=0.2, help="PPO value clipping parameter.")
+    parser.add_argument("--enable_grad_clip_critic_v", action="store_true", default=True, help="Flag to enable gradient clipping for the critic.")
+    parser.add_argument("--grad_clip_critic_v", type=float, default=0.5, help="Gradient clipping value for the critic.")
+    parser.add_argument("--norm_returns_v", action="store_true", default=True, help="Flag to use PopArt normalization for returns.")
+    parser.add_argument("--clamp_rewards", action="store_true", default=False, help="Flag to clamp rewards.")
+    parser.add_argument("--clamp_rewards_value_min", type=float, default=0.0, help="Min value for reward clamping.")
+    parser.add_argument("--clamp_rewards_value_max", type=float, default=2.0, help="Max value for reward clamping.")
+    
+    # --- Logging and Saving Arguments ---
+    parser.add_argument("--save_model", action="store_true", default=True, help="Flag to save model checkpoints.")
+    parser.add_argument("--save_model_checkpoint", type=int, default=1000, help="Frequency of model saving (in episodes).")
+    parser.add_argument("--save_comet_ml_plot", action="store_true", default=True, help="Flag to enable Comet.ml logging.")
+    parser.add_argument("--eval_policy", action="store_true", default=True, help="Flag to enable evaluation data saving.")
+    parser.add_argument("--test_num", type=str, default="Learning_Reward_Func_for_Credit_Assignment", help="Test name for logging.")
+    
+    args = parser.parse_args()
+    return vars(args)
 
 
 if __name__ == '__main__':
