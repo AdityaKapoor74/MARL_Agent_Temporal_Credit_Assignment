@@ -147,6 +147,16 @@ class RolloutBuffer:
 		self.num_episodes = num_episodes
 		self.max_time_steps = max_time_steps
 		self.num_agents = num_agents
+		self.num_enemies = num_enemies if "StarCraft" in self.environment else None
+		self.ally_state_shape = ally_state_shape if "StarCraft" in self.environment else None
+		self.enemy_state_shape = enemy_state_shape if "StarCraft" in self.environment else None
+		self.local_obs_shape = local_obs_shape
+		self.global_obs_shape = global_obs_shape if "GFootball" in self.environment else None
+		self.rnn_num_layers_actor = rnn_num_layers_actor
+		self.actor_hidden_state = actor_hidden_state
+		self.rnn_num_layers_v = rnn_num_layers_v
+		self.v_hidden_state = v_hidden_state
+		self.num_actions = num_actions
 		self.data_chunk_length = data_chunk_length
 		self.norm_returns_v = norm_returns_v
 		self.clamp_rewards = clamp_rewards
