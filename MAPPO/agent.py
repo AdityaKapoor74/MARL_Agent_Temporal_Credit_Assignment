@@ -71,6 +71,61 @@ class PPOAgent:
 		self.gae_lambda = dictionary["gae_lambda"]
 		self.policy_clip = dictionary["policy_clip"]
 		self.norm_adv = dictionary["norm_adv"]
+
+
+		# Arguments for the Critic (Value) network
+		critic_args = {
+			'environment': self.environment,
+			'use_recurrent_critic': dictionary['use_recurrent_critic'],
+			'global_observation_input_dim': self.global_observation_shape,
+			'ally_obs_input_dim': self.ally_observation_shape,
+			'enemy_obs_input_dim': self.enemy_observation_shape,
+			'num_agents': self.num_agents,
+			'num_enemies': self.num_enemies,
+			'num_actions': self.num_actions,
+			'rnn_num_layers': dictionary['rnn_num_layers_v'],
+			'comp_emb_shape': dictionary['v_comp_emb_shape'],
+			'device': self.device
+		}
+
+		# Arguments for the Actor (Policy) network
+		policy_args = {
+			'use_recurrent_policy': dictionary['use_recurrent_policy'],
+			'obs_input_dim': self.local_observation_shape,
+			'num_actions': self.num_actions,
+			'num_agents': self.num_agents,
+			'rnn_num_layers': dictionary['rnn_num_layers_actor'],
+			'rnn_hidden_actor': dictionary['rnn_hidden_actor'],
+			'device': self.device
+		}
+		
+		# Arguments for the on-policy RolloutBuffer
+		buffer_args = {
+			'environment': self.environment,
+			'experiment_type': dictionary['experiment_type'],
+			'num_episodes': dictionary['ppo_eps_elapse_update_freq'],
+			'max_time_steps': self.max_time_steps,
+			'num_agents': self.num_agents,
+			'num_enemies': self.num_enemies,
+			'ally_state_shape': self.ally_observation_shape,
+			'enemy_state_shape': self.enemy_observation_shape,
+			'local_obs_shape': self.local_observation_shape,
+			'global_obs_shape': self.global_observation_shape,
+			'rnn_num_layers_actor': dictionary['rnn_num_layers_actor'],
+			'actor_hidden_state': dictionary['rnn_hidden_actor'],
+			'rnn_num_layers_v': dictionary['rnn_num_layers_v'],
+			'v_hidden_state': dictionary['rnn_hidden_v'],
+			'num_actions': self.num_actions,
+			'data_chunk_length': dictionary['data_chunk_length'],
+			'norm_returns_v': self.norm_returns_v,
+			'clamp_rewards': dictionary['clamp_rewards'],
+			'clamp_rewards_value_min': dictionary['clamp_rewards_value_min'],
+			'clamp_rewards_value_max': dictionary['clamp_rewards_value_max'],
+			'gae_lambda': self.gae_lambda,
+			'gamma': self.gamma
+		}
+
+
 		
 		# --- Initialize Networks ---
 		# Critic Network with optional PopArt normalization for value targets
@@ -79,13 +134,13 @@ class PPOAgent:
 		else:
 			self.V_PopArt = None
 
-		self.critic_network_v = Value(**dictionary).to(self.device)
+		self.critic_network_v = Value(**critic_args).to(self.device)
 		
 		# Policy Network (Actor)
-		self.policy_network = Policy(**dictionary).to(self.device)
+		self.policy_network = Policy(**policy_args).to(self.device)
 
 		# --- Initialize Buffers ---
-		self.buffer = RolloutBuffer(**dictionary)
+		self.buffer = RolloutBuffer(**buffer_args)
 
 		# --- Initialize Optimizers ---
 		self.v_critic_optimizer = optim.AdamW(self.critic_network_v.parameters(), lr=dictionary["v_value_lr"], weight_decay=dictionary["v_weight_decay"], eps=1e-05)
@@ -94,18 +149,77 @@ class PPOAgent:
 		# --- Initialize Credit Assignment Model (if used) ---
 		self.use_reward_model = dictionary["use_reward_model"]
 		if self.use_reward_model:
-			self.reward_buffer = RewardRolloutBuffer(**dictionary)
+			reward_buffer_args = {
+				'environment': self.environment,
+				'capacity': dictionary['replay_buffer_size'],
+				'max_episode_len': self.max_time_steps,
+				'num_agents': self.num_agents,
+				'num_enemies': self.num_enemies,
+				'ally_obs_shape': self.ally_observation_shape,
+				'enemy_obs_shape': self.enemy_observation_shape,
+				'local_obs_shape': self.local_observation_shape,
+				'rnn_num_layers_actor': dictionary['rnn_num_layers_actor'],
+				'actor_hidden_state': dictionary['rnn_hidden_actor'],
+				'action_shape': self.num_actions,
+				'device': self.device
+			}
+			self.reward_buffer = RewardRolloutBuffer(**reward_buffer_args)
 			
 			# Dynamically import and initialize the correct reward model based on experiment type
 			if "TAR^2" in dictionary["experiment_type"]:
 				from TAR2 import TAR2
-				self.reward_model = TAR2.TAR2(**dictionary).to(self.device)
+				reward_model_args = {
+                    'environment': self.environment,
+                    'ally_obs_shape': self.ally_observation_shape,
+                    'enemy_obs_shape': self.enemy_observation_shape,
+                    'n_actions': self.num_actions,
+                    'emb_dim': dictionary['reward_linear_compression_dim'],
+                    'n_heads': dictionary['reward_n_heads'],
+                    'n_layer': dictionary['reward_depth'],
+                    'seq_length': self.max_time_steps,
+                    'n_agents': self.num_agents,
+                    'sample_num': 5, # This is hardcoded in your original file
+                    'device': self.device,
+                    'emb_dropout': 0.0 # This is hardcoded in your original file
+                }
+				self.reward_model = TAR2.TAR2(**reward_model_args).to(self.device)
 			elif "AREL" in dictionary["experiment_type"]:
 				from AREL import AREL
-				self.reward_model = AREL.Time_Agent_Transformer(**dictionary).to(self.device)
+				arel_model_args = {
+                    'environment': self.environment,
+                    'ally_obs_shape': self.ally_observation_shape,
+                    'enemy_obs_shape': self.enemy_observation_shape,
+                    'action_shape': self.num_actions,
+                    'heads': dictionary['reward_n_heads'],
+                    'depth': dictionary['reward_depth'],
+                    'seq_length': self.max_time_steps,
+                    'n_agents': self.num_agents,
+                    'n_actions': self.num_actions,
+                    'agent': dictionary['reward_agent_attn'],
+                    'dropout': dictionary['reward_dropout'],
+                    'wide': dictionary['reward_attn_net_wide'],
+                    'version': dictionary['version'],
+                    'linear_compression_dim': dictionary['reward_linear_compression_dim'],
+                    'device': self.device
+                }
+				self.reward_model = AREL.Time_Agent_Transformer(**arel_model_args).to(self.device)
 			elif "STAS" in dictionary["experiment_type"]:
 				from STAS import stas
-				self.reward_model = stas.STAS_ML(**dictionary).to(self.device)
+				stas_model_args = {
+                    'environment': self.environment,
+                    'ally_obs_shape': self.ally_observation_shape,
+                    'enemy_obs_shape': self.enemy_observation_shape,
+                    'n_actions': self.num_actions,
+                    'emb_dim': dictionary['reward_linear_compression_dim'],
+                    'n_heads': dictionary['reward_n_heads'],
+                    'n_layer': dictionary['reward_depth'],
+                    'seq_length': self.max_time_steps,
+                    'n_agents': self.num_agents,
+                    'sample_num': 5, # This is hardcoded in your original file
+                    'device': self.device,
+                    'emb_dropout': 0.0 # This is hardcoded in your original file
+                }
+				self.reward_model = stas.STAS_ML(**stas_model_args).to(self.device)
 			
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			self.classification_loss = nn.CrossEntropyLoss(reduction="none")
@@ -135,19 +249,19 @@ class PPOAgent:
 
 	def get_action(self, state_policy, last_actions, mask_actions, hidden_state, greedy=False):
 		"""
-        Selects an action for each agent based on the current policy.
+		Selects an action for each agent based on the current policy.
 
-        Args:
-            state_policy: The local observations for each agent.
-            last_actions: The last action taken by each agent.
-            mask_actions: A mask of available actions for each agent.
-            hidden_state: The recurrent state of the policy network.
-            greedy (bool): If True, selects the action with the highest probability (for evaluation).
-                           If False, samples from the action distribution (for training).
+		Args:
+			state_policy: The local observations for each agent.
+			last_actions: The last action taken by each agent.
+			mask_actions: A mask of available actions for each agent.
+			hidden_state: The recurrent state of the policy network.
+			greedy (bool): If True, selects the action with the highest probability (for evaluation).
+						   If False, samples from the action distribution (for training).
 
-        Returns:
-            tuple: A tuple containing the selected actions, their log probabilities, and the next hidden state.
-        """
+		Returns:
+			tuple: A tuple containing the selected actions, their log probabilities, and the next hidden state.
+		"""
 		with torch.no_grad():
 			state_policy = torch.FloatTensor(state_policy).unsqueeze(0).unsqueeze(1).to(self.device)
 			last_actions = torch.LongTensor(last_actions).unsqueeze(0).unsqueeze(1).to(self.device)
@@ -170,15 +284,15 @@ class PPOAgent:
 
 	def reward_model_output(self, eval_reward_model=False):
 		"""
-        Generates shaped rewards using the credit assignment model.
+		Generates shaped rewards using the credit assignment model.
 
-        Args:
-            eval_reward_model (bool): If True, uses only the latest episode for evaluation.
-                                      If False, uses the full on-policy buffer.
+		Args:
+			eval_reward_model (bool): If True, uses only the latest episode for evaluation.
+									  If False, uses the full on-policy buffer.
 
-        Returns:
-            np.array: An array of shaped rewards for each agent at each timestep.
-        """
+		Returns:
+			np.array: An array of shaped rewards for each agent at each timestep.
+		"""
 
 		action_prediction = None
 
@@ -386,9 +500,9 @@ class PPOAgent:
 
 	def update(self, episode):
 		"""
-        Performs the main MAPPO update for the actor and critic networks.
-        This method is called once per PPO update cycle (e.g., every 10 episodes).
-        """
+		Performs the main MAPPO update for the actor and critic networks.
+		This method is called once per PPO update cycle (e.g., every 10 episodes).
+		"""
 		v_value_loss_batch = 0
 		policy_loss_batch = 0
 		entropy_batch = 0
