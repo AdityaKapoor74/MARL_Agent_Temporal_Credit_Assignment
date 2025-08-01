@@ -185,7 +185,6 @@ class PPOAgent:
 				'enemy_obs_shape': self.enemy_observation_shape,
 				'local_obs_shape': self.local_observation_shape,
 				'action_shape': self.num_actions,
-				'device': self.device
 			}
 			self.reward_buffer = RewardRolloutBuffer(**reward_buffer_args)
 			
