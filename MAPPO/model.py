@@ -104,6 +104,7 @@ class Policy(nn.Module):
     def __init__(self, use_recurrent_policy, obs_input_dim, num_actions, num_agents, rnn_num_layers, rnn_hidden_actor, device):
         super(Policy, self).__init__()
         self.use_recurrent_policy = use_recurrent_policy
+        self.rnn_num_layers = rnn_num_layers
         self.rnn_hidden_actor = rnn_hidden_actor
         self.num_agents = num_agents
         self.num_actions = num_actions
