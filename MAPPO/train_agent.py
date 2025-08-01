@@ -271,6 +271,11 @@ def parse_args():
 	parser.add_argument("--reward_attn_net_wide", action="store_true", default=True, help="Flag to use wide attention in AREL.")
 	parser.add_argument("--version", type=str, default="temporal", choices=["temporal", "agent_temporal"], help="Version of AREL to use.")
 	parser.add_argument("--norm_rewards", action="store_true", default=False, help="Flag to normalize rewards.")
+	parser.add_argument("--clamp_rewards", action="store_true", default=False, help="Flag to clamp rewards.")
+	parser.add_argument("--clamp_rewards_value_min", type=float, default=0.0, help="Min value for reward clamping.")
+	parser.add_argument("--clamp_rewards_value_max", type=float, default=2.0, help="Max value for reward clamping.")
+	parser.add_argument("--enable_reward_grad_clip", action="store_true", default=True, help="Flag to enable gradient clipping for the reward model.")
+	parser.add_argument("--reward_grad_clip_value", type=float, default=0.5, help="Gradient clipping value for the reward model.")
 
 	# --- Actor Arguments ---
 	parser.add_argument("--use_recurrent_policy", action="store_true", default=True, help="Flag to use a recurrent policy.")
@@ -299,11 +304,9 @@ def parse_args():
 	parser.add_argument("--enable_grad_clip_critic_v", action="store_true", default=True, help="Flag to enable gradient clipping for the critic.")
 	parser.add_argument("--grad_clip_critic_v", type=float, default=0.5, help="Gradient clipping value for the critic.")
 	parser.add_argument("--norm_returns_v", action="store_true", default=True, help="Flag to use PopArt normalization for returns.")
-	parser.add_argument("--clamp_rewards", action="store_true", default=False, help="Flag to clamp rewards.")
-	parser.add_argument("--clamp_rewards_value_min", type=float, default=0.0, help="Min value for reward clamping.")
-	parser.add_argument("--clamp_rewards_value_max", type=float, default=2.0, help="Max value for reward clamping.")
 	
 	# --- Logging and Saving Arguments ---
+	parser.add_argument("--load_models", action="store_true", default=False, help="Flag to save model checkpoints.")
 	parser.add_argument("--save_model", action="store_true", default=True, help="Flag to save model checkpoints.")
 	parser.add_argument("--save_model_checkpoint", type=int, default=1000, help="Frequency of model saving (in episodes).")
 	parser.add_argument("--save_comet_ml_plot", action="store_true", default=True, help="Flag to enable Comet.ml logging.")
@@ -334,106 +337,108 @@ if __name__ == '__main__':
 	args["critic_dir"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/critic_networks/"
 	args["actor_dir"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/actor_networks/"
 	args["policy_eval_dir"] = f"../../../tests/{args['test_num']}/policy_eval/{args['env']}_{args['experiment_type']}_{extension}/"
+	args["model_path_v_value"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/critic_networks/critic_V_episode10000.pt"
+	args["model_path_policy"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/actor_networks/actor_episode10000.pt"
 
 
 	torch.set_printoptions(profile="full")
 	torch.autograd.set_detect_anomaly(True)
 
 	# for i in range(1, 6):
-	# 	extension = "MAPPO_"+str(i)
-	# 	test_num = "Learning_Reward_Func_for_Credit_Assignment"
-	# 	environment = "StarCraft" # StarCraft/ GFootball
-	# 	env_name = "3s5z" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
-	# 	experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
-	# 	experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
+		# extension = "MAPPO_"+str(i)
+		# test_num = "Learning_Reward_Func_for_Credit_Assignment"
+		# environment = "StarCraft" # StarCraft/ GFootball
+		# env_name = "3s5z" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
+		# experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
+		# experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
 
-	# 	dictionary = {
-	# 			# TRAINING
-	# 			"iteration": i,
-	# 			"device": "gpu",
-	# 			"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
-	# 			"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-	# 			"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-	# 			"n_epochs": 5,
-	# 			"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
-	# 			"environment": environment,
-	# 			"experiment_name": experiment_name,
-	# 			"test_num": test_num,
-	# 			"extension": extension,
-	# 			"gamma": 0.99,
-	# 			"load_models": False,
-	# 			"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
-	# 			"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-	# 			"eval_policy": True,
-	# 			"save_model": True,
-	# 			"save_model_checkpoint": 1000,
-	# 			"save_comet_ml_plot": True,
-	# 			"learn":True,
-	# 			"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
-	# 			"max_time_steps": 100, # 50 (StarCraft environments)/ 200 (GFootball)
-	# 			"experiment_type": experiment_type,
-	# 			"scheduler_need": False,
-	# 			"norm_rewards": False,
-	# 			"clamp_rewards": False,
-	# 			"clamp_rewards_value_min": 0.0,
-	# 			"clamp_rewards_value_max": 2.0,
-	# 			"warm_up_period": 200, # 200
-
-
-	# 			# REWARD MODEL
-	# 			"use_reward_model": True,
-	# 			"reward_n_heads": 4, # 3
-	# 			"reward_depth": 3, # 3
-	# 			"reward_agent_attn": True,
-	# 			"reward_dropout": 0.0,
-	# 			"reward_attn_net_wide": True,
-	# 			"version": "temporal", # temporal, agent_temporal ---- For AREL
-	# 			"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
-	# 			"reward_batch_size": 64, # 128
-	# 			"reward_lr": 1e-4,
-	# 			"reward_weight_decay": 0.0,
-	# 			"dynamic_loss_coeffecient": 5e-2,
-	# 			"variance_loss_coeff": 0.0,
-	# 			"enable_reward_grad_clip": True,
-	# 			"reward_grad_clip_value": 0.5,
-	# 			"replay_buffer_size": 5000,
-	# 			"update_reward_model_freq": 100, # 100
-	# 			"reward_model_update_epochs": 200, # 200
-	# 			"norm_rewards": False,
+		# dictionary = {
+		# 		# TRAINING
+		# 		"iteration": i,
+		# 		"device": "gpu",
+		# 		"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
+		# 		"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+		# 		"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+		# 		"n_epochs": 5,
+		# 		"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+		# 		"environment": environment,
+		# 		"experiment_name": experiment_name,
+		# 		"test_num": test_num,
+		# 		"extension": extension,
+		# 		"gamma": 0.99,
+		# 		"load_models": False,
+		# 		"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
+		# 		"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
+		# 		"eval_policy": True,
+		# 		"save_model": True,
+		# 		"save_model_checkpoint": 1000,
+		# 		"save_comet_ml_plot": True,
+		# 		"learn":True,
+		# 		"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
+		# 		"max_time_steps": 100, # 50 (StarCraft environments)/ 200 (GFootball)
+		# 		"experiment_type": experiment_type,
+		# 		"scheduler_need": False,
+		# 		"norm_rewards": False,
+		# 		"clamp_rewards": False,
+		# 		"clamp_rewards_value_min": 0.0,
+		# 		"clamp_rewards_value_max": 2.0,
+		# 		"warm_up_period": 200, # 200
 
 
-	# 			# ENVIRONMENT
-	# 			"env": env_name,
+		# 		# REWARD MODEL
+		# 		"use_reward_model": True,
+		# 		"reward_n_heads": 4, # 3
+		# 		"reward_depth": 3, # 3
+		# 		"reward_agent_attn": True,
+		# 		"reward_dropout": 0.0,
+		# 		"reward_attn_net_wide": True,
+		# 		"version": "temporal", # temporal, agent_temporal ---- For AREL
+		# 		"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
+		# 		"reward_batch_size": 64, # 128
+		# 		"reward_lr": 1e-4,
+		# 		"reward_weight_decay": 0.0,
+		# 		"dynamic_loss_coeffecient": 5e-2,
+		# 		"variance_loss_coeff": 0.0,
+		# 		"enable_reward_grad_clip": True,
+		# 		"reward_grad_clip_value": 0.5,
+		# 		"replay_buffer_size": 5000,
+		# 		"update_reward_model_freq": 100, # 100
+		# 		"reward_model_update_epochs": 200, # 200
+		# 		"norm_rewards": False,
 
-	# 			# CRITIC
-	# 			"use_recurrent_critic": True,
-	# 			"rnn_num_layers_v": 1,
-	# 			"rnn_hidden_v": 64,
-	# 			"v_value_lr": 5e-4, #1e-3
-	# 			"v_weight_decay": 0.0,
-	# 			"v_comp_emb_shape": 64,
-	# 			"enable_grad_clip_critic_v": True,
-	# 			"grad_clip_critic_v": 0.5,
-	# 			"value_clip": 0.2,
-	# 			"norm_returns_v": True,
+
+		# 		# ENVIRONMENT
+		# 		"env": env_name,
+
+		# 		# CRITIC
+		# 		"use_recurrent_critic": True,
+		# 		"rnn_num_layers_v": 1,
+		# 		"rnn_hidden_v": 64,
+		# 		"v_value_lr": 5e-4, #1e-3
+		# 		"v_weight_decay": 0.0,
+		# 		"v_comp_emb_shape": 64,
+		# 		"enable_grad_clip_critic_v": True,
+		# 		"grad_clip_critic_v": 0.5,
+		# 		"value_clip": 0.2,
+		# 		"norm_returns_v": True,
 				
 
-	# 			# ACTOR
-	# 			"use_recurrent_policy": True,
-	# 			"data_chunk_length": 10,
-	# 			"rnn_num_layers_actor": 1,
-	# 			"rnn_hidden_actor": 64,
-	# 			"enable_grad_clip_actor": True,
-	# 			"grad_clip_actor": 0.5,
-	# 			"policy_clip": 0.2,
-	# 			"policy_lr": 5e-4, 
-	# 			"policy_weight_decay": 0.0,
-	# 			"entropy_pen": 6e-3, #8e-3
-	# 			"entropy_pen_final": 6e-3,
-	# 			"entropy_pen_steps": 20000,
-	# 			"gae_lambda": 0.95,
-	# 			"norm_adv": True,
-	# 		}
+		# 		# ACTOR
+		# 		"use_recurrent_policy": True,
+		# 		"data_chunk_length": 10,
+		# 		"rnn_num_layers_actor": 1,
+		# 		"rnn_hidden_actor": 64,
+		# 		"enable_grad_clip_actor": True,
+		# 		"grad_clip_actor": 0.5,
+		# 		"policy_clip": 0.2,
+		# 		"policy_lr": 5e-4, 
+		# 		"policy_weight_decay": 0.0,
+		# 		"entropy_pen": 6e-3, #8e-3
+		# 		"entropy_pen_final": 6e-3,
+		# 		"entropy_pen_steps": 20000,
+		# 		"gae_lambda": 0.95,
+		# 		"norm_adv": True,
+		# 	}
 
 	# 	seeds = [42, 142, 242, 342, 442]
 	# 	torch.manual_seed(seeds[dictionary["iteration"]-1])

@@ -158,6 +158,21 @@ class PPOAgent:
 		self.v_critic_optimizer = optim.AdamW(self.critic_network_v.parameters(), lr=dictionary["v_value_lr"], weight_decay=dictionary["v_weight_decay"], eps=1e-05)
 		self.policy_optimizer = optim.AdamW(self.policy_network.parameters(), lr=dictionary["policy_lr"], weight_decay=dictionary["policy_weight_decay"], eps=1e-05)
 
+		if dictionary["load_models"]:
+			# For CPU
+			if torch.cuda.is_available() is False:
+				self.critic_network_v.load_state_dict(torch.load(dictionary["model_path_v_value"], map_location=torch.device('cpu')))
+				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"], map_location=torch.device('cpu')))
+			# For GPU
+			else:
+				self.critic_network_v.load_state_dict(torch.load(dictionary["model_path_v_value"]))
+				self.policy_network.load_state_dict(torch.load(dictionary["model_path_policy"]))
+
+
+		if self.scheduler_need:
+			self.scheduler_policy = optim.lr_scheduler.MultiStepLR(self.policy_optimizer, milestones=[1000, 20000], gamma=0.1)
+			self.scheduler_v_critic = optim.lr_scheduler.MultiStepLR(self.v_critic_optimizer, milestones=[1000, 20000], gamma=0.1)
+
 		# --- Initialize Credit Assignment Model (if used) ---
 		self.use_reward_model = dictionary["use_reward_model"]
 		if self.use_reward_model:
@@ -244,10 +259,9 @@ class PPOAgent:
 				else:
 					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"]))
 
+			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			if self.scheduler_need:
 				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
-
-			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			self.classification_loss = nn.CrossEntropyLoss(reduction="none")
 		else:
 			self.reward_model = None
