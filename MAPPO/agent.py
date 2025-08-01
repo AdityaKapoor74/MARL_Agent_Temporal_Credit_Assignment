@@ -39,6 +39,20 @@ class PPOAgent:
 		# --- Unpack all hyperparameters from the dictionary ---
 		# Environment Setup
 		self.environment = dictionary["environment"]
+		self.experiment_type = dictionary["experiment_type"]
+		self.norm_rewards = dictionary["norm_rewards"]
+		self.scheduler_need = dictionary["scheduler_need"]
+		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
+		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
+		self.dynamic_loss_coeffecient = dictionary["dynamic_loss_coeffecient"]
+		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
+		self.entropy_pen = dictionary["entropy_pen"]
+		self.entropy_pen_decay = dictionary["entropy_pen_decay"]
+		self.entropy_pen_final = dictionary["entropy_pen_final"]
+		self.grad_clip_actor = dictionary["grad_clip_actor"]
+		self.grad_clip_critic_v = dictionary["grad_clip_critic_v"]
+		self.enable_grad_clip_actor = dictionary["enable_grad_clip_actor"]
+		self.enable_grad_clip_critic_v = dictionary["enable_grad_clip_critic_v"]
 		self.env_name = dictionary["env"]
 		self.num_agents = dictionary["num_agents"]
 		self.num_actions = dictionary["num_actions"]
@@ -125,8 +139,6 @@ class PPOAgent:
 			'gamma': self.gamma
 		}
 
-
-		
 		# --- Initialize Networks ---
 		# Critic Network with optional PopArt normalization for value targets
 		if self.norm_returns_v:
@@ -220,7 +232,21 @@ class PPOAgent:
                     'emb_dropout': 0.0 # This is hardcoded in your original file
                 }
 				self.reward_model = stas.STAS_ML(**stas_model_args).to(self.device)
+
+			if self.norm_rewards:
+				self.reward_normalizer = PopArt(input_shape=1, num_agents=self.num_agents, device=self.device)
 			
+			if dictionary["load_models"]:
+				# For CPU
+				if torch.cuda.is_available() is False:
+					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"], map_location=torch.device('cpu')))
+				# For GPU
+				else:
+					self.reward_model.load_state_dict(torch.load(dictionary["model_path_reward_net"]))
+
+			if self.scheduler_need:
+				self.scheduler_reward = optim.lr_scheduler.MultiStepLR(self.reward_optimizer, milestones=[10000, 30000], gamma=0.5)
+
 			self.reward_optimizer = optim.AdamW(self.reward_model.parameters(), lr=dictionary["reward_lr"], weight_decay=dictionary["reward_weight_decay"], eps=1e-5)
 			self.classification_loss = nn.CrossEntropyLoss(reduction="none")
 		else:
@@ -361,9 +387,9 @@ class PPOAgent:
 					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
 					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
 
-					episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
+					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
 					
-					return ((temporal_weights*agent_weights).cpu()*episodic_rewards).numpy()
+					return ((temporal_weights*agent_weights).cpu()*episodic_reward_batch.unsqueeze(-1)).numpy()
 
 			elif "STAS" in self.experiment_type:
 
@@ -459,7 +485,7 @@ class PPOAgent:
 
 			rewards = rewards.transpose(1, 2) * agent_masks_batch
 
-			reward_loss = F.mse_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
+			reward_loss = F.huber_loss(rewards.reshape(actions_batch.shape[0], -1).sum(dim=-1), episodic_reward_batch)
 
 		self.reward_optimizer.zero_grad()
 		reward_loss.backward()
@@ -564,9 +590,10 @@ class PPOAgent:
 
 			critic_v_loss_1 = F.huber_loss(values, target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
 			critic_v_loss_2 = F.huber_loss(torch.clamp(values, values_old.to(self.device)-self.value_clip, values_old.to(self.device)+self.value_clip), target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
-		
 				
 			critic_v_loss = torch.max(critic_v_loss_1, critic_v_loss_2)
+
+			print("Critic Loss", critic_v_loss_1, critic_v_loss_2, critic_v_loss)
 			
 			# Perform gradient update for the critic
 			self.v_critic_optimizer.zero_grad()
