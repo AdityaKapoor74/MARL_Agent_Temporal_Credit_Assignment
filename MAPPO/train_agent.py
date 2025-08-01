@@ -412,7 +412,7 @@ if __name__ == '__main__':
 		import gym
 		import smaclite  # noqa
 		
-		env = gym.make(f"smaclite/{args["env"]}-v0", use_cpp_rvo2=USE_CPP_RVO2)
+		env = gym.make(f"smaclite/{args['env']}-v0", use_cpp_rvo2=USE_CPP_RVO2)
 		obs, info = env.reset(return_info=True)
 		args["ally_observation_shape"] = info["ally_states"][0].shape[0]
 		args["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
