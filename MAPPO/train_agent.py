@@ -143,6 +143,7 @@ class MAPPO:
 
 				# Process environment-specific outputs
 				if "StarCraft" in self.environment:
+					next_global_obs = None
 					next_ally_states = np.array(next_info["ally_states"])
 					next_enemy_states = np.array(next_info["enemy_states"])
 					next_mask_actions = np.array(next_info["avail_actions"], dtype=int)
