@@ -306,7 +306,7 @@ class TAR2(nn.Module):
 			x = x.reshape(b, n_a, t, -1)
 			
 			# Agent attention
-			x = layer[1](x)
+			x = layer[1](x, agent_temporal_mask)
 			agent_scores.append(layer[1].phi.agent_scores)
 			agent_weights.append(layer[1].phi.agent_weights)
 			
