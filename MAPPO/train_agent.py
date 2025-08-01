@@ -13,6 +13,7 @@ The script is configured via a dictionary and can be run for different environme
 like StarCraft II (via SMACLite) and Google Research Football.
 """
 import os
+import argparse
 from comet_ml import Experiment
 import numpy as np
 from agent import PPOAgent
@@ -227,256 +228,328 @@ class MAPPO:
 				torch.save(self.agents.policy_network.state_dict(), f'{self.actor_model_path}_episode{episode}.pt')
 				
 
+def parse_args():
+	"""
+	Parses command-line arguments for the training script.
+	"""
+	parser = argparse.ArgumentParser(description="Train MAPPO with various credit assignment methods.")
+	
+	# --- General Training Arguments ---
+	parser.add_argument("--iteration", type=int, default=1, help="Seed and iteration number for the run.")
+	parser.add_argument("--device", type=str, default="gpu", choices=["gpu", "cpu"], help="Device to use for training.")
+	parser.add_argument("--n_epochs", type=int, default=5, help="Number of PPO update epochs.")
+	parser.add_argument("--ppo_eps_elapse_update_freq", type=int, default=10, help="Update PPO agent after this many episodes.")
+	parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
+	parser.add_argument("--learn", action="store_true", default=True, help="Flag to enable learning.")
+	parser.add_argument("--max_episodes", type=int, default=30000, help="Maximum number of training episodes.")
+	parser.add_argument("--warm_up_period", type=int, default=200, help="Number of episodes to warm up the reward buffer.")
+
+	# --- Environment Arguments ---
+	parser.add_argument("--environment", type=str, default="StarCraft", choices=["StarCraft", "GFootball"], help="Environment to use.")
+	parser.add_argument("--env", type=str, default="3s5z", help="Specific map or scenario name.")
+	parser.add_argument("--max_time_steps", type=int, default=100, help="Maximum timesteps per episode.")
+
+	# --- Credit Assignment Arguments ---
+	parser.add_argument("--experiment_type", type=str, default="TAR^2", choices=["episodic_team", "Uniform", "AREL", "STAS", "TAR^2"], help="Credit assignment method to use.")
+	parser.add_argument("--use_reward_model", action="store_true", default=True, help="Flag to use a credit assignment model.")
+	parser.add_argument("--reward_n_heads", type=int, default=4, help="Number of attention heads in the reward model.")
+	parser.add_argument("--reward_depth", type=int, default=3, help="Number of layers in the reward model.")
+	parser.add_argument("--reward_linear_compression_dim", type=int, default=64, help="Embedding dimension in the reward model.")
+	parser.add_argument("--reward_batch_size", type=int, default=64, help="Batch size for reward model updates.")
+	parser.add_argument("--reward_lr", type=float, default=1e-4, help="Learning rate for the reward model.")
+	parser.add_argument("--dynamic_loss_coeffecient", type=float, default=5e-2, help="Coefficient for the inverse dynamics loss.")
+	parser.add_argument("--replay_buffer_size", type=int, default=5000, help="Capacity of the off-policy reward buffer.")
+	parser.add_argument("--update_reward_model_freq", type=int, default=100, help="Frequency of reward model updates (in episodes).")
+	parser.add_argument("--reward_model_update_epochs", type=int, default=200, help="Number of gradient steps per reward model update.")
+	
+	# --- Actor Arguments ---
+	parser.add_argument("--policy_lr", type=float, default=5e-4, help="Actor learning rate.")
+	parser.add_argument("--entropy_pen", type=float, default=6e-3, help="Entropy bonus coefficient.")
+	parser.add_argument("--gae_lambda", type=float, default=0.95, help="GAE lambda parameter.")
+	parser.add_argument("--norm_adv", action="store_true", default=True, help="Flag to normalize advantages.")
+	parser.add_argument("--policy_clip", type=float, default=0.2, help="PPO clipping parameter.")
+	
+	# --- Critic Arguments ---
+	parser.add_argument("--v_value_lr", type=float, default=5e-4, help="Critic learning rate.")
+	parser.add_argument("--norm_returns_v", action="store_true", default=True, help="Flag to use PopArt normalization for returns.")
+	
+	# --- Logging and Saving Arguments ---
+	parser.add_argument("--save_model", action="store_true", default=True, help="Flag to save model checkpoints.")
+	parser.add_argument("--save_model_checkpoint", type=int, default=1000, help="Frequency of model saving (in episodes).")
+	parser.add_argument("--save_comet_ml_plot", action="store_true", default=True, help="Flag to enable Comet.ml logging.")
+	parser.add_argument("--eval_policy", action="store_true", default=True, help="Flag to enable evaluation data saving.")
+	parser.add_argument("--test_num", type=str, default="Learning_Reward_Func_for_Credit_Assignment", help="Test name for logging.")
+	
+	args = parser.parse_args()
+	return vars(args) # Return as a dictionary
+
+
 if __name__ == '__main__':
 	# This block sets up the configuration dictionary and launches the training run.
 	# It allows for easy configuration of different environments, baselines, and hyperparameters.
 	RENDER = False
 	USE_CPP_RVO2 = False
 
+	# --- Parse Arguments and Set Up ---
+	args = parse_args()
+	
+	# Set seed for reproducibility
+	seeds = [42, 142, 242, 342, 442]
+	torch.manual_seed(seeds[args["iteration"] - 1])
+	np.random.seed(seeds[args["iteration"] - 1])
+
+	# --- Create Dynamic Configuration Dictionary ---
+	extension = f"MAPPO_{args['iteration']}"
+	args["experiment_name"] = f"MAPPO_{args['experiment_type']}"
+	args["critic_dir"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/critic_networks/"
+	args["actor_dir"] = f"../../../tests/{args['test_num']}/models/{args['env']}_{args['experiment_type']}_{extension}/actor_networks/"
+	args["policy_eval_dir"] = f"../../../tests/{args['test_num']}/policy_eval/{args['env']}_{args['experiment_type']}_{extension}/"
+
+
 	torch.set_printoptions(profile="full")
 	torch.autograd.set_detect_anomaly(True)
 
-	for i in range(1, 6):
-		extension = "MAPPO_"+str(i)
-		test_num = "Learning_Reward_Func_for_Credit_Assignment"
-		environment = "StarCraft" # StarCraft/ GFootball
-		env_name = "3s5z" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
-		experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
-		experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
+	# for i in range(1, 6):
+	# 	extension = "MAPPO_"+str(i)
+	# 	test_num = "Learning_Reward_Func_for_Credit_Assignment"
+	# 	environment = "StarCraft" # StarCraft/ GFootball
+	# 	env_name = "3s5z" # 5m_vs_6m, 10m_vs_11m, 3s5z/ academy_3_vs_1_with_keeper, academy_counterattack_easy, academy_run_pass_and_shoot_with_keeper 
+	# 	experiment_type = "TAR^2" # episodic_team, episodic_agent, temporal_team, temporal_agent, Uniform, AREL, STAS, TAR^2
+	# 	experiment_name = "MAPPO_TAR^2" # MAPPO_TAR^2, MAPPO_AREL, MAPPO_STAS, MAPPO_Uniform, MAPPO_temporal, MAPPO_agent_temporal, MAPPO_episodic_agent, MAPPO_episodic_team
 
-		dictionary = {
-				# TRAINING
-				"iteration": i,
-				"device": "gpu",
-				"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
-				"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
-				"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
-				"n_epochs": 5,
-				"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
-				"environment": environment,
-				"experiment_name": experiment_name,
-				"test_num": test_num,
-				"extension": extension,
-				"gamma": 0.99,
-				"load_models": False,
-				"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
-				"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
-				"eval_policy": True,
-				"save_model": True,
-				"save_model_checkpoint": 1000,
-				"save_comet_ml_plot": True,
-				"learn":True,
-				"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
-				"max_time_steps": 100, # 50 (StarCraft environments)/ 200 (GFootball)
-				"experiment_type": experiment_type,
-				"scheduler_need": False,
-				"norm_rewards": False,
-				"clamp_rewards": False,
-				"clamp_rewards_value_min": 0.0,
-				"clamp_rewards_value_max": 2.0,
-				"warm_up_period": 200, # 200
-
-
-				# REWARD MODEL
-				"use_reward_model": True,
-				"reward_n_heads": 4, # 3
-				"reward_depth": 3, # 3
-				"reward_agent_attn": True,
-				"reward_dropout": 0.0,
-				"reward_attn_net_wide": True,
-				"version": "temporal", # temporal, agent_temporal ---- For AREL
-				"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
-				"reward_batch_size": 64, # 128
-				"reward_lr": 1e-4,
-				"reward_weight_decay": 0.0,
-				"dynamic_loss_coeffecient": 5e-2,
-				"variance_loss_coeff": 0.0,
-				"enable_reward_grad_clip": True,
-				"reward_grad_clip_value": 0.5,
-				"replay_buffer_size": 5000,
-				"update_reward_model_freq": 100, # 100
-				"reward_model_update_epochs": 200, # 200
-				"norm_rewards": False,
+	# 	dictionary = {
+	# 			# TRAINING
+	# 			"iteration": i,
+	# 			"device": "gpu",
+	# 			"critic_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/critic_networks/',
+	# 			"actor_dir": '../../../tests/'+test_num+'/models/'+env_name+'_'+experiment_type+'_'+extension+'/actor_networks/',
+	# 			"policy_eval_dir":'../../../tests/'+test_num+'/policy_eval/'+env_name+'_'+experiment_type+'_'+extension+'/',
+	# 			"n_epochs": 5,
+	# 			"ppo_eps_elapse_update_freq": 10, # update ppo agent after every ppo_eps_elapse_update_freq episodes; 10 (StarCraft/MPE/PressurePlate/LBF)/ 5 (PettingZoo)
+	# 			"environment": environment,
+	# 			"experiment_name": experiment_name,
+	# 			"test_num": test_num,
+	# 			"extension": extension,
+	# 			"gamma": 0.99,
+	# 			"load_models": False,
+	# 			"model_path_v_value": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/critic_networks/critic_V_epsiode10000.pt",
+	# 			"model_path_policy": "../../tests/RLC_2024/relevant_set_visualization/crossing_team_greedy/prd_soft_advantage/models/crossing_team_greedy_prd_soft_advantage_MAPPO_1/actor_networks/actor_epsiode10000.pt",
+	# 			"eval_policy": True,
+	# 			"save_model": True,
+	# 			"save_model_checkpoint": 1000,
+	# 			"save_comet_ml_plot": True,
+	# 			"learn":True,
+	# 			"max_episodes": 30000, # 30000 (StarCraft environments)/ 120000 (GFootball)
+	# 			"max_time_steps": 100, # 50 (StarCraft environments)/ 200 (GFootball)
+	# 			"experiment_type": experiment_type,
+	# 			"scheduler_need": False,
+	# 			"norm_rewards": False,
+	# 			"clamp_rewards": False,
+	# 			"clamp_rewards_value_min": 0.0,
+	# 			"clamp_rewards_value_max": 2.0,
+	# 			"warm_up_period": 200, # 200
 
 
-				# ENVIRONMENT
-				"env": env_name,
+	# 			# REWARD MODEL
+	# 			"use_reward_model": True,
+	# 			"reward_n_heads": 4, # 3
+	# 			"reward_depth": 3, # 3
+	# 			"reward_agent_attn": True,
+	# 			"reward_dropout": 0.0,
+	# 			"reward_attn_net_wide": True,
+	# 			"version": "temporal", # temporal, agent_temporal ---- For AREL
+	# 			"reward_linear_compression_dim": 64, # 16 for TAR^2_agent_temporal
+	# 			"reward_batch_size": 64, # 128
+	# 			"reward_lr": 1e-4,
+	# 			"reward_weight_decay": 0.0,
+	# 			"dynamic_loss_coeffecient": 5e-2,
+	# 			"variance_loss_coeff": 0.0,
+	# 			"enable_reward_grad_clip": True,
+	# 			"reward_grad_clip_value": 0.5,
+	# 			"replay_buffer_size": 5000,
+	# 			"update_reward_model_freq": 100, # 100
+	# 			"reward_model_update_epochs": 200, # 200
+	# 			"norm_rewards": False,
 
-				# CRITIC
-				"use_recurrent_critic": True,
-				"rnn_num_layers_v": 1,
-				"rnn_hidden_v": 64,
-				"v_value_lr": 5e-4, #1e-3
-				"v_weight_decay": 0.0,
-				"v_comp_emb_shape": 64,
-				"enable_grad_clip_critic_v": True,
-				"grad_clip_critic_v": 0.5,
-				"value_clip": 0.2,
-				"norm_returns_v": True,
+
+	# 			# ENVIRONMENT
+	# 			"env": env_name,
+
+	# 			# CRITIC
+	# 			"use_recurrent_critic": True,
+	# 			"rnn_num_layers_v": 1,
+	# 			"rnn_hidden_v": 64,
+	# 			"v_value_lr": 5e-4, #1e-3
+	# 			"v_weight_decay": 0.0,
+	# 			"v_comp_emb_shape": 64,
+	# 			"enable_grad_clip_critic_v": True,
+	# 			"grad_clip_critic_v": 0.5,
+	# 			"value_clip": 0.2,
+	# 			"norm_returns_v": True,
 				
 
-				# ACTOR
-				"use_recurrent_policy": True,
-				"data_chunk_length": 10,
-				"rnn_num_layers_actor": 1,
-				"rnn_hidden_actor": 64,
-				"enable_grad_clip_actor": True,
-				"grad_clip_actor": 0.5,
-				"policy_clip": 0.2,
-				"policy_lr": 5e-4, 
-				"policy_weight_decay": 0.0,
-				"entropy_pen": 6e-3, #8e-3
-				"entropy_pen_final": 6e-3,
-				"entropy_pen_steps": 20000,
-				"gae_lambda": 0.95,
-				"norm_adv": True,
-			}
+	# 			# ACTOR
+	# 			"use_recurrent_policy": True,
+	# 			"data_chunk_length": 10,
+	# 			"rnn_num_layers_actor": 1,
+	# 			"rnn_hidden_actor": 64,
+	# 			"enable_grad_clip_actor": True,
+	# 			"grad_clip_actor": 0.5,
+	# 			"policy_clip": 0.2,
+	# 			"policy_lr": 5e-4, 
+	# 			"policy_weight_decay": 0.0,
+	# 			"entropy_pen": 6e-3, #8e-3
+	# 			"entropy_pen_final": 6e-3,
+	# 			"entropy_pen_steps": 20000,
+	# 			"gae_lambda": 0.95,
+	# 			"norm_adv": True,
+	# 		}
 
-		seeds = [42, 142, 242, 342, 442]
-		torch.manual_seed(seeds[dictionary["iteration"]-1])
+	# 	seeds = [42, 142, 242, 342, 442]
+	# 	torch.manual_seed(seeds[dictionary["iteration"]-1])
 		
-		if "StarCraft" in dictionary["environment"]:
-			import gym
-			import smaclite  # noqa
-			
-			env = gym.make(f"smaclite/{env_name}-v0", use_cpp_rvo2=USE_CPP_RVO2)
-			obs, info = env.reset(return_info=True)
-			dictionary["ally_observation_shape"] = info["ally_states"][0].shape[0]
-			dictionary["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
-			dictionary["local_observation_shape"] = obs[0].shape[0]
-			dictionary["num_agents"] = env.n_agents
-			dictionary["num_enemies"] = env.n_enemies
-			dictionary["num_actions"] = env.action_space[0].n
-		elif "GFootball" in dictionary["environment"]:
-			import random
+	if "StarCraft" in args["environment"]:
+		import gym
+		import smaclite  # noqa
+		
+		env = gym.make(f"smaclite/{args["env"]}-v0", use_cpp_rvo2=USE_CPP_RVO2)
+		obs, info = env.reset(return_info=True)
+		args["ally_observation_shape"] = info["ally_states"][0].shape[0]
+		args["enemy_observation_shape"] = info["enemy_states"][0].shape[0]
+		args["local_observation_shape"] = obs[0].shape[0]
+		args["num_agents"] = env.n_agents
+		args["num_enemies"] = env.n_enemies
+		args["num_actions"] = env.action_space[0].n
+	elif "GFootball" in args["environment"]:
+		import random
 
-			import gfootball.env as football_env
-			from gym import spaces
-			import numpy as np
-
-
-			class FootballEnv(object):
-				'''Wrapper to make Google Research Football environment compatible'''
-
-				def __init__(self, ):
-					self.scenario_name = env_name
-
-					if self.scenario_name == "academy_3_vs_1_with_keeper":
-						'''
-						num_env_steps=25000000
-						episode_length=200
-						'''
-						self.num_agents = 3
-					elif self.scenario_name in ["academy_counterattack_easy", "academy_counterattack_hard"]:
-						'''
-						num_env_steps=25000000
-						episode_length=200
-						'''
-						self.num_agents = 4
-					elif self.scenario_name == "academy_corner":
-						'''
-						num_env_steps=50000000
-						episode_length=1000
-						'''
-						self.num_agents = 10
-					elif self.scenario_name in ["academy_run_and_pass_with_keeper", "academy_run_pass_and_shoot_with_keeper"]:
-						'''
-						num_env_steps=25000000
-						episode_length=200
-						'''
-						self.num_agents = 2
-
-					self.env = football_env.create_environment(
-					  env_name=self.scenario_name,
-					  stacked=False,
-					  representation="simple115v2",
-					  rewards="scoring,checkpoints",
-					  number_of_left_players_agent_controls=self.num_agents,
-					  number_of_right_players_agent_controls=0,
-					  channel_dimensions=(96, 72),
-					  render=(False and False)
-					)
-						
-					self.max_steps = self.env.unwrapped.observation()[0]["steps_left"]
-					self.remove_redundancy = False
-					self.zero_feature = False
-					self.share_reward = True
-					self.action_space = []
-					self.observation_space = []
-					self.share_observation_space = []
-
-					if self.num_agents == 1:
-						self.action_space.append(self.env.action_space)
-						self.observation_space.append(self.env.observation_space)
-						self.share_observation_space.append(self.env.observation_space)
-					else:
-						for idx in range(self.num_agents):
-							self.action_space.append(spaces.Discrete(
-								n=self.env.action_space[idx].n
-							))
-							self.observation_space.append(spaces.Box(
-								low=self.env.observation_space.low[idx],
-								high=self.env.observation_space.high[idx],
-								shape=self.env.observation_space.shape[1:],
-								dtype=self.env.observation_space.dtype
-							))
-							self.share_observation_space.append(spaces.Box(
-								low=self.env.observation_space.low[idx],
-								high=self.env.observation_space.high[idx],
-								shape=self.env.observation_space.shape[1:],
-								dtype=self.env.observation_space.dtype
-							))
+		import gfootball.env as football_env
+		from gym import spaces
+		import numpy as np
 
 
-				def reset(self):
-					obs = self.env.reset()
-					obs = self._obs_wrapper(obs)
+		class FootballEnv(object):
+			'''Wrapper to make Google Research Football environment compatible'''
+
+			def __init__(self, env_name):
+				self.scenario_name = env_name
+
+				if self.scenario_name == "academy_3_vs_1_with_keeper":
+					'''
+					num_env_steps=25000000
+					episode_length=200
+					'''
+					self.num_agents = 3
+				elif self.scenario_name in ["academy_counterattack_easy", "academy_counterattack_hard"]:
+					'''
+					num_env_steps=25000000
+					episode_length=200
+					'''
+					self.num_agents = 4
+				elif self.scenario_name == "academy_corner":
+					'''
+					num_env_steps=50000000
+					episode_length=1000
+					'''
+					self.num_agents = 10
+				elif self.scenario_name in ["academy_run_and_pass_with_keeper", "academy_run_pass_and_shoot_with_keeper"]:
+					'''
+					num_env_steps=25000000
+					episode_length=200
+					'''
+					self.num_agents = 2
+
+				self.env = football_env.create_environment(
+					env_name=self.scenario_name,
+					stacked=False,
+					representation="simple115v2",
+					rewards="scoring,checkpoints",
+					number_of_left_players_agent_controls=self.num_agents,
+					number_of_right_players_agent_controls=0,
+					channel_dimensions=(96, 72),
+					render=(False and False)
+				)
+					
+				self.max_steps = self.env.unwrapped.observation()[0]["steps_left"]
+				self.remove_redundancy = False
+				self.zero_feature = False
+				self.share_reward = True
+				self.action_space = []
+				self.observation_space = []
+				self.share_observation_space = []
+
+				if self.num_agents == 1:
+					self.action_space.append(self.env.action_space)
+					self.observation_space.append(self.env.observation_space)
+					self.share_observation_space.append(self.env.observation_space)
+				else:
+					for idx in range(self.num_agents):
+						self.action_space.append(spaces.Discrete(
+							n=self.env.action_space[idx].n
+						))
+						self.observation_space.append(spaces.Box(
+							low=self.env.observation_space.low[idx],
+							high=self.env.observation_space.high[idx],
+							shape=self.env.observation_space.shape[1:],
+							dtype=self.env.observation_space.dtype
+						))
+						self.share_observation_space.append(spaces.Box(
+							low=self.env.observation_space.low[idx],
+							high=self.env.observation_space.high[idx],
+							shape=self.env.observation_space.shape[1:],
+							dtype=self.env.observation_space.dtype
+						))
+
+
+			def reset(self):
+				obs = self.env.reset()
+				obs = self._obs_wrapper(obs)
+				return obs
+
+			def step(self, action):
+				obs, reward, done, info = self.env.step(action)
+				obs = self._obs_wrapper(obs)
+				reward = reward.reshape(self.num_agents, 1)
+				if self.share_reward:
+					global_reward = np.sum(reward)
+					reward = [[global_reward]] * self.num_agents
+
+				done = np.array([done] * self.num_agents)
+				info = self._info_wrapper(info)
+				return obs, reward, done, info
+
+			def seed(self, seed=None):
+				if seed is None:
+					random.seed(1)
+				else:
+					random.seed(seed)
+
+			def close(self):
+				self.env.close()
+
+			def _obs_wrapper(self, obs):
+				if self.num_agents == 1:
+					return obs[np.newaxis, :]
+				else:
 					return obs
 
-				def step(self, action):
-					obs, reward, done, info = self.env.step(action)
-					obs = self._obs_wrapper(obs)
-					reward = reward.reshape(self.num_agents, 1)
-					if self.share_reward:
-						global_reward = np.sum(reward)
-						reward = [[global_reward]] * self.num_agents
-
-					done = np.array([done] * self.num_agents)
-					info = self._info_wrapper(info)
-					return obs, reward, done, info
-
-				def seed(self, seed=None):
-					if seed is None:
-						random.seed(1)
-					else:
-						random.seed(seed)
-
-				def close(self):
-					self.env.close()
-
-				def _obs_wrapper(self, obs):
-					if self.num_agents == 1:
-						return obs[np.newaxis, :]
-					else:
-						return obs
-
-				def _info_wrapper(self, info):
-					state = self.env.unwrapped.observation()
-					info.update(state[0])
-					info["max_steps"] = self.max_steps
-					info["active"] = np.array([state[i]["active"] for i in range(self.num_agents)])
-					info["designated"] = np.array([state[i]["designated"] for i in range(self.num_agents)])
-					info["sticky_actions"] = np.stack([state[i]["sticky_actions"] for i in range(self.num_agents)])
-					return info
+			def _info_wrapper(self, info):
+				state = self.env.unwrapped.observation()
+				info.update(state[0])
+				info["max_steps"] = self.max_steps
+				info["active"] = np.array([state[i]["active"] for i in range(self.num_agents)])
+				info["designated"] = np.array([state[i]["designated"] for i in range(self.num_agents)])
+				info["sticky_actions"] = np.stack([state[i]["sticky_actions"] for i in range(self.num_agents)])
+				return info
 
 
-			env = FootballEnv()
+		env = FootballEnv(args["env"])
 
-			dictionary["num_agents"] = env.num_agents
-			dictionary["local_observation_shape"] = env.observation_space[0].shape[0]
-			dictionary["global_observation_shape"] = env.observation_space[0].shape[0]
-			dictionary["num_actions"] = env.action_space[0].n
-			
+		args["num_agents"] = env.num_agents
+		args["local_observation_shape"] = env.observation_space[0].shape[0]
+		args["global_observation_shape"] = env.observation_space[0].shape[0]
+		args["num_actions"] = env.action_space[0].n
+		
 
-		ma_controller = MAPPO(env, dictionary)
-		ma_controller.run()
+	ma_controller = MAPPO(env, args)
+	ma_controller.run()
