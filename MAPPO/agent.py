@@ -331,8 +331,6 @@ class PPOAgent:
 			np.array: An array of shaped rewards for each agent at each timestep.
 		"""
 
-		action_prediction = None
-
 		if eval_reward_model:
 			latest_sample_index = self.buffer.episode_num
 			if "StarCraft" in self.environment:
@@ -345,7 +343,7 @@ class PPOAgent:
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[latest_sample_index]).float().unsqueeze(0).to(self.device)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[latest_sample_index, :-1, :]).float().unsqueeze(0).to(self.device)
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length[latest_sample_index, :-1]).long().unsqueeze(0).to(self.device)
-			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1).unsqueeze(0).to(self.device)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[latest_sample_index, :, 0]).float().sum(dim=-1, keepdim=True).unsqueeze(0).to(self.device)
 		else:
 			if "StarCraft" in self.environment:	
 				ally_state_batch = torch.from_numpy(self.buffer.ally_states).float().permute(0, 2, 1, 3).to(self.device)
@@ -357,7 +355,7 @@ class PPOAgent:
 			team_mask_batch = 1-torch.from_numpy(self.buffer.team_dones[:, :-1]).float().to(self.device)
 			agent_masks_batch = 1-torch.from_numpy(self.buffer.indiv_dones[:, :-1, :]).float().to(self.device)
 			episode_len_batch = torch.from_numpy(self.buffer.episode_length).long().to(self.device)
-			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1).to(self.device)
+			episodic_reward_batch = torch.from_numpy(self.buffer.rewards[:, :, 0]).float().sum(dim=-1, keepdim=True).to(self.device)
 		
 		with torch.no_grad():
 			if "AREL" in self.experiment_type:
