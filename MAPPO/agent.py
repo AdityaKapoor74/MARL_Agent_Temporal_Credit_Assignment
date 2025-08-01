@@ -510,7 +510,7 @@ class PPOAgent:
 		grad_norm_policy_batch = 0
 
 		# First, calculate advantages and value targets from the collected rollouts
-		self.buffer.calculate_targets(episode, self.V_PopArt)
+		self.buffer.calculate_targets(self.V_PopArt)
 
 		# Perform PPO updates for a fixed number of epochs over the collected data
 		# Optimize policy for n epochs

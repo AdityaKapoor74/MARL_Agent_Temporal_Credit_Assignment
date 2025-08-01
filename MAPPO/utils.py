@@ -267,7 +267,7 @@ class RolloutBuffer:
 		last_actions, actions, action_masks, agent_masks, team_masks, values, target_values, advantage
 
 
-	def calculate_targets(self, episode, v_value_norm=None):
+	def calculate_targets(self, v_value_norm=None):
 		"""
 		Calculates the advantage and value targets using GAE.
 
