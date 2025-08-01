@@ -593,7 +593,7 @@ class PPOAgent:
 				
 			critic_v_loss = torch.max(critic_v_loss_1, critic_v_loss_2)
 
-			print("Critic Loss", critic_v_loss_1, critic_v_loss_2, critic_v_loss)
+			print("Critic Loss", critic_v_loss_1, critic_v_loss_2, critic_v_loss, self.norm_rewards)
 			
 			# Perform gradient update for the critic
 			self.v_critic_optimizer.zero_grad()

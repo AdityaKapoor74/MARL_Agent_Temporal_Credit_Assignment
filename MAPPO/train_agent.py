@@ -270,6 +270,7 @@ def parse_args():
     parser.add_argument("--reward_dropout", type=float, default=0.0, help="Dropout in AREL.")
     parser.add_argument("--reward_attn_net_wide", action="store_true", default=True, help="Flag to use wide attention in AREL.")
     parser.add_argument("--version", type=str, default="temporal", choices=["temporal", "agent_temporal"], help="Version of AREL to use.")
+	parser.add_argument("--norm_rewards", action="store_true", default=False, help="Flag to normalize rewards.")
 
     # --- Actor Arguments ---
     parser.add_argument("--use_recurrent_policy", action="store_true", default=True, help="Flag to use a recurrent policy.")
