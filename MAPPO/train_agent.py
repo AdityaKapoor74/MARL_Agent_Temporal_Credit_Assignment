@@ -190,7 +190,7 @@ class MAPPO:
 				if all(indiv_dones) or step == self.max_time_steps:
 					if self.learn:
 						# Get final value estimate for GAE calculation
-						_, final_value_v = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
+						final_value_v, _ = self.agents.get_values(global_obs, ally_states, enemy_states, actions, rnn_hidden_state_v, indiv_dones)
 						self.agents.buffer.end_episode(step, final_value_v, indiv_dones, all(indiv_dones))
 
 					# During warmup, clear the on-policy buffer to only use shaped rewards later
