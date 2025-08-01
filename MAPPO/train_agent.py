@@ -189,7 +189,7 @@ class MAPPO:
 					)
 				if self.use_reward_model:
 					self.agents.reward_buffer.push(
-						ally_states, enemy_states, local_obs, actions, mask_actions, rnn_hidden_state_actor, action_logprob, rewards_to_send, all(indiv_dones), indiv_dones
+						ally_states, enemy_states, local_obs, actions, mask_actions, rewards_to_send, all(indiv_dones), indiv_dones
 					)
 
 				# Update states for the next iteration
@@ -234,9 +234,6 @@ class MAPPO:
 
 			if self.use_reward_model:
 				self.agents.reward_buffer.end_episode()
-
-			
-
 			
 			# --- Agent and Model Updates ---
 			# Update the main MAPPO agent
@@ -267,7 +264,7 @@ class MAPPO:
 						entropy_temporal_weights_batch, entropy_agent_weights_batch = 0.0, 0.0
 						reward_prediction_loss_batch, dynamic_loss_batch = 0.0, 0.0
 					
-					for i in range(self.reward_model_update_epochs):
+					for _ in range(self.reward_model_update_epochs):
 						sample = self.agents.reward_buffer.sample_reward_model(num_episodes=self.reward_batch_size)
 						if "AREL" in self.experiment_type:
 							reward_loss, reward_var, grad_norm_value_reward = self.agents.update_reward_model(sample)

@@ -33,8 +33,7 @@ class RewardRolloutBuffer:
 	necessary information for the sequence-to-sequence reward models.
 	"""
 	def __init__(self, environment, capacity, max_episode_len, num_agents, num_enemies,
-				 ally_obs_shape, enemy_obs_shape, local_obs_shape, rnn_num_layers_actor,
-				 actor_hidden_state, action_shape, device):
+				 ally_obs_shape, enemy_obs_shape, local_obs_shape, action_shape):
 		self.environment = environment
 		self.capacity = capacity
 		self.length = 0
@@ -57,11 +56,10 @@ class RewardRolloutBuffer:
 		self.buffer['done'] = np.ones((self.capacity, self.max_episode_len), dtype=np.float32)
 		self.buffer['indiv_dones'] = np.ones((self.capacity, self.max_episode_len, self.num_agents), dtype=np.float32)
 		self.buffer['local_obs'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, local_obs_shape))
-		self.buffer['hidden_state_actor'] = np.zeros((self.capacity, self.max_episode_len, rnn_num_layers_actor, self.num_agents, actor_hidden_state))
 		self.buffer['action_masks'] = np.zeros((self.capacity, self.max_episode_len, self.num_agents, self.action_shape))
 		self.episode_len = np.zeros(self.capacity)
 
-	def push(self, ally_obs, enemy_obs, local_obs, actions, action_masks, hidden_state_actor, logprobs, reward, done, indiv_dones):
+	def push(self, ally_obs, enemy_obs, local_obs, actions, action_masks, reward, done, indiv_dones):
 		"""Adds a single timestep of experience to the buffer."""
 		if "StarCraft" in self.environment:
 			self.buffer['ally_obs'][self.episode][self.t] = ally_obs
@@ -71,7 +69,6 @@ class RewardRolloutBuffer:
 		self.buffer['local_obs'][self.episode][self.t] = local_obs
 		self.buffer['actions'][self.episode][self.t] = actions
 		self.buffer['action_masks'][self.episode][self.t] = action_masks
-		self.buffer['hidden_state_actor'][self.episode][self.t] = hidden_state_actor
 		self.buffer['reward'][self.episode][self.t] = reward
 		self.buffer['done'][self.episode][self.t] = done
 		self.buffer['indiv_dones'][self.episode][self.t] = indiv_dones
@@ -109,7 +106,6 @@ class RewardRolloutBuffer:
 		local_obs_batch = np.take(self.buffer['local_obs'], batch_indices, axis=0)
 		actions_batch = np.take(self.buffer['actions'], batch_indices, axis=0)
 		action_masks_batch = np.take(self.buffer['action_masks'], batch_indices, axis=0)
-		hidden_state_actor_batch = np.take(self.buffer['hidden_state_actor'], batch_indices, axis=0)
 		reward_batch = np.take(self.buffer['reward'], batch_indices, axis=0)
 		mask_batch = 1 - np.take(self.buffer['done'], batch_indices, axis=0)
 		agent_masks_batch = 1 - np.take(self.buffer['indiv_dones'], batch_indices, axis=0)
@@ -120,9 +116,9 @@ class RewardRolloutBuffer:
 		last_actions_batch = np.concatenate((first_last_actions, actions_batch[:, :-1, :]), axis=1)
 
 		if "StarCraft" in self.environment:
-			return ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, None, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+			return ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 		elif "GFootball" in self.environment:
-			return ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, None, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
+			return ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, reward_batch, mask_batch, agent_masks_batch, episode_len_batch
 
 	def __len__(self):
 		return self.length

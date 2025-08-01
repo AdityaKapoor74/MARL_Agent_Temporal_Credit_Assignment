@@ -184,8 +184,6 @@ class PPOAgent:
 				'ally_obs_shape': self.ally_observation_shape,
 				'enemy_obs_shape': self.enemy_observation_shape,
 				'local_obs_shape': self.local_observation_shape,
-				'rnn_num_layers_actor': dictionary['rnn_num_layers_actor'],
-				'actor_hidden_state': dictionary['rnn_hidden_actor'],
 				'action_shape': self.num_actions,
 				'device': self.device
 			}
@@ -425,9 +423,9 @@ class PPOAgent:
 		"""Performs a single update step for the credit assignment model."""
 		# sample episodes from replay buffer
 		if "StarCraft" in self.environment:
-			ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+			ally_obs_batch, enemy_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		elif "GFootball" in self.environment:
-			ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, hidden_state_actor_batch, logprobs_old_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
+			ally_obs_batch, local_obs_batch, actions_batch, last_actions_batch, action_masks_batch, reward_batch, team_mask_batch, agent_masks_batch, episode_len_batch = sample
 		
 		# convert numpy array to tensor
 		if "StarCraft" in self.environment:
@@ -440,8 +438,6 @@ class PPOAgent:
 		actions_batch = torch.from_numpy(actions_batch).long().permute(0, 2, 1).to(self.device)
 		last_actions_batch = torch.from_numpy(last_actions_batch).long().to(self.device)
 		action_masks_batch = torch.from_numpy(action_masks_batch).to(self.device)
-		hidden_state_actor_batch = torch.from_numpy(hidden_state_actor_batch).float().to(self.device)
-		logprobs_old_batch = torch.from_numpy(logprobs_old_batch).float() .to(self.device)
 		reward_batch = torch.from_numpy(reward_batch).float().to(self.device)
 		episodic_reward_batch = reward_batch.sum(dim=1).to(self.device)
 		team_mask_batch = torch.from_numpy(team_mask_batch).float().to(self.device)
