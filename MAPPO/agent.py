@@ -590,7 +590,7 @@ class PPOAgent:
 
 			if self.norm_returns_v:
 				targets_shape = target_values.shape
-				target_values = (self.V_PopArt(target_values.view(-1), agent_masks.view(-1), train=True).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
+				target_values = (self.V_PopArt(target_values.reshape(-1), agent_masks.reshape(-1), train=True).view(targets_shape) * agent_masks.view(targets_shape)).cpu()
 
 			critic_v_loss_1 = F.huber_loss(values, target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
 			critic_v_loss_2 = F.huber_loss(torch.clamp(values, values_old.to(self.device)-self.value_clip, values_old.to(self.device)+self.value_clip), target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
