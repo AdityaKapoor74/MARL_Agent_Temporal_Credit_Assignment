@@ -98,6 +98,8 @@ class TAR2(nn.Module):
 		self.reward_prediction = nn.Sequential(
 			nn.Linear(2*self.emb_dim*self.n_layer, emb_dim),
 			nn.GELU(),
+			nn.Linear(self.emb_dim, self.emb_dim), 
+			nn.GELU(),
 			nn.Linear(emb_dim, 1),
 			)
 		
