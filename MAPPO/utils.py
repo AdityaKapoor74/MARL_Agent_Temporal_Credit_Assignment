@@ -143,12 +143,15 @@ class RolloutBuffer:
 		
 		# Store all configuration parameters
 		self.environment = environment
+		self.experiment_type = experiment_type
 		self.num_episodes = num_episodes
 		self.max_time_steps = max_time_steps
 		self.num_agents = num_agents
 		self.data_chunk_length = data_chunk_length
 		self.norm_returns_v = norm_returns_v
 		self.clamp_rewards = clamp_rewards
+		self.clamp_rewards_value_min = clamp_rewards_value_min
+		self.clamp_rewards_value_max = clamp_rewards_value_max
 		self.gae_lambda = gae_lambda
 		self.gamma = gamma
 		self.episode_num = 0
