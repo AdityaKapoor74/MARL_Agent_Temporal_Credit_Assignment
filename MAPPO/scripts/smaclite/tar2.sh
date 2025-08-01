@@ -13,6 +13,7 @@
 python train_agent.py \
     --iteration 1 \
     --learn \
+    --use_reward_model \
     --device gpu \
     --environment StarCraft \
     --env 3s5z \
