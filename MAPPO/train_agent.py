@@ -75,6 +75,7 @@ class MAPPO:
 		self.rnn_hidden_actor = dictionary["rnn_hidden_actor"]
 
 		# --- Comet.ml Logging ---
+		self.save_comet_ml_plot = dictionary["save_comet_ml_plot"]
 		self.comet_ml = None
 		if dictionary["save_comet_ml_plot"]:
 			self.comet_ml = Experiment("im5zK8gFkz6j07uflhc3hXk8I", project_name=dictionary["test_num"])
