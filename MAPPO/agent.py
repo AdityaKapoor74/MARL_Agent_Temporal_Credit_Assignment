@@ -40,19 +40,6 @@ class PPOAgent:
 		# Environment Setup
 		self.environment = dictionary["environment"]
 		self.experiment_type = dictionary["experiment_type"]
-		self.norm_rewards = dictionary["norm_rewards"]
-		self.scheduler_need = dictionary["scheduler_need"]
-		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
-		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
-		self.dynamic_loss_coeffecient = dictionary["dynamic_loss_coeffecient"]
-		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
-		self.entropy_pen = dictionary["entropy_pen"]
-		self.entropy_pen_decay = dictionary["entropy_pen_decay"]
-		self.entropy_pen_final = dictionary["entropy_pen_final"]
-		self.grad_clip_actor = dictionary["grad_clip_actor"]
-		self.grad_clip_critic_v = dictionary["grad_clip_critic_v"]
-		self.enable_grad_clip_actor = dictionary["enable_grad_clip_actor"]
-		self.enable_grad_clip_critic_v = dictionary["enable_grad_clip_critic_v"]
 		self.env_name = dictionary["env"]
 		self.num_agents = dictionary["num_agents"]
 		self.num_actions = dictionary["num_actions"]
@@ -61,6 +48,7 @@ class PPOAgent:
 		# Training setup
 		self.n_epochs = dictionary["n_epochs"]
 		self.device = torch.device("cuda" if dictionary["device"] == "gpu" and torch.cuda.is_available() else "cpu")
+		self.scheduler_need = dictionary["scheduler_need"]
 
 		# Model Setup
 		if "StarCraft" in self.environment:
@@ -78,6 +66,8 @@ class PPOAgent:
 		# Critic setup
 		self.norm_returns_v = dictionary["norm_returns_v"]
 		self.value_clip = dictionary["value_clip"]
+		self.grad_clip_critic_v = dictionary["grad_clip_critic_v"]
+		self.enable_grad_clip_critic_v = dictionary["enable_grad_clip_critic_v"]
 		
 		# Actor setup
 		self.gamma = dictionary["gamma"]
@@ -85,8 +75,16 @@ class PPOAgent:
 		self.gae_lambda = dictionary["gae_lambda"]
 		self.policy_clip = dictionary["policy_clip"]
 		self.norm_adv = dictionary["norm_adv"]
+		self.grad_clip_actor = dictionary["grad_clip_actor"]
+		self.enable_grad_clip_actor = dictionary["enable_grad_clip_actor"]
 		self.entropy_pen_decay = (dictionary["entropy_pen"] - dictionary["entropy_pen_final"])/dictionary["entropy_pen_steps"]
 
+		# Reward setup
+		self.norm_rewards = dictionary["norm_rewards"]
+		self.enable_reward_grad_clip = dictionary["enable_reward_grad_clip"]
+		self.reward_grad_clip_value = dictionary["reward_grad_clip_value"]
+		self.dynamic_loss_coeffecient = dictionary["dynamic_loss_coeffecient"]
+		self.variance_loss_coeff = dictionary["variance_loss_coeff"]
 
 		# Arguments for the Critic (Value) network
 		critic_args = {
