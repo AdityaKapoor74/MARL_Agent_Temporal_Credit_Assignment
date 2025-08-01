@@ -3,11 +3,11 @@ This file contains the core implementation of the Temporal-Agent Reward Redistri
 
 The main components are:
 1.  ShapelyAttention: A module that uses a multi-head attention mechanism inspired by
-    Shapley values to compute agent-specific contributions within a timestep.
+	Shapley values to compute agent-specific contributions within a timestep.
 2.  TAR2: The main sequence-to-sequence model that processes trajectory data. It uses a
-    dual temporal-agent transformer architecture to produce unnormalized credit scores.
-    It is regularized by an auxiliary inverse dynamics model and uses final-state
-    conditioning to produce a stable learning signal.
+	dual temporal-agent transformer architecture to produce unnormalized credit scores.
+	It is regularized by an auxiliary inverse dynamics model and uses final-state
+	conditioning to produce a stable learning signal.
 """
 import torch
 from torch import nn
@@ -129,7 +129,7 @@ class ShapelyAttention(nn.Module):
 
 		Args:
 			input_tensor (torch.Tensor): A tensor of input sequences with shape
-										(batch, n_agents, seq_len, emb_dim).
+									 (batch, n_agents, seq_len, emb_dim).
 			agent_temporal_mask (torch.Tensor): Mask for inactive agents/timesteps.
 
 		Returns:
@@ -148,17 +148,33 @@ class ShapelyAttention(nn.Module):
 
 		# Generate structured coalitions
 		attn_masks = self._generate_structured_coalitions(n_a, agent_mask_reshaped)
+		
+		# If no agents are active, attn_masks could be empty.
+		if attn_masks.shape[0] == 0:
+			return torch.zeros_like(input_tensor)
 
 		# Expand input tensor to match the number of coalition samples
 		num_samples = attn_masks.shape[0] // (b * t)
 		input_expanded = input_with_embedding.unsqueeze(1).repeat(1, num_samples, 1, 1).reshape(-1, n_a, e)
 
 		marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, attn_masks)
+		
+		# The attention module now contains weights/scores for all samples.
+		# We need to reshape and average them before they are accessed by the TAR2 model.
+		# Average agent attention weights
+		all_sample_weights = self.phi.agent_weights
+		all_sample_weights = all_sample_weights.reshape(b * t, num_samples, n_a, n_a)
+		self.phi.agent_weights = all_sample_weights.mean(dim=1) # Overwrite with averaged weights
 
-		# Reshape and average the results
+		# Average agent attention scores
+		all_sample_scores = self.phi.agent_scores
+		all_sample_scores = all_sample_scores.reshape(b * t, num_samples, self.phi.n_head, n_a, n_a)
+		self.phi.agent_scores = all_sample_scores.mean(dim=1) # Overwrite with averaged scores
+
+		# Reshape and average the results for the reward
 		marginal_rewards = marginal_rewards.reshape(b * t, num_samples, n_a, e)
 		avg_shapley_reward = marginal_rewards.mean(dim=1)
-
+		
 		# Reshape back to the original batch format
 		avg_shapley_reward = avg_shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
 
