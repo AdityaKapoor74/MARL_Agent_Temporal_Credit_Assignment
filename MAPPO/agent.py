@@ -596,8 +596,6 @@ class PPOAgent:
 			critic_v_loss_2 = F.huber_loss(torch.clamp(values, values_old.to(self.device)-self.value_clip, values_old.to(self.device)+self.value_clip), target_values.to(self.device), reduction="sum", delta=10.0) / agent_masks.sum()
 				
 			critic_v_loss = torch.max(critic_v_loss_1, critic_v_loss_2)
-
-			print("Agent Mask Sum", agent_masks.sum())
 			
 			# Perform gradient update for the critic
 			self.v_critic_optimizer.zero_grad()
