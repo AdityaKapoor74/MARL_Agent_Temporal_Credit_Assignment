@@ -15,132 +15,341 @@ import numpy as np
 import torch.nn.functional as F
 from .modules import EncoderLayer, init_model, MultiAgentAttention
 
+# class ShapelyAttention(nn.Module):
+# 	"""
+# 	Approximates Shapley values for agent importance using multi-head attention.
+
+# 	This module supports three coalition sampling methods:
+# 	- 'random': Pure Monte Carlo sampling of random coalitions.
+# 	- 'structured': For each agent, samples coalitions with and without it.
+# 	- 'stratified': Samples coalitions stratified by size to reduce variance.
+# 	"""
+# 	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='stratified'):
+# 		super().__init__()
+# 		self.emb_dim = emb_dim
+# 		self.device = device
+# 		self.n_agents = n_agents
+# 		self.sample_num = sample_num
+# 		self.coalition_method = coalition_method
+		
+# 		self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
+# 		self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
+
+# 	def _generate_random_masks(self, batch_shape, n_agents):
+# 		"""Generates purely random binary masks for coalitions."""
+# 		masks = []
+# 		for _ in range(self.sample_num):
+# 			mask = torch.bernoulli(torch.full((n_agents, n_agents), 0.5, device=self.device))
+# 			mask = mask - torch.diag(torch.diag(mask)) + torch.eye(n_agents, device=self.device)
+# 			masks.append(mask)
+		
+# 		stacked_masks = torch.stack(masks, dim=0).unsqueeze(0).repeat(batch_shape, 1, 1, 1)
+# 		return stacked_masks.reshape(batch_shape * self.sample_num, n_agents, n_agents)
+
+# 	def _generate_structured_masks(self, n_agents, agent_mask):
+# 		"""Generates structured coalitions (with/without each agent)."""
+# 		b, _ = agent_mask.shape
+# 		all_coalition_vectors = []
+
+# 		active_agents_indices = [torch.where(m)[0] for m in agent_mask]
+
+# 		for i in range(b):
+# 			coalition_vectors = []
+# 			active_agents = active_agents_indices[i]
+# 			if len(active_agents) == 0:
+# 				# If no agents are active, create placeholder zero masks
+# 				all_coalition_vectors.append(torch.zeros(2 * n_agents, n_agents, device=self.device))
+# 				continue
+
+# 			for agent_idx in active_agents:
+# 				other_agents = active_agents[active_agents != agent_idx]
+				
+# 				# Coalition WITH agent i
+# 				coalition_with = torch.zeros(n_agents, device=self.device)
+# 				coalition_with[agent_idx] = 1
+# 				if len(other_agents) > 0:
+# 					random_others = other_agents[torch.bernoulli(torch.full((len(other_agents),), 0.5)).bool()]
+# 					coalition_with[random_others] = 1
+				
+# 				# Coalition WITHOUT agent i
+# 				coalition_without = coalition_with.clone()
+# 				coalition_without[agent_idx] = 0
+				
+# 				coalition_vectors.extend([coalition_with, coalition_without])
+# 			all_coalition_vectors.append(torch.stack(coalition_vectors))
+
+# 		stacked_vectors = torch.stack(all_coalition_vectors)
+# 		attn_mask = stacked_vectors.unsqueeze(-1) * stacked_vectors.unsqueeze(-2)
+# 		attn_mask = attn_mask + torch.eye(n_agents, device=self.device).unsqueeze(0).unsqueeze(0)
+# 		attn_mask = (attn_mask > 0).float()
+		
+# 		return attn_mask.reshape(-1, n_agents, n_agents)
+
+# 	def _generate_stratified_masks(self, n_agents, agent_mask):
+# 		"""
+# 		Generates coalitions using stratified sampling based on coalition size.
+
+# 		This method samples uniformly across coalition sizes to ensure a balanced
+# 		evaluation, which can reduce the variance of the Shapley value estimate.
+# 		"""
+# 		b, _ = agent_mask.shape
+# 		all_coalition_vectors = []
+		
+# 		active_indices_list = [torch.where(m)[0] for m in agent_mask]
+# 		num_active_list = agent_mask.sum(dim=1)
+
+# 		for i in range(b):
+# 			coalition_vectors = []
+# 			num_active = int(num_active_list[i].item())
+# 			active_indices = active_indices_list[i]
+
+# 			if num_active == 0:
+# 				all_coalition_vectors.append(torch.zeros(self.sample_num, n_agents, device=self.device))
+# 				continue
+
+# 			# Sample coalition sizes uniformly from 0 to num_active
+# 			sampled_sizes = torch.randint(0, num_active + 1, (self.sample_num,))
+			
+# 			for k in sampled_sizes:
+# 				coalition_mask_vector = torch.zeros(n_agents, device=self.device)
+# 				if k > 0:
+# 					# Randomly choose k agents from the active set
+# 					perm = torch.randperm(num_active)
+# 					chosen_indices = active_indices[perm[:k]]
+# 					coalition_mask_vector[chosen_indices] = 1.0
+# 				coalition_vectors.append(coalition_mask_vector)
+			
+# 			all_coalition_vectors.append(torch.stack(coalition_vectors))
+
+# 		stacked_vectors = torch.stack(all_coalition_vectors)
+# 		attn_mask = stacked_vectors.unsqueeze(-1) * stacked_vectors.unsqueeze(-2)
+# 		attn_mask = attn_mask + torch.eye(n_agents, device=self.device).unsqueeze(0).unsqueeze(0)
+# 		attn_mask = (attn_mask > 0).float()
+		
+# 		return attn_mask.reshape(-1, n_agents, n_agents)
+
+# 	def forward(self, input_tensor, agent_temporal_mask):
+# 		b, n_a, t, e = input_tensor.size()
+# 		input_tensor_reshaped = input_tensor.permute(0, 2, 1, 3).contiguous().reshape(b * t, n_a, -1)
+# 		agent_mask_reshaped = agent_temporal_mask.permute(0, 2, 1).contiguous().reshape(b * t, n_a)
+
+# 		coalition = np.arange(self.n_agents)
+# 		np.random.shuffle(coalition)
+# 		agent_embedding = self.agent_embedding(torch.tensor(coalition, device=self.device))[None, :, :].expand(b * t, n_a, self.emb_dim)
+# 		input_with_embedding = input_tensor_reshaped + agent_embedding
+
+# 		# --- Select Coalition Generation Method ---
+# 		if self.coalition_method == 'random':
+# 			attn_masks = self._generate_random_masks(b * t, n_a)
+# 			num_samples = self.sample_num
+# 		elif self.coalition_method == 'structured':
+# 			attn_masks = self._generate_structured_masks(n_a, agent_mask_reshaped)
+# 			num_samples = attn_masks.shape[0] // (b * t) if (b * t) > 0 else 0
+# 		elif self.coalition_method == 'stratified':
+# 			attn_masks = self._generate_stratified_masks(n_a, agent_mask_reshaped)
+# 			num_samples = self.sample_num
+# 		else:
+# 			raise ValueError(f"Unknown coalition method: {self.coalition_method}")
+
+# 		if num_samples == 0:
+# 			return torch.zeros_like(input_tensor)
+
+# 		input_expanded = input_with_embedding.unsqueeze(1).repeat(1, num_samples, 1, 1).reshape(-1, n_a, e)
+# 		marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, attn_masks)
+		
+# 		# Reshape and average results
+# 		marginal_rewards = marginal_rewards.reshape(b * t, num_samples, n_a, e)
+# 		avg_shapley_reward = marginal_rewards.mean(dim=1)
+		
+# 		# Average attention weights and scores for logging/analysis
+# 		all_sample_weights = self.phi.agent_weights.reshape(b * t, num_samples, n_a, n_a)
+# 		self.phi.agent_weights = all_sample_weights.mean(dim=1)
+# 		all_sample_scores = self.phi.agent_scores.reshape(b * t, num_samples, self.phi.n_head, n_a, n_a)
+# 		self.phi.agent_scores = all_sample_scores.mean(dim=1)
+
+# 		avg_shapley_reward = avg_shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
+# 		return avg_shapley_reward
+	
+	
 class ShapelyAttention(nn.Module):
-    """
-    Approximates Shapley values for agent importance using multi-head attention.
+	"""
+	Approximates Shapley values for agent importance using multi-head attention.
 
-    This module uses a structured coalition sampling strategy that is fully vectorized
-    to ensure high performance and handle variable numbers of active agents without errors.
-    """
-    def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='structured'):
-        super().__init__()
-        self.emb_dim = emb_dim
-        self.device = device
-        self.n_agents = n_agents
-        self.sample_num = sample_num # Note: In structured sampling, this is a factor, not a fixed number.
-        self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
-        self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
-        self.coalition_method = coalition_method
+	This module supports three coalition sampling methods:
+	- 'random': Pure Monte Carlo sampling of random coalitions.
+	- 'structured': For each agent, samples coalitions with and without it.
+	- 'stratified': Samples coalitions stratified by size to reduce variance.
+	"""
+	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='stratified'):
+		super().__init__()
+		self.emb_dim = emb_dim
+		self.device = device
+		self.n_agents = n_agents
+		self.sample_num = sample_num
+		self.coalition_method = coalition_method
+		
+		self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
+		self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
+		
+		# Pre-compute agent indices and permutation for efficiency
+		self.register_buffer('agent_indices', torch.arange(n_agents, device=device))
+		self.register_buffer('eye_mask', torch.eye(n_agents, device=device))
+		
+		# Pre-allocate coalition size templates for stratified sampling
+		if coalition_method == 'stratified':
+			self._precompute_stratified_templates()
 
-    def _generate_structured_coalitions(self, n_agents, agent_mask_batch):
-        """
-        Generates structured coalition vectors for each item in the batch in a vectorized manner.
+	def _precompute_stratified_templates(self):
+		"""Pre-compute coalition size distributions for stratified sampling."""
+		# Pre-compute uniform distribution over coalition sizes
+		self.register_buffer('coalition_sizes', 
+						   torch.arange(0, self.n_agents + 1, device=self.device))
 
-        For each active agent in an item, it creates two coalition vectors: one with the
-        agent and one without. The results are padded to a uniform size for batch processing.
+	def _generate_random_masks_vectorized(self, batch_size):
+		"""Vectorized random mask generation - no loops."""
+		# Generate all masks at once
+		masks = torch.bernoulli(
+			torch.full((batch_size, self.sample_num, self.n_agents, self.n_agents), 
+					  0.5, device=self.device)
+		)
+		
+		# Remove diagonal and add identity in one operation
+		diagonal_indices = torch.arange(self.n_agents, device=self.device)
+		masks[:, :, diagonal_indices, diagonal_indices] = 1.0
+		
+		return masks.reshape(batch_size * self.sample_num, self.n_agents, self.n_agents)
 
-        Args:
-            n_agents (int): The total number of agents.
-            agent_mask_batch (torch.Tensor): Mask of active agents. Shape (batch_size, n_agents).
+	def _generate_structured_masks_vectorized(self, agent_mask):
+		"""Vectorized structured mask generation."""
+		b, n_agents = agent_mask.shape
+		
+		# Find active agents for all batches at once
+		active_counts = agent_mask.sum(dim=1, keepdim=True)  # (b, 1)
+		max_active = int(active_counts.max().item())
+		
+		if max_active == 0:
+			return torch.zeros(b * 2 * n_agents, n_agents, n_agents, device=self.device)
+		
+		# Create coalition vectors more efficiently
+		all_masks = []
+		
+		for i in range(b):
+			active_agents = torch.where(agent_mask[i])[0]
+			n_active = len(active_agents)
+			
+			if n_active == 0:
+				masks = torch.zeros(2 * n_agents, n_agents, n_agents, device=self.device)
+			else:
+				# Vectorized coalition generation
+				coalitions = []
+				for agent_idx in active_agents:
+					other_agents = active_agents[active_agents != agent_idx]
+					
+					# Coalition WITH agent (vectorized random selection)
+					coalition_with = torch.zeros(n_agents, device=self.device)
+					coalition_with[agent_idx] = 1
+					if len(other_agents) > 0:
+						random_mask = torch.bernoulli(torch.full((len(other_agents),), 0.5, device=self.device))
+						coalition_with[other_agents] = random_mask
+					
+					# Coalition WITHOUT agent
+					coalition_without = coalition_with.clone()
+					coalition_without[agent_idx] = 0
+					
+					coalitions.extend([coalition_with, coalition_without])
+				
+				coalition_vectors = torch.stack(coalitions)
+				# Vectorized attention mask computation
+				masks = coalition_vectors.unsqueeze(-1) * coalition_vectors.unsqueeze(-2)
+				masks = masks + self.eye_mask.unsqueeze(0)
+				masks = (masks > 0).float()
+			
+			all_masks.append(masks)
+		
+		return torch.cat(all_masks, dim=0)
 
-        Returns:
-            tuple: A tuple containing:
-                - padded_coalitions (torch.Tensor): Padded coalition vectors.
-                - sample_mask (torch.Tensor): A mask to ignore padded samples.
-        """
-        b, _ = agent_mask_batch.shape
-        
-        # Determine the number of active agents for each item in the batch
-        num_active = agent_mask_batch.sum(dim=1).long()
-        max_samples_needed = 2 * num_active.max()
-        
-        if max_samples_needed == 0:
-            # Handle the edge case where no agents are active in the entire batch
-            return torch.zeros(b, 1, n_agents, device=self.device), torch.zeros(b, 1, device=self.device)
+	def _generate_stratified_masks_vectorized(self, agent_mask):
+		"""Highly optimized stratified mask generation."""
+		b, n_agents = agent_mask.shape
+		
+		# Generate all coalition sizes at once
+		coalition_sizes = torch.randint(0, self.n_agents + 1, 
+									  (b, self.sample_num), device=self.device)
+		
+		# Vectorized coalition generation
+		all_coalition_vectors = torch.zeros(b, self.sample_num, n_agents, device=self.device)
+		
+		for i in range(b):
+			active_indices = torch.where(agent_mask[i])[0]
+			n_active = len(active_indices)
+			
+			if n_active == 0:
+				continue
+				
+			# Clamp coalition sizes to number of active agents
+			valid_sizes = torch.clamp(coalition_sizes[i], 0, n_active)
+			
+			for j, k in enumerate(valid_sizes):
+				if k > 0:
+					# Efficient random sampling without replacement
+					perm = torch.randperm(n_active, device=self.device)[:k]
+					chosen_indices = active_indices[perm]
+					all_coalition_vectors[i, j, chosen_indices] = 1.0
+		
+		# Vectorized attention mask computation
+		coalition_vectors = all_coalition_vectors.reshape(-1, n_agents)
+		attn_mask = coalition_vectors.unsqueeze(-1) * coalition_vectors.unsqueeze(-2)
+		attn_mask = attn_mask + self.eye_mask.unsqueeze(0)
+		attn_mask = (attn_mask > 0).float()
+		
+		return attn_mask
 
-        # Generate random base coalitions for "other" agents
-        random_others = torch.bernoulli(torch.full((b, max_samples_needed, n_agents), 0.5, device=self.device))
+	def forward(self, input_tensor, agent_temporal_mask):
+		b, n_a, t, e = input_tensor.size()
+		
+		# More efficient reshaping - combine operations
+		input_flat = input_tensor.permute(0, 2, 1, 3).reshape(b * t, n_a, e)
+		agent_mask_flat = agent_temporal_mask.permute(0, 2, 1).reshape(b * t, n_a)
+		
+		# Optimized agent embedding computation
+		# Use pre-computed indices instead of numpy operations
+		perm_indices = torch.randperm(self.n_agents, device=self.device)
+		agent_embedding = self.agent_embedding(perm_indices).unsqueeze(0).expand(b * t, -1, -1)
+		input_with_embedding = input_flat + agent_embedding
+		
+		# Optimized coalition generation
+		if self.coalition_method == 'random':
+			attn_masks = self._generate_random_masks_vectorized(b * t)
+			num_samples = self.sample_num
+		elif self.coalition_method == 'structured':
+			attn_masks = self._generate_structured_masks_vectorized(agent_mask_flat)
+			num_samples = attn_masks.shape[0] // (b * t) if (b * t) > 0 else 0
+		elif self.coalition_method == 'stratified':
+			attn_masks = self._generate_stratified_masks_vectorized(agent_mask_flat)
+			num_samples = self.sample_num
+		else:
+			raise ValueError(f"Unknown coalition method: {self.coalition_method}")
 
-        # --- Vectorized creation of (with/without) coalitions ---
-        agent_indices = torch.arange(n_agents, device=self.device)
-        
-        # Create masks to isolate each agent
-        i_mask = agent_indices.expand(b, n_agents, n_agents) == agent_indices.unsqueeze(1)
-        
-        # Create base masks for including or excluding agent i
-        with_i_mask = torch.ones(b, n_agents, n_agents, device=self.device)
-        without_i_mask = with_i_mask.clone()
-        without_i_mask[i_mask] = 0
-        
-        # Combine to form all possible structured samples for all batch items
-        base_coalitions = random_others.unsqueeze(1).repeat(1, n_agents, 1, 1)
-        coalitions_with = base_coalitions * ~i_mask.unsqueeze(2) + with_i_mask.unsqueeze(2)
-        coalitions_without = base_coalitions * ~i_mask.unsqueeze(2) + without_i_mask.unsqueeze(2)
-        
-        # Interleave the with/without coalitions: [with_a1, without_a1, with_a2, without_a2, ...]
-        all_samples = torch.stack([coalitions_with, coalitions_without], dim=3).reshape(b, n_agents * 2, n_agents)
+		if num_samples == 0:
+			return torch.zeros_like(input_tensor)
 
-        # --- Create a mask to select only the valid samples for each batch item ---
-        # A sample is valid if it corresponds to an *active* agent.
-        sample_indices = torch.arange(n_agents * 2, device=self.device).expand(b, n_agents * 2)
-        agent_of_sample = sample_indices // 2 # Determine which agent each sample pair belongs to
-        
-        # The mask should be true only if the agent for that sample is active
-        validity_mask = agent_mask_batch[torch.arange(b).unsqueeze(1), agent_of_sample]
-        
-        # Pad the coalition tensor and the mask to the max number of samples
-        padded_coalitions = torch.zeros(b, max_samples_needed, n_agents, device=self.device)
-        padded_mask = torch.zeros(b, max_samples_needed, device=self.device)
-
-        # Use the mask to fill the padded tensors in a vectorized way
-        for i in range(b):
-            valid_samples = all_samples[i][validity_mask[i]]
-            num_valid = valid_samples.shape[0]
-            if num_valid > 0:
-                padded_coalitions[i, :num_valid] = valid_samples
-                padded_mask[i, :num_valid] = 1.0
-
-        return padded_coalitions, padded_mask
-
-    def forward(self, input_tensor, agent_temporal_mask):
-        b, n_a, t, e = input_tensor.size()
-        input_reshaped = input_tensor.permute(0, 2, 1, 3).contiguous().reshape(b * t, n_a, -1)
-        agent_mask_reshaped = agent_temporal_mask.permute(0, 2, 1).contiguous().reshape(b * t, n_a)
-
-        coalition = np.arange(self.n_agents)
-        np.random.shuffle(coalition)
-        agent_embedding = self.agent_embedding(torch.tensor(coalition, device=self.device))[None, :, :].expand(b * t, n_a, self.emb_dim)
-        input_with_embedding = input_reshaped + agent_embedding
-
-        # --- Vectorized Coalition Generation ---
-        coalition_vectors, sample_mask = self._generate_structured_coalitions(n_a, agent_mask_reshaped)
-        num_samples = coalition_vectors.shape[1]
-
-        # Convert coalition vectors to attention masks
-        attn_masks = coalition_vectors.unsqueeze(-1) * coalition_vectors.unsqueeze(-2)
-        attn_masks = (attn_masks + torch.eye(n_a, device=self.device).unsqueeze(0).unsqueeze(0) > 0).float()
-        attn_masks = attn_masks.reshape(-1, n_a, n_a)
-        
-        # Expand input to match the number of samples for a single parallel forward pass
-        input_expanded = input_with_embedding.unsqueeze(1).repeat(1, num_samples, 1, 1).reshape(-1, n_a, e)
-        
-        # --- Single, Fast, Parallelized Attention Computation ---
-        marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, attn_masks)
-        
-        # --- Masked Averaging ---
-        # Reshape results to separate the sample dimension
-        marginal_rewards = marginal_rewards.reshape(b * t, num_samples, n_a, e)
-        
-        # Use the sample_mask to compute a masked average, ignoring padded samples
-        sample_mask_expanded = sample_mask.unsqueeze(-1).unsqueeze(-1)
-        avg_shapley_reward = (marginal_rewards * sample_mask_expanded).sum(dim=1) / (sample_mask.sum(dim=1).unsqueeze(-1).unsqueeze(-1).clamp(min=1))
-
-        # Average attention weights and scores for logging, using the same mask
-        self.phi.agent_weights = (self.phi.agent_weights.reshape(b*t, num_samples, n_a, n_a) * sample_mask.unsqueeze(-1).unsqueeze(-1)).sum(dim=1) / (sample_mask.sum(dim=1).unsqueeze(-1).unsqueeze(-1).clamp(min=1))
-        self.phi.agent_scores = (self.phi.agent_scores.reshape(b*t, num_samples, -1, n_a, n_a) * sample_mask.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)).sum(dim=1) / (sample_mask.sum(dim=1).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).clamp(min=1))
-
-        avg_shapley_reward = avg_shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
-        return avg_shapley_reward
+		# More efficient tensor expansion
+		input_expanded = input_with_embedding.unsqueeze(1).expand(-1, num_samples, -1, -1).reshape(-1, n_a, e)
+		
+		# Forward pass through attention
+		marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, attn_masks)
+		
+		# Efficient averaging and reshaping
+		marginal_rewards = marginal_rewards.view(b * t, num_samples, n_a, e).mean(dim=1)
+		
+		# Update attention weights and scores (if needed for logging)
+		if hasattr(self.phi, 'agent_weights'):
+			self.phi.agent_weights = self.phi.agent_weights.view(b * t, num_samples, n_a, n_a).mean(dim=1)
+		if hasattr(self.phi, 'agent_scores'):
+			self.phi.agent_scores = self.phi.agent_scores.view(b * t, num_samples, -1, n_a, n_a).mean(dim=1)
+		
+		# Final reshape back to original dimensions
+		return marginal_rewards.view(b, t, n_a, e).permute(0, 2, 1, 3)
 
 
 class TAR2(nn.Module):
