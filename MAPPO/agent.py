@@ -39,6 +39,7 @@ class PPOAgent:
 		# --- Unpack all hyperparameters from the dictionary ---
 		# Environment Setup
 		self.environment = dictionary["environment"]
+		self.version = dictionary["version"]
 		self.experiment_type = dictionary["experiment_type"]
 		self.env_name = dictionary["env"]
 		self.num_agents = dictionary["num_agents"]
@@ -194,6 +195,7 @@ class PPOAgent:
 				from TAR2 import TAR2
 				reward_model_args = {
                     'environment': self.environment,
+					"version": self.version,
                     'ally_obs_shape': self.ally_observation_shape,
                     'enemy_obs_shape': self.enemy_observation_shape,
                     'n_actions': self.num_actions,
@@ -382,23 +384,24 @@ class PPOAgent:
 						agent_masks_batch,
 						)
 
-					# USING MIN-MAX NORMALIZATION
-					temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
-					temporal_rewards_copy = copy.deepcopy(temporal_rewards)
-					temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
-					min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
-					temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
-					temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
+					if self.version == "no_normalization":
+						return (rewards*agent_masks_batch).cpu().numpy()
+					else:
+						# USING MIN-MAX NORMALIZATION
+						temporal_rewards = (rewards*agent_masks_batch).sum(dim=-1, keepdim=True)
+						temporal_rewards_copy = copy.deepcopy(temporal_rewards)
+						temporal_rewards_copy[(agent_masks_batch.sum(dim=-1, keepdim=True)>0).int() == 0] = float('nan')
+						min_temporal_rewards, _ = torch_nanmin(temporal_rewards_copy, dim=-2, keepdim=True)
+						temporal_rewards = (temporal_rewards-min_temporal_rewards) * (agent_masks_batch.sum(dim=-1, keepdim=True)>0).int()
+						temporal_weights = temporal_rewards / (temporal_rewards.sum(dim=1, keepdim=True) + 1e-5)
 
-					agent_rewards_copy = copy.deepcopy(rewards)
-					agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
-					min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
-					agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
-					agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
-
-					# episodic_rewards = torch.from_numpy(self.buffer.rewards[:, :, 0]).sum(dim=1, keepdim=True).unsqueeze(-1)
-					
-					return ((temporal_weights*agent_weights).cpu()*episodic_reward_batch.unsqueeze(-1)).numpy()
+						agent_rewards_copy = copy.deepcopy(rewards)
+						agent_rewards_copy[agent_masks_batch.int() == 0] = float('nan')
+						min_agent_rewards, _ = torch_nanmin(agent_rewards_copy, dim=-1, keepdim=True)
+						agent_rewards = (rewards-min_agent_rewards)*agent_masks_batch
+						agent_weights = agent_rewards / (agent_rewards.sum(dim=-1, keepdim=True) + 1e-5)
+						
+						return ((temporal_weights*agent_weights).cpu()*episodic_reward_batch.unsqueeze(-1)).numpy()
 
 			elif "STAS" in self.experiment_type:
 
@@ -477,8 +480,11 @@ class PPOAgent:
 			# Calculate the composite loss (reward regression + inverse dynamics)
 			total_scores = scores.reshape(actions_batch.shape[0], -1).sum(dim=-1)  # Sum all c_i,t
 			reward_prediction_loss = F.huber_loss(total_scores, episodic_reward_batch)
-			dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
-			reward_loss = reward_prediction_loss + dynamic_loss
+			if self.version == "no_inverse_dynamics":
+				inverse_dynamic_loss = 0.0
+			else:
+				inverse_dynamic_loss = self.dynamic_loss_coeffecient * (self.classification_loss(action_prediction.reshape(-1, self.num_actions), actions_batch.long().reshape(-1)) * agent_masks_batch.reshape(-1)).sum() / (agent_masks_batch.sum() + 1e-5)
+			reward_loss = reward_prediction_loss + inverse_dynamic_loss
 			
 		elif "STAS" in self.experiment_type:
 			

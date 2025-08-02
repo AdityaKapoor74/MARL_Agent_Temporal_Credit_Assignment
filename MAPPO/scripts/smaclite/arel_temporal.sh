@@ -1,14 +1,7 @@
 #!/bin/bash
 
-# This is an example script to launch a TAR² training run.
-# You can create similar scripts for each of your baselines (STAS, AREL, etc.)
-# by changing the --experiment_type argument.
-
-# To run 5 seeds, you could use a loop:
-# for seed in 1 2 3 4 5
-# do
-#   python train_agent.py --iteration $seed ...
-# done
+# AREL-Temporal baseline
+# Performs temporal credit assignment for the team as a whole
 
 python train_agent.py \
     --iteration 1 \
@@ -17,8 +10,8 @@ python train_agent.py \
     --device gpu \
     --environment StarCraft \
     --env 3s5z \
-    --experiment_type "TAR^2" \
-    -version "original" \
+    --experiment_type "AREL" \
+    --version "temporal" \
     --max_episodes 30000 \
     --max_time_steps 100 \
     --ppo_eps_elapse_update_freq 10 \
@@ -28,7 +21,16 @@ python train_agent.py \
     --reward_depth 3 \
     --reward_n_heads 4 \
     --reward_linear_compression_dim 64 \
-    --dynamic_loss_coeffecient 5e-2 \
+    --reward_agent_attn \
+    --reward_dropout 0.0 \
+    --reward_attn_net_wide \
+    --reward_batch_size 64 \
+    --reward_weight_decay 0.0 \
+    --variance_loss_coeff 0.0 \
+    --enable_reward_grad_clip \
+    --reward_grad_clip_value 0.5 \
+    --update_reward_model_freq 100 \
+    --reward_model_update_epochs 200 \
     --entropy_pen 6e-3 \
     --save_model \
     --save_comet_ml_plot \

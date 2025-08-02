@@ -370,11 +370,12 @@ class TAR2(nn.Module):
 		model are passed to a separate, non-learned function that guarantees
 		strict return equivalence.
 	"""
-	def __init__(self, environment, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
+	def __init__(self, environment, version, ally_obs_shape, enemy_obs_shape, n_actions, emb_dim, n_heads, n_layer, seq_length, n_agents, sample_num,
 			device, emb_dropout=0.5):
 		super().__init__()
 
 		self.environment = environment
+		self.version = version
 		self.emb_dim = emb_dim
 		self.n_heads = n_heads
 		self.n_layer = n_layer
@@ -407,26 +408,36 @@ class TAR2(nn.Module):
 		# agent's own historical context.
 		# Input: [current_global_state, past_state_action_embedding]
 		# Dims:  [emb_dim,            emb_dim*n_layer]
-		self.dynamics_model = nn.Sequential(
-			nn.Linear(self.emb_dim * (self.n_layer + 2), self.emb_dim),
-			nn.GELU(),
-			nn.Linear(self.emb_dim, self.emb_dim),
-			nn.GELU(),
-			nn.Linear(self.emb_dim, n_actions),
-		)
+		if self.version != "no_inverse_dynamics": 
+			self.dynamics_model = nn.Sequential(
+				nn.Linear(self.emb_dim * (self.n_layer + 2), self.emb_dim),
+				nn.GELU(),
+				nn.Linear(self.emb_dim, self.emb_dim),
+				nn.GELU(),
+				nn.Linear(self.emb_dim, n_actions),
+			)
 
 		# --- Main Reward Prediction Head ---
 		# Predicts the unnormalized scores c_i,t from the post-attention embeddings
 		# concatenated with a representation of the final trajectory outcome.
 		# Input: [current_context, final_outcome_context]
 		# Dims:  [emb_dim*n_layer, emb_dim*n_layer]
-		self.reward_prediction = nn.Sequential(
-			nn.Linear(2 * emb_dim * self.n_layer, emb_dim),
-			nn.GELU(),
-			nn.Linear(self.emb_dim, self.emb_dim),
-			nn.GELU(),
-			nn.Linear(emb_dim, 1),
-		)
+		if self.version == "no_final_outcome":
+			self.reward_prediction = nn.Sequential(
+				nn.Linear(emb_dim * self.n_layer, emb_dim),
+				nn.GELU(),
+				nn.Linear(self.emb_dim, self.emb_dim),
+				nn.GELU(),
+				nn.Linear(emb_dim, 1),
+			)
+		else:
+			self.reward_prediction = nn.Sequential(
+				nn.Linear(2 * emb_dim * self.n_layer, emb_dim),
+				nn.GELU(),
+				nn.Linear(self.emb_dim, self.emb_dim),
+				nn.GELU(),
+				nn.Linear(emb_dim, 1),
+			)
 
 		init_model(self)
 
@@ -509,35 +520,39 @@ class TAR2(nn.Module):
 		x_intermediate = torch.cat(x_intermediate, dim=-1).reshape(b, n_a, t, -1)
 
 		# --- 3. Inverse Dynamics Model ---
-		# This implementation predicts the action at time t based on the global state at t
-		# and the agent's contextualized history up to t-1.
-
-		# inverse dynamics model
-		# 1. Calculate the global state embedding (pre-attention) for each timestep.
-		global_state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
-		# 2. Get the next global state embedding by shifting the tensor.
-		# For the last timestep, there is no "next" state, so we pad with zeros.
-		next_global_state_embeddings = torch.cat([global_state_embeddings[:, :, 1:, :], torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)], dim=-2)
-		# 3. Get the agent-specific state-action context from the previous timestep (post-attention).
-		first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim).to(self.device)
-		past_state_action_embeddings = torch.cat([first_past_state_action_embedding, x_intermediate[:, :, :-1, :]], dim=-2)
-		# 4. Concatenate all three embeddings to form the input.
-		dynamics_model_input = torch.cat([global_state_embeddings, next_global_state_embeddings, past_state_action_embeddings], dim=-1)
-		# 5. Predict the action.
-		action_prediction = self.dynamics_model(dynamics_model_input)
+		if self.version == "no_inverse_dynamics":
+			action_prediction = torch.zeros(b, n_a, t, self.emb_dim).to(self.device)
+		else:
+			# This implementation predicts the action at time t based on the global state at t
+			# and the agent's contextualized history up to t-1.
+			# inverse dynamics model
+			# 1. Calculate the global state embedding (pre-attention) for each timestep.
+			global_state_embeddings = (state_action_embedding.view(b, n_a, t, self.emb_dim) - actions_embed).reshape(b, n_a, t, self.emb_dim).sum(dim=1, keepdim=True).repeat(1, n_a, 1, 1).reshape(b, n_a, t, -1) / (agent_temporal_mask.transpose(1, 2).sum(dim=1, keepdim=True).unsqueeze(-1) + 1e-5)
+			# 2. Get the next global state embedding by shifting the tensor.
+			# For the last timestep, there is no "next" state, so we pad with zeros.
+			next_global_state_embeddings = torch.cat([global_state_embeddings[:, :, 1:, :], torch.zeros(b, n_a, 1, self.emb_dim).to(self.device)], dim=-2)
+			# 3. Get the agent-specific state-action context from the previous timestep (post-attention).
+			first_past_state_action_embedding = torch.zeros(b, n_a, 1, self.n_layer*self.emb_dim).to(self.device)
+			past_state_action_embeddings = torch.cat([first_past_state_action_embedding, x_intermediate[:, :, :-1, :]], dim=-2)
+			# 4. Concatenate all three embeddings to form the input.
+			dynamics_model_input = torch.cat([global_state_embeddings, next_global_state_embeddings, past_state_action_embeddings], dim=-1)
+			# 5. Predict the action.
+			action_prediction = self.dynamics_model(dynamics_model_input)
 
 		# --- 4. Final Reward Prediction ---
-		# Get the embedding of the final state for each agent in the batch
-		indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2) - 1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim * self.n_layer).long()
-		final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
-
-		# Create the final outcome embedding (Z) by averaging final states across agents.
-		# Detach to treat it as a fixed conditioning variable.
-		final_outcome_embedding = final_x.mean(dim=1, keepdim=True).detach()
-
-		# Condition the reward prediction on both the current context and the final outcome
-		reward_prediction_embeddings = torch.cat([x_intermediate, final_outcome_embedding.unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
-
+		if self.version == "no_final_outcome":
+			# If no final outcome conditioning, just use the intermediate states.
+			reward_prediction_embeddings = x_intermediate
+		else:
+			# Get the embedding of the final state for each agent in the batch
+			indiv_agent_episode_len = (agent_temporal_mask.sum(dim=-2) - 1).unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, self.emb_dim * self.n_layer).long()
+			final_x = torch.gather(x_intermediate, 2, indiv_agent_episode_len).squeeze(2)
+			# Create the final outcome embedding (Z) by averaging final states across agents.
+			# Detach to treat it as a fixed conditioning variable.
+			final_outcome_embedding = final_x.mean(dim=1, keepdim=True).detach()
+			# Condition the reward prediction on both the current context and the final outcome
+			reward_prediction_embeddings = torch.cat([x_intermediate, final_outcome_embedding.unsqueeze(1).repeat(1, n_a, t, 1)], dim=-1)
+		
 		rewards = self.reward_prediction(reward_prediction_embeddings).view(b, n_a, t).contiguous().transpose(1, 2) * agent_temporal_mask.to(self.device)
 
 		return rewards, temporal_weights, agent_weights, temporal_scores, agent_scores, action_prediction

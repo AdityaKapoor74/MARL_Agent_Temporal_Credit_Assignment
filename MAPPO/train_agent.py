@@ -342,7 +342,7 @@ def parse_args():
 	parser.add_argument("--max_time_steps", type=int, default=100, help="Maximum timesteps per episode.")
 
 	# --- Credit Assignment Arguments ---
-	parser.add_argument("--experiment_type", type=str, default="TAR^2", choices=["episodic_team", "Uniform", "AREL", "STAS", "TAR^2"], help="Credit assignment method to use.")
+	parser.add_argument("--experiment_type", type=str, default="TAR^2", choices=["episodic_team", "episodic_agent", "temporal_team", "temporal_agent", "Uniform", "AREL", "STAS", "TAR^2"], help="Credit assignment method to use.")
 	parser.add_argument("--use_reward_model", action="store_true", default=True, help="Flag to use a credit assignment model.")
 	parser.add_argument("--reward_n_heads", type=int, default=4, help="Number of attention heads in the reward model.")
 	parser.add_argument("--reward_depth", type=int, default=3, help="Number of layers in the reward model.")
@@ -358,7 +358,7 @@ def parse_args():
 	parser.add_argument("--reward_agent_attn", action="store_true", default=True, help="Flag to use agent attention in AREL.")
 	parser.add_argument("--reward_dropout", type=float, default=0.0, help="Dropout in AREL.")
 	parser.add_argument("--reward_attn_net_wide", action="store_true", default=True, help="Flag to use wide attention in AREL.")
-	parser.add_argument("--version", type=str, default="temporal", choices=["temporal", "agent_temporal"], help="Version of AREL to use.")
+	parser.add_argument("--version", type=str, default="temporal", choices=["temporal", "agent_temporal", "original", "no_inverse_dynamics", "no_normalization", "no_final_outcome"], help="Version of AREL/TAR^2 to use.")
 	parser.add_argument("--norm_rewards", action="store_true", default=False, help="Flag to normalize rewards.")
 	parser.add_argument("--clamp_rewards", action="store_true", default=False, help="Flag to clamp rewards.")
 	parser.add_argument("--clamp_rewards_value_min", type=float, default=0.0, help="Min value for reward clamping.")
@@ -403,6 +403,12 @@ def parse_args():
 	parser.add_argument("--test_num", type=str, default="Learning_Reward_Func_for_Credit_Assignment", help="Test name for logging.")
 	
 	args = parser.parse_args()
+	if args.exoeriment_type in ["TAR^2", "AREL", "STAS"]:
+		args.use_reward_model = True
+	# Ensure the environment is set correctly
+	if args.environment not in ["StarCraft", "GFootball"]:
+		raise ValueError("Invalid environment specified. Choose 'StarCraft' or 'GFootball'.")
+	
 	return vars(args)
 
 
