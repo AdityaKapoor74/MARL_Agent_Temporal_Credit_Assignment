@@ -403,7 +403,7 @@ def parse_args():
 	parser.add_argument("--test_num", type=str, default="Learning_Reward_Func_for_Credit_Assignment", help="Test name for logging.")
 	
 	args = parser.parse_args()
-	if args.exoeriment_type in ["TAR^2", "AREL", "STAS"]:
+	if args.experiment_type in ["TAR^2", "AREL", "STAS"]:
 		args.use_reward_model = True
 	# Ensure the environment is set correctly
 	if args.environment not in ["StarCraft", "GFootball"]:
