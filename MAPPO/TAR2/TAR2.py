@@ -197,6 +197,27 @@ class ShapelyAttention(nn.Module):
         all_marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, 
                                          all_coalition_masks[:b*t*effective_sample_num])
         
+        # Process attention weights to match expected format for TAR2
+        if hasattr(self.phi, 'agent_weights') and self.phi.agent_weights is not None:
+            # agent_weights shape: (b*t*effective_sample_num, n_a, n_a)
+            # Reshape and average over samples: (b*t, effective_sample_num, n_a, n_a) -> (b*t, n_a, n_a)
+            raw_agent_weights = self.phi.agent_weights.reshape(b*t, effective_sample_num, n_a, n_a).mean(dim=1)
+            
+            # Store in expected format for TAR2 (reshape to match original expectation)
+            self.attn_weights = raw_agent_weights  # Store for TAR2 compatibility
+        else:
+            # Fallback: create identity-like attention weights
+            self.attn_weights = torch.eye(n_a, device=self.device).unsqueeze(0).expand(b*t, -1, -1)
+        
+        # Process attention scores similarly
+        if hasattr(self.phi, 'agent_scores') and self.phi.agent_scores is not None:
+            raw_agent_scores = self.phi.agent_scores.reshape(b*t, effective_sample_num, -1, n_a, n_a).mean(dim=1)
+            self.attn_scores = raw_agent_scores
+        else:
+            # Fallback: create zero scores
+            n_heads = getattr(self.phi, 'n_head', 1)
+            self.attn_scores = torch.zeros(b*t, n_heads, n_a, n_a, device=self.device)
+        
         # Reshape and average over samples: (b*t*sample_num, n_a, e) -> (b*t, n_a, e)
         marginal_rewards = all_marginal_rewards.reshape(b*t, effective_sample_num, n_a, e).mean(dim=1)
         
