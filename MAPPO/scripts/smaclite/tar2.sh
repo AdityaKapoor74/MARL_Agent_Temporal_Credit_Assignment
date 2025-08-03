@@ -18,7 +18,7 @@ python train_agent.py \
     --environment StarCraft \
     --env 3s5z \
     --experiment_type "TAR^2" \
-    -version "original" \
+    --version "original" \
     --max_episodes 30000 \
     --max_time_steps 100 \
     --ppo_eps_elapse_update_freq 10 \
