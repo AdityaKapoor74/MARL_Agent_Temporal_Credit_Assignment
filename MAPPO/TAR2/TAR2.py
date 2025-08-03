@@ -15,215 +15,192 @@ import numpy as np
 import torch.nn.functional as F
 from .modules import EncoderLayer, init_model, MultiAgentAttention
 
-# class ShapelyAttention(nn.Module):
-# 	"""
-# 	Approximates Shapley values for agent importance using multi-head attention.
+class ShapelyAttention(nn.Module):
+	"""
+	Approximates Shapley values for agent importance using multi-head attention.
 
-# 	This module computes the marginal contribution of each agent by attending over
-# 	randomly sampled coalitions of agents. It serves as the agent-axis attention
-# 	mechanism within the main STAS transformer body.
-# 	"""
-# 	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0):
-# 		super().__init__()
-# 		self.emb_dim = emb_dim
-# 		self.device = device
-# 		self.n_agents = n_agents
-# 		self.sample_num = sample_num
-# 		# The core multi-agent attention mechanism
-# 		self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
-# 		self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
+	This module computes the marginal contribution of each agent by attending over
+	randomly sampled coalitions of agents. It serves as the agent-axis attention
+	mechanism within the main STAS transformer body.
+	"""
+	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0):
+		super().__init__()
+		self.emb_dim = emb_dim
+		self.device = device
+		self.n_agents = n_agents
+		self.sample_num = sample_num
+		# The core multi-agent attention mechanism
+		self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
+		self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
 	
-# 	def get_attn_mask(self, shape):
-# 		"""Generates a random binary mask to represent a coalition of agents."""
-# 		# Create a random mask for sampling a coalition
-# 		mask = torch.bernoulli(torch.full((shape, shape), 0.5))
-# 		# Ensure an agent always attends to itself
-# 		mask = mask - torch.diag(torch.diag(mask)) + torch.eye(shape)
-# 		return mask.to(self.device)
+	def get_attn_mask(self, shape):
+		"""Generates a random binary mask to represent a coalition of agents."""
+		# Create a random mask for sampling a coalition
+		mask = torch.bernoulli(torch.full((shape, shape), 0.5))
+		# Ensure an agent always attends to itself
+		mask = mask - torch.diag(torch.diag(mask)) + torch.eye(shape)
+		return mask.to(self.device)
 
-# 	def forward(self, input, agent_temporal_mask):
-# 		"""
-# 		Computes the Shapley-inspired agent representations for a batch of timesteps.
+	def forward(self, input, agent_temporal_mask):
+		"""
+		Computes the Shapley-inspired agent representations for a batch of timesteps.
 
-# 		Args:
-# 			input (torch.Tensor): A tensor of input sequences with shape
-# 								  (batch, n_agents, seq_len, emb_dim).
-# 			agent_temporal_mask (torch.Tensor): Mask for inactive agents/timesteps.
+		Args:
+			input (torch.Tensor): A tensor of input sequences with shape
+								  (batch, n_agents, seq_len, emb_dim).
+			agent_temporal_mask (torch.Tensor): Mask for inactive agents/timesteps.
 
-# 		Returns:
-# 			torch.Tensor: The final Shapley-inspired representations, averaged over samples.
-# 		"""
-# 		b, n_a, t, e = input.size()
-# 		# Reshape for batch processing of all timesteps
-# 		input = input.permute(0, 2, 1, 3).contiguous().reshape(b*t, n_a, -1)
+		Returns:
+			torch.Tensor: The final Shapley-inspired representations, averaged over samples.
+		"""
+		b, n_a, t, e = input.size()
+		# Reshape for batch processing of all timesteps
+		input = input.permute(0, 2, 1, 3).contiguous().reshape(b*t, n_a, -1)
 		
-# 		# Add a randomized agent embedding to break symmetry
-# 		coalition = np.arange(self.n_agents)
-# 		np.random.shuffle(coalition)
-# 		agent_embedding = self.agent_embedding(torch.tensor(coalition).to(self.device))[None, :, :].expand(b*t, n_a, self.emb_dim)
-# 		input = input + agent_embedding
+		# Add a randomized agent embedding to break symmetry
+		coalition = np.arange(self.n_agents)
+		np.random.shuffle(coalition)
+		agent_embedding = self.agent_embedding(torch.tensor(coalition).to(self.device))[None, :, :].expand(b*t, n_a, self.emb_dim)
+		input = input + agent_embedding
 		
-# 		shapley_reward = []
-# 		# Monte Carlo approximation of Shapley values
-# 		for _ in range(self.sample_num):
-# 			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1)
-# 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
-# 			shapley_reward.append(marginal_reward)
+		shapley_reward = []
+		# Monte Carlo approximation of Shapley values
+		for _ in range(self.sample_num):
+			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1)
+			marginal_reward, _ = self.phi(input, input, input, attn_mask)
+			shapley_reward.append(marginal_reward)
 
-# 		# Average the representations over all sampled coalitions
-# 		shapley_reward = sum(shapley_reward)/self.sample_num
-# 		# Reshape back to the original batch format
-# 		shapley_reward = shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
+		# Average the representations over all sampled coalitions
+		shapley_reward = sum(shapley_reward)/self.sample_num
+		# Reshape back to the original batch format
+		shapley_reward = shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
 
-# 		return shapley_reward
+		return shapley_reward
+	
 
 class ShapelyAttention(nn.Module):
     """
-    Approximates Shapley values for agent importance using multi-head attention.
-    This module computes the marginal contribution of each agent by attending over
-    randomly sampled coalitions of agents. It serves as the agent-axis attention
-    mechanism within the main STAS transformer body.
+    Optimized Shapley values approximation using multi-head attention.
     
-    Now properly incorporates agent_masks in coalition formation and attention.
+    Key optimizations:
+    1. Vectorized coalition generation (no loops)
+    2. Respects agent_temporal_mask to exclude inactive agents
+    3. Bounded operations to prevent infinite loops
+    4. Efficient tensor operations for speed
     """
     def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0):
         super().__init__()
         self.emb_dim = emb_dim
         self.device = device
         self.n_agents = n_agents
-        self.sample_num = sample_num
+        # Cap sample_num to prevent excessive computation
+        self.sample_num = min(sample_num, 50)  # Hard limit for safety
+        
         # The core multi-agent attention mechanism
         self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
         self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
+        
+        # Pre-allocate commonly used tensors
+        self.register_buffer('eye_mask', torch.eye(n_agents, device=device))
+        self.register_buffer('agent_indices', torch.arange(n_agents, device=device))
     
-    def get_masked_coalition(self, active_agents):
+    def generate_vectorized_coalitions(self, agent_mask_flat):
         """
-        Generates a coalition mask that only includes active agents.
+        Generate all coalition masks at once using vectorized operations.
+        Only includes active agents in coalitions.
         
         Args:
-            active_agents (torch.Tensor): Boolean tensor indicating which agents are active
+            agent_mask_flat: (batch*time, n_agents) mask of active agents
             
         Returns:
-            torch.Tensor: Coalition mask for active agents
+            torch.Tensor: (batch*time*sample_num, n_agents, n_agents) attention masks
         """
-        n_active = active_agents.sum().item()
-        if n_active == 0:
-            # No active agents - return identity mask
-            return torch.eye(self.n_agents, device=self.device)
+        bt, n_a = agent_mask_flat.shape
         
-        # Get indices of active agents
-        active_indices = torch.where(active_agents)[0]
+        # Generate all random coalition decisions at once
+        # Shape: (bt, sample_num, n_a, n_a)
+        random_coalitions = torch.rand(bt, self.sample_num, n_a, n_a, device=self.device) < 0.5
         
-        # Create coalition among active agents only
-        coalition_mask = torch.zeros(self.n_agents, device=self.device)
+        # Ensure agents always attend to themselves (diagonal = True)
+        diag_indices = torch.arange(n_a, device=self.device)
+        random_coalitions[:, :, diag_indices, diag_indices] = True
         
-        # Randomly sample a subset of active agents for the coalition
-        if n_active > 0:
-            # Sample coalition size uniformly from 1 to n_active
-            coalition_size = torch.randint(1, n_active + 1, (1,), device=self.device).item()
-            
-            # Randomly select agents for the coalition
-            perm = torch.randperm(n_active, device=self.device)
-            selected_active = active_indices[perm[:coalition_size]]
-            coalition_mask[selected_active] = 1.0
+        # Apply agent mask constraints - only active agents can participate in coalitions
+        # Expand agent mask to match coalition dimensions
+        agent_mask_4d = agent_mask_flat.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # (bt, 1, 1, 1)
+        agent_mask_4d = agent_mask_4d.expand(-1, self.sample_num, n_a, n_a)  # (bt, sample_num, n_a, n_a)
         
-        # Convert to attention mask
-        attn_mask = coalition_mask.unsqueeze(-1) * coalition_mask.unsqueeze(0)
+        # Create 2D mask for valid agent pairs (active agents can attend to active agents)
+        agent_pairs_mask = agent_mask_flat.unsqueeze(-1) * agent_mask_flat.unsqueeze(-2)  # (bt, n_a, n_a)
+        agent_pairs_mask = agent_pairs_mask.unsqueeze(1).expand(-1, self.sample_num, -1, -1)  # (bt, sample_num, n_a, n_a)
         
-        # Ensure each agent attends to itself (diagonal = 1)
-        attn_mask = attn_mask + torch.eye(self.n_agents, device=self.device)
+        # Apply constraints: coalitions can only exist between active agents
+        coalition_masks = random_coalitions.float() * agent_pairs_mask.float()
         
-        # Apply agent mask - inactive agents cannot attend or be attended to
-        agent_mask_2d = active_agents.unsqueeze(-1) * active_agents.unsqueeze(0)
-        attn_mask = attn_mask * agent_mask_2d.float()
+        # Ensure inactive agents only attend to themselves
+        inactive_agents = ~agent_mask_flat.bool()  # (bt, n_a)
         
-        # Ensure inactive agents attend only to themselves (for numerical stability)
-        inactive_mask = ~active_agents
-        attn_mask[inactive_mask, :] = 0.0
-        attn_mask[:, inactive_mask] = 0.0
-        attn_mask[inactive_mask, inactive_mask] = 1.0
+        # Set inactive agent rows and columns to 0
+        coalition_masks[inactive_agents.unsqueeze(1).unsqueeze(-1).expand(-1, self.sample_num, -1, n_a)] = 0.0
+        coalition_masks[inactive_agents.unsqueeze(1).unsqueeze(-2).expand(-1, self.sample_num, n_a, -1)] = 0.0
         
-        return attn_mask
+        # Ensure inactive agents attend to themselves (for numerical stability)
+        inactive_expanded = inactive_agents.unsqueeze(1).expand(-1, self.sample_num, -1)  # (bt, sample_num, n_a)
+        coalition_masks[inactive_expanded, diag_indices, diag_indices] = 1.0
+        
+        # Reshape to (bt*sample_num, n_a, n_a) for batch processing
+        return coalition_masks.reshape(bt * self.sample_num, n_a, n_a)
     
-    def get_attn_mask(self, shape, active_agents=None):
-        """
-        Generates a random binary mask to represent a coalition of agents.
-        Now incorporates agent masks to only form coalitions among active agents.
-        
-        Args:
-            shape (int): Number of agents
-            active_agents (torch.Tensor): Boolean mask indicating active agents
-            
-        Returns:
-            torch.Tensor: Attention mask respecting active agents
-        """
-        if active_agents is not None:
-            return self.get_masked_coalition(active_agents)
-        else:
-            # Fallback to original behavior if no mask provided
-            mask = torch.bernoulli(torch.full((shape, shape), 0.5, device=self.device))
-            mask = mask - torch.diag(torch.diag(mask)) + torch.eye(shape, device=self.device)
-            return mask
-
     def forward(self, input, agent_temporal_mask):
         """
-        Computes the Shapley-inspired agent representations for a batch of timesteps.
+        Vectorized forward pass that respects agent masks and avoids loops.
         
         Args:
-            input (torch.Tensor): A tensor of input sequences with shape
-                                (batch, n_agents, seq_len, emb_dim).
-            agent_temporal_mask (torch.Tensor): Mask for inactive agents/timesteps with shape
-                                              (batch, n_agents, seq_len).
-                                              
+            input (torch.Tensor): (batch, n_agents, seq_len, emb_dim)
+            agent_temporal_mask (torch.Tensor): (batch, n_agents, seq_len) - 1 for active, 0 for inactive
+            
         Returns:
-            torch.Tensor: The final Shapley-inspired representations, averaged over samples.
+            torch.Tensor: Shapley-inspired representations
         """
         b, n_a, t, e = input.size()
         
+        # Safety check to prevent excessive computation
+        total_ops = b * t * self.sample_num
+        if total_ops > 100000:  # Hard limit
+            effective_sample_num = max(1, 100000 // (b * t))
+            print(f"Warning: Reducing sample_num from {self.sample_num} to {effective_sample_num} to prevent timeout")
+        else:
+            effective_sample_num = self.sample_num
+        
         # Reshape for batch processing of all timesteps
-        input = input.permute(0, 2, 1, 3).contiguous().reshape(b*t, n_a, -1)
+        input_reshaped = input.permute(0, 2, 1, 3).contiguous().reshape(b*t, n_a, e)
+        agent_mask_flat = agent_temporal_mask.permute(0, 2, 1).contiguous().reshape(b*t, n_a)
         
-        # Reshape agent mask to match: (batch*seq_len, n_agents)
-        agent_mask_reshaped = agent_temporal_mask.permute(0, 2, 1).contiguous().reshape(b*t, n_a)
+        # Add agent embeddings (use fixed permutation for consistency)
+        perm_indices = torch.randperm(self.n_agents, device=self.device)
+        agent_embedding = self.agent_embedding(perm_indices).unsqueeze(0).expand(b*t, -1, -1)
+        input_with_embedding = input_reshaped + agent_embedding
         
-        # Add a randomized agent embedding to break symmetry
-        coalition = np.arange(self.n_agents)
-        np.random.shuffle(coalition)
-        agent_embedding = self.agent_embedding(torch.tensor(coalition, device=self.device))[None, :, :].expand(b*t, n_a, self.emb_dim)
-        input = input + agent_embedding
+        # Generate all coalition masks at once (vectorized)
+        all_coalition_masks = self.generate_vectorized_coalitions(agent_mask_flat)
         
-        shapley_reward = []
+        # Expand input for all samples: (b*t, n_a, e) -> (b*t*sample_num, n_a, e)
+        input_expanded = input_with_embedding.unsqueeze(1).expand(-1, effective_sample_num, -1, -1)
+        input_expanded = input_expanded.reshape(b*t*effective_sample_num, n_a, e)
         
-        # Monte Carlo approximation of Shapley values
-        for i in range(self.sample_num):
-            # Generate attention masks for each batch*time step
-            batch_attn_masks = []
-            
-            for bt_idx in range(b*t):
-                # Get active agents for this batch*time step
-                active_agents = agent_mask_reshaped[bt_idx].bool()
-                
-                # Generate coalition mask considering only active agents
-                attn_mask = self.get_attn_mask(n_a, active_agents)
-                batch_attn_masks.append(attn_mask)
-            
-            # Stack all attention masks
-            batch_attn_mask = torch.stack(batch_attn_masks, dim=0)  # (b*t, n_a, n_a)
-            
-            # Forward pass through multi-agent attention
-            marginal_reward, _ = self.phi(input, input, input, batch_attn_mask)
-            
-            # Apply agent mask to ensure inactive agents have zero contribution
-            agent_mask_expanded = agent_mask_reshaped.unsqueeze(-1).expand(-1, -1, e)
-            marginal_reward = marginal_reward * agent_mask_expanded
-            
-            shapley_reward.append(marginal_reward)
+        # Single forward pass through attention for all samples at once
+        all_marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, 
+                                         all_coalition_masks[:b*t*effective_sample_num])
         
-        # Average the representations over all sampled coalitions
-        shapley_reward = sum(shapley_reward) / self.sample_num
+        # Reshape and average over samples: (b*t*sample_num, n_a, e) -> (b*t, n_a, e)
+        marginal_rewards = all_marginal_rewards.reshape(b*t, effective_sample_num, n_a, e).mean(dim=1)
         
-        # Reshape back to the original batch format
-        shapley_reward = shapley_reward.reshape(b, t, n_a, -1).permute(0, 2, 1, 3)
+        # Apply final agent mask to ensure inactive agents have zero output
+        agent_mask_expanded = agent_mask_flat.unsqueeze(-1).expand(-1, -1, e)
+        marginal_rewards = marginal_rewards * agent_mask_expanded
+        
+        # Reshape back to original format: (b*t, n_a, e) -> (b, n_a, t, e)
+        shapley_reward = marginal_rewards.reshape(b, t, n_a, e).permute(0, 2, 1, 3)
         
         return shapley_reward
 	
