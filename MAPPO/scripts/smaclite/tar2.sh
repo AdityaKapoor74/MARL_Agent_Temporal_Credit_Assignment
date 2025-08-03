@@ -29,7 +29,7 @@ python train_agent.py \
     --reward_n_heads 4 \
     --reward_linear_compression_dim 64 \
     --dynamic_loss_coeffecient 5e-2 \
-    --entropy_pen 8e-3 \
+    --entropy_pen 6e-3 \
     --save_model \
     --save_comet_ml_plot \
     --test_num "Learning_Reward_Func_for_Credit_Assignment"
