@@ -65,7 +65,7 @@ class ShapelyAttention(nn.Module):
 		
 		shapley_reward = []
 		# Monte Carlo approximation of Shapley values
-		for i in range(self.sample_num):
+		for _ in range(self.sample_num):
 			attn_mask = self.get_attn_mask(n_a).unsqueeze(0).repeat(b*t, 1, 1)
 			marginal_reward, _ = self.phi(input, input, input, attn_mask)
 			shapley_reward.append(marginal_reward)
@@ -230,7 +230,7 @@ class TAR2(nn.Module):
 			x = x.reshape(b, n_a, t, -1)
 			
 			# Agent attention
-			x = layer[1](x)
+			x = layer[1](x, agent_temporal_mask)
 			agent_scores.append(layer[1].phi.agent_scores)
 			agent_weights.append(layer[1].phi.agent_weights)
 			
