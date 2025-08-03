@@ -125,28 +125,33 @@ class ShapelyAttention(nn.Module):
         diag_indices = torch.arange(n_a, device=self.device)
         random_coalitions[:, :, diag_indices, diag_indices] = True
         
-        # Apply agent mask constraints - only active agents can participate in coalitions
-        # Expand agent mask to match coalition dimensions
-        agent_mask_4d = agent_mask_flat.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)  # (bt, 1, 1, 1)
-        agent_mask_4d = agent_mask_4d.expand(-1, self.sample_num, n_a, n_a)  # (bt, sample_num, n_a, n_a)
-        
         # Create 2D mask for valid agent pairs (active agents can attend to active agents)
+        # agent_mask_flat: (bt, n_a) -> agent_pairs_mask: (bt, n_a, n_a)
         agent_pairs_mask = agent_mask_flat.unsqueeze(-1) * agent_mask_flat.unsqueeze(-2)  # (bt, n_a, n_a)
-        agent_pairs_mask = agent_pairs_mask.unsqueeze(1).expand(-1, self.sample_num, -1, -1)  # (bt, sample_num, n_a, n_a)
+        
+        # Expand to match coalition dimensions: (bt, n_a, n_a) -> (bt, sample_num, n_a, n_a)
+        agent_pairs_mask = agent_pairs_mask.unsqueeze(1).expand(-1, self.sample_num, -1, -1)
         
         # Apply constraints: coalitions can only exist between active agents
         coalition_masks = random_coalitions.float() * agent_pairs_mask.float()
         
-        # Ensure inactive agents only attend to themselves
+        # Handle inactive agents more efficiently
         inactive_agents = ~agent_mask_flat.bool()  # (bt, n_a)
         
-        # Set inactive agent rows and columns to 0
-        coalition_masks[inactive_agents.unsqueeze(1).unsqueeze(-1).expand(-1, self.sample_num, -1, n_a)] = 0.0
-        coalition_masks[inactive_agents.unsqueeze(1).unsqueeze(-2).expand(-1, self.sample_num, n_a, -1)] = 0.0
-        
-        # Ensure inactive agents attend to themselves (for numerical stability)
-        inactive_expanded = inactive_agents.unsqueeze(1).expand(-1, self.sample_num, -1)  # (bt, sample_num, n_a)
-        coalition_masks[inactive_expanded, diag_indices, diag_indices] = 1.0
+        if inactive_agents.any():
+            # Create masks for inactive agent positions
+            # Shape: (bt, sample_num, n_a)
+            inactive_expanded = inactive_agents.unsqueeze(1).expand(-1, self.sample_num, -1)
+            
+            # Set rows and columns of inactive agents to 0
+            # Use advanced indexing to set entire rows to 0
+            bt_idx, sample_idx, agent_idx = torch.where(inactive_expanded)
+            if len(bt_idx) > 0:
+                coalition_masks[bt_idx, sample_idx, agent_idx, :] = 0.0  # Set rows to 0
+                coalition_masks[bt_idx, sample_idx, :, agent_idx] = 0.0  # Set columns to 0
+                
+                # Ensure inactive agents attend to themselves (diagonal = 1)
+                coalition_masks[bt_idx, sample_idx, agent_idx, agent_idx] = 1.0
         
         # Reshape to (bt*sample_num, n_a, n_a) for batch processing
         return coalition_masks.reshape(bt * self.sample_num, n_a, n_a)
