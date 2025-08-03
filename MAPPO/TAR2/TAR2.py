@@ -350,6 +350,173 @@ class ShapelyAttention(nn.Module):
 		
 		# Final reshape back to original dimensions
 		return marginal_rewards.view(b, t, n_a, e).permute(0, 2, 1, 3)
+	
+
+class ShapelyAttention(nn.Module):
+    """
+    Corrected and optimized version with better error handling and consistency.
+    """
+    def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='stratified'):
+        super().__init__()
+        self.emb_dim = emb_dim
+        self.device = device
+        self.n_agents = n_agents
+        self.sample_num = sample_num
+        self.coalition_method = coalition_method
+        
+        self.phi = MultiAgentAttention(emb_dim, n_heads, n_agents, dropout, device)
+        self.agent_embedding = nn.Embedding(self.n_agents, emb_dim)
+        
+        # Pre-register fixed permutation for consistency
+        fixed_permutation = torch.randperm(n_agents)
+        self.register_buffer('agent_permutation', fixed_permutation)
+
+    def _generate_coalition_masks(self, batch_size, agent_mask):
+        """Unified coalition mask generation with proper error handling."""
+        if self.coalition_method == 'random':
+            return self._random_coalitions(batch_size)
+        elif self.coalition_method == 'stratified':
+            return self._stratified_coalitions(batch_size, agent_mask)
+        elif self.coalition_method == 'structured':
+            return self._structured_coalitions(batch_size, agent_mask)
+        else:
+            raise ValueError(f"Unknown coalition method: {self.coalition_method}")
+
+    def _random_coalitions(self, batch_size):
+        """Generate random coalitions."""
+        masks = torch.bernoulli(
+            torch.full((batch_size * self.sample_num, self.n_agents, self.n_agents), 
+                      0.5, device=self.device)
+        )
+        # Ensure diagonal is 1 (agents attend to themselves)
+        masks.diagonal(dim1=-2, dim2=-1).fill_(1.0)
+        return masks
+
+    def _stratified_coalitions(self, batch_size, agent_mask):
+        """Generate stratified coalitions by coalition size."""
+        masks = []
+        
+        for i in range(batch_size):
+            active_agents = torch.where(agent_mask[i])[0]
+            n_active = len(active_agents)
+            
+            if n_active == 0:
+                # No active agents - create empty masks
+                batch_masks = torch.eye(self.n_agents, device=self.device).unsqueeze(0).repeat(self.sample_num, 1, 1)
+                masks.append(batch_masks)
+                continue
+            
+            batch_masks = []
+            for _ in range(self.sample_num):
+                # Sample coalition size uniformly
+                coalition_size = torch.randint(0, n_active + 1, (1,), device=self.device).item()
+                
+                # Create coalition mask
+                coalition_mask = torch.zeros(self.n_agents, device=self.device)
+                if coalition_size > 0:
+                    chosen_agents = active_agents[torch.randperm(n_active, device=self.device)[:coalition_size]]
+                    coalition_mask[chosen_agents] = 1.0
+                
+                # Convert to attention mask
+                attn_mask = coalition_mask.unsqueeze(-1) * coalition_mask.unsqueeze(-2)
+                attn_mask = attn_mask + torch.eye(self.n_agents, device=self.device)
+                attn_mask = (attn_mask > 0).float()
+                
+                batch_masks.append(attn_mask)
+            
+            masks.append(torch.stack(batch_masks))
+        
+        return torch.cat(masks, dim=0)
+
+    def _structured_coalitions(self, batch_size, agent_mask):
+        """Generate structured coalitions (with/without each agent)."""
+        masks = []
+        
+        for i in range(batch_size):
+            active_agents = torch.where(agent_mask[i])[0]
+            n_active = len(active_agents)
+            
+            if n_active == 0:
+                # No active agents - create identity masks
+                batch_masks = torch.eye(self.n_agents, device=self.device).unsqueeze(0).repeat(self.sample_num, 1, 1)
+                masks.append(batch_masks)
+                continue
+            
+            batch_masks = []
+            samples_per_agent = max(1, self.sample_num // (2 * n_active))
+            
+            for agent_idx in active_agents:
+                other_agents = active_agents[active_agents != agent_idx]
+                
+                for _ in range(samples_per_agent):
+                    # Coalition WITH the agent
+                    coalition_with = torch.zeros(self.n_agents, device=self.device)
+                    coalition_with[agent_idx] = 1
+                    if len(other_agents) > 0:
+                        # Randomly include some other agents
+                        include_mask = torch.bernoulli(torch.full((len(other_agents),), 0.5, device=self.device))
+                        coalition_with[other_agents] = include_mask
+                    
+                    # Coalition WITHOUT the agent
+                    coalition_without = coalition_with.clone()
+                    coalition_without[agent_idx] = 0
+                    
+                    # Convert to attention masks
+                    for coalition in [coalition_with, coalition_without]:
+                        attn_mask = coalition.unsqueeze(-1) * coalition.unsqueeze(-2)
+                        attn_mask = attn_mask + torch.eye(self.n_agents, device=self.device)
+                        attn_mask = (attn_mask > 0).float()
+                        batch_masks.append(attn_mask)
+                        
+                        if len(batch_masks) >= self.sample_num:
+                            break
+                    
+                    if len(batch_masks) >= self.sample_num:
+                        break
+                
+                if len(batch_masks) >= self.sample_num:
+                    break
+            
+            # Pad if necessary
+            while len(batch_masks) < self.sample_num:
+                batch_masks.append(torch.eye(self.n_agents, device=self.device))
+            
+            masks.append(torch.stack(batch_masks[:self.sample_num]))
+        
+        return torch.cat(masks, dim=0)
+
+    def forward(self, input_tensor, agent_temporal_mask):
+        b, n_a, t, e = input_tensor.size()
+        
+        # Reshape inputs
+        input_flat = input_tensor.permute(0, 2, 1, 3).reshape(b * t, n_a, e)
+        agent_mask_flat = agent_temporal_mask.permute(0, 2, 1).reshape(b * t, n_a)
+        
+        # Add agent embeddings using fixed permutation
+        agent_embedding = self.agent_embedding(self.agent_permutation).unsqueeze(0).expand(b * t, -1, -1)
+        input_with_embedding = input_flat + agent_embedding
+        
+        # Generate coalition masks
+        attn_masks = self._generate_coalition_masks(b * t, agent_mask_flat)
+        
+        # Expand input for all samples
+        input_expanded = input_with_embedding.unsqueeze(1).expand(-1, self.sample_num, -1, -1)
+        input_expanded = input_expanded.reshape(-1, n_a, e)
+        
+        # Forward pass through attention
+        marginal_rewards, _ = self.phi(input_expanded, input_expanded, input_expanded, attn_masks)
+        
+        # Reshape and average
+        marginal_rewards = marginal_rewards.view(b * t, self.sample_num, n_a, e).mean(dim=1)
+        
+        # Update attention weights for logging
+        if hasattr(self.phi, 'agent_weights') and self.phi.agent_weights is not None:
+            self.phi.agent_weights = self.phi.agent_weights.view(b * t, self.sample_num, n_a, n_a).mean(dim=1)
+        if hasattr(self.phi, 'agent_scores') and self.phi.agent_scores is not None:
+            self.phi.agent_scores = self.phi.agent_scores.view(b * t, self.sample_num, -1, n_a, n_a).mean(dim=1)
+        
+        # Reshape back to original format
+        return marginal_rewards.view(b, t, n_a, e).permute(0, 2, 1, 3)
 
 
 class TAR2(nn.Module):
