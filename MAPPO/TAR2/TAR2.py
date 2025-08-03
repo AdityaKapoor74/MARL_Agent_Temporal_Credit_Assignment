@@ -180,7 +180,7 @@ class ShapelyAttention(nn.Module):
 	- 'structured': For each agent, samples coalitions with and without it.
 	- 'stratified': Samples coalitions stratified by size to reduce variance.
 	"""
-	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='stratified'):
+	def __init__(self, emb_dim, n_heads, n_agents, sample_num, device, dropout=0.0, coalition_method='random'):
 		super().__init__()
 		self.emb_dim = emb_dim
 		self.device = device
